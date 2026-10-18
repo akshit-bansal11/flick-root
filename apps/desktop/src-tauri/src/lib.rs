@@ -1,5 +1,6 @@
 //! Tauri shell for the launcher.
 pub mod autostart;
+mod error;
 mod hotkey;
 mod tray;
 mod window;
@@ -27,6 +28,7 @@ pub fn run() {
             tray::setup(app)?;
             // A conflict is already logged and emitted; keep running.
             let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
+            tracing::info!("ready");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

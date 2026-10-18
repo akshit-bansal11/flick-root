@@ -3,6 +3,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use crate::error::CommandError;
 use crate::window;
 
 /// Label of the Settings window.
@@ -85,6 +86,7 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
 
 /// Opens Settings on behalf of the launcher UI.
 #[tauri::command]
-pub async fn open_settings(app: AppHandle, section: Option<String>) -> Result<(), String> {
-    open_settings_window(&app, section.as_deref()).map_err(|e| e.to_string())
+pub async fn open_settings(app: AppHandle, section: Option<String>) -> Result<(), CommandError> {
+    open_settings_window(&app, section.as_deref())?;
+    Ok(())
 }

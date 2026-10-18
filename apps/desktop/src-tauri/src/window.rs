@@ -2,9 +2,10 @@
 use std::sync::Mutex;
 use std::time::Instant;
 
+use crate::error::CommandError;
 use serde_json::json;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow, WindowEvent,
 };
 
 /// Label of the single launcher window.
@@ -13,7 +14,7 @@ const BASE_WIDTH: f64 = 700.0;
 const SIDE_MARGIN: f64 = 16.0;
 const TOP_FRACTION: f64 = 0.28;
 
-type Rect = (i32, i32, u32, u32);
+type Rect = (i32, i32, u32, u32, u64);
 
 /// Timing and monitor state shared between toggles and `report_shown`.
 #[derive(Default)]
@@ -63,6 +64,7 @@ fn emit(app: &AppHandle, event: &str, payload: serde_json::Value) {
 /// Shows the launcher on the monitor under the cursor, or hides it if visible.
 pub fn toggle(app: &AppHandle, reason: &str) {
     let t0 = Instant::now();
+    tracing::debug!(reason, "toggle");
     let Some(win) = app.get_webview_window(LABEL) else {
         tracing::error!("launcher window missing");
         return;
@@ -105,48 +107,60 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let Some(m) = found.or(monitors.first()) else {
         return Ok(());
     };
-    let rect: Rect = (
-        m.position().x,
-        m.position().y,
-        m.size().width,
-        m.size().height,
-    );
+    let (pos, size, scale) = (*m.position(), *m.size(), m.scale_factor());
+    let key: Rect = (pos.x, pos.y, size.width, size.height, scale.to_bits());
     let state: State<ShowState> = app.state();
     {
         let s = state
             .inner
             .lock()
             .map_err(|_| anyhow::anyhow!("state poisoned"))?;
-        if s.monitor == Some(rect) {
+        if s.monitor == Some(key) {
             return Ok(());
         }
     }
-    let scale = m.scale_factor();
-    let logical_w = f64::from(rect.2) / scale;
-    let width_l = if logical_w < BASE_WIDTH + 2.0 * SIDE_MARGIN {
-        logical_w - 2.0 * SIDE_MARGIN
-    } else {
-        BASE_WIDTH
-    };
-    let height = win.outer_size()?.height;
-    win.set_size(LogicalSize::new(width_l, f64::from(height) / scale))?;
-    let width = win.outer_size()?.width;
-    let x = rect.0 + ((i64::from(rect.2) - i64::from(width)) / 2) as i32;
-    let y = rect.1 + (f64::from(rect.3) * TOP_FRACTION) as i32;
-    win.set_position(PhysicalPosition::new(x, y))?;
+    // Current height in logical px, converted with the window's own scale.
+    let logical_h = f64::from(win.outer_size()?.height) / win.scale_factor()?;
+    let (p, sz) = placement(pos, size, scale, BASE_WIDTH, logical_h);
+    win.set_size(sz)?;
+    win.set_position(p)?;
     if let Ok(mut s) = state.inner.lock() {
-        s.monitor = Some(rect);
+        s.monitor = Some(key);
     }
     Ok(())
 }
 
+/// Window position and size in the target monitor's physical pixels: width is
+/// `logical_width` capped to the monitor minus side margins, centred
+/// horizontally, top edge at 28% of the monitor height.
+pub fn placement(
+    monitor_pos: PhysicalPosition<i32>,
+    monitor_size: PhysicalSize<u32>,
+    scale: f64,
+    logical_width: f64,
+    logical_height: f64,
+) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
+    let mw = f64::from(monitor_size.width);
+    let mh = f64::from(monitor_size.height);
+    let width_l = logical_width.min(mw / scale - 2.0 * SIDE_MARGIN).max(1.0);
+    let w = (width_l * scale).round();
+    let h = (logical_height * scale).round();
+    let x = f64::from(monitor_pos.x) + ((mw - w) / 2.0).floor();
+    let y = f64::from(monitor_pos.y) + (mh * TOP_FRACTION).floor();
+    // Values are bounded by monitor geometry, so the casts cannot overflow.
+    (
+        PhysicalPosition::new(x as i32, y as i32),
+        PhysicalSize::new(w as u32, h as u32),
+    )
+}
+
 /// Called by the UI after paint; logs hotkey-to-paint latency.
 #[tauri::command]
-pub async fn report_shown(state: State<'_, ShowState>, shown_id: u64) -> Result<(), String> {
+pub async fn report_shown(state: State<'_, ShowState>, shown_id: u64) -> Result<(), CommandError> {
     let s = state
         .inner
         .lock()
-        .map_err(|_| "state poisoned".to_string())?;
+        .map_err(|_| CommandError::new("internal", "state poisoned"))?;
     if s.shown_id == shown_id
         && let Some(t0) = s.t0
     {
@@ -158,10 +172,53 @@ pub async fn report_shown(state: State<'_, ShowState>, shown_id: u64) -> Result<
 
 /// Hides the launcher on behalf of the UI (Esc, after launch).
 #[tauri::command]
-pub async fn hide_launcher(app: AppHandle) -> Result<(), String> {
+pub async fn hide_launcher(app: AppHandle) -> Result<(), CommandError> {
     let win = app
         .get_webview_window(LABEL)
-        .ok_or_else(|| "launcher window missing".to_string())?;
+        .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
     hide(&app, &win);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(x: i32, w: u32, h: u32, scale: f64) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
+        placement(
+            PhysicalPosition::new(x, 0),
+            PhysicalSize::new(w, h),
+            scale,
+            700.0,
+            64.0,
+        )
+    }
+
+    #[test]
+    fn scale_100() {
+        let (p, s) = run(0, 1920, 1080, 1.0);
+        assert_eq!((s.width, s.height), (700, 64));
+        assert_eq!((p.x, p.y), (610, 302));
+    }
+
+    #[test]
+    fn scale_150() {
+        let (p, s) = run(0, 2880, 1620, 1.5);
+        assert_eq!((s.width, s.height), (1050, 96));
+        assert_eq!((p.x, p.y), (915, 453));
+    }
+
+    #[test]
+    fn narrow_monitor_keeps_margin() {
+        let (p, s) = run(0, 600, 800, 1.0);
+        assert_eq!(s.width, 568);
+        assert_eq!(p.x, 16);
+    }
+
+    #[test]
+    fn negative_x_monitor() {
+        let (p, s) = run(-1920, 1920, 1080, 1.0);
+        assert_eq!(s.width, 700);
+        assert_eq!(p.x, -1310);
+    }
 }
