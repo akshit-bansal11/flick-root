@@ -20,3 +20,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - apps/desktop/vite.config.ts: `dedupe` + createRoot test workaround hide duplicate React copies (T3.0 pins one version).
 - Cargo.toml: reqwest switched from rustls-tls to native-tls (+ form, query); record in ADR-006/011 docs and architecture.md.
 - crates/index-files/src/scan.rs:104-114: when `b.push` returns None the stack isn't pushed and children attach to the grandparent (arena overflow only).
+- index-files/src/watch.rs: compaction busy flag is reset only after compact() returns; a panic inside compact would block further compactions (use a drop guard).
