@@ -5,6 +5,7 @@ mod error;
 mod hotkey;
 mod icons;
 mod logging;
+mod meta_store;
 mod state;
 mod tray;
 mod window;
@@ -51,7 +52,15 @@ pub fn run() {
             commands::launch::launch,
             commands::launch::reveal,
             commands::launch::copy_path,
-            commands::launch::open_link
+            commands::launch::open_link,
+            commands::providers::list_providers,
+            commands::providers::probe_providers,
+            commands::providers::set_provider,
+            commands::providers::set_provider_order,
+            commands::secrets::set_secret,
+            commands::secrets::delete_secret,
+            commands::secrets::test_secret,
+            commands::secrets::list_secrets
         ])
         .build(tauri::generate_context!());
     match result {

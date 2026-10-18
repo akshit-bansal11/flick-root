@@ -1,5 +1,7 @@
 //! Shared application state, startup tasks and shutdown.
+use crate::error::CommandError;
 use crate::icons::Icons;
+use crate::meta_store::JsonMeta;
 use anyhow::Context;
 use arc_swap::ArcSwap;
 use features::{EventSink, FeatureCtx, Registry, TaskScope, builtin_features};
@@ -10,7 +12,9 @@ use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
 use launcher_core::store::Store;
 use launcher_core::{Input, Item};
 use parking_lot::Mutex;
+use providers::KeySource;
 use providers::hub::ProviderHub;
+use providers::secret::{KeyringBackend, SecretVault, VaultKeys};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -46,6 +50,8 @@ pub struct AppState {
     pub overlay: ArcSwap<Overlay>,
     /// File watcher, held while Find is on.
     pub watch: Mutex<Option<WatchHandle>>,
+    /// Write-only secret vault (Credential Manager plus metadata).
+    pub vault: Arc<SecretVault>,
     /// Stops a running scan on exit.
     pub scan_cancel: Arc<AtomicBool>,
     /// Feature registry.
@@ -60,6 +66,10 @@ pub struct AppState {
     pub last_input: Mutex<Option<Input>>,
     /// Latest search sequence number.
     pub latest_seq: AtomicU64,
+    /// Key source over the vault, for building providers.
+    pub keys: Arc<dyn KeySource>,
+    config_path: PathBuf,
+    config_write: Mutex<()>,
     cache_dir: PathBuf,
 }
 
@@ -81,6 +91,28 @@ pub fn build_match(entries: Arc<Vec<AppEntry>>) -> AppMatch {
 }
 
 impl AppState {
+    /// Applies `f` to a copy of the config, saves it atomically, publishes it and
+    /// rebuilds the provider hub. Writers are serialized; `f` errors change nothing.
+    pub fn update_config<R>(
+        &self,
+        f: impl FnOnce(&mut Config) -> Result<R, CommandError>,
+    ) -> Result<R, CommandError> {
+        let _guard = self.config_write.lock();
+        let mut next = (*self.config.load_full()).clone();
+        let out = f(&mut next)?;
+        next.save(&self.config_path)
+            .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
+        self.config.store(Arc::new(next));
+        self.rebuild_hub();
+        Ok(out)
+    }
+
+    /// Rebuilds the provider hub from the live config.
+    pub fn rebuild_hub(&self) {
+        let hub = ProviderHub::from_config(&self.config.load().providers, &self.keys);
+        self.ctx.providers.store(Arc::new(hub));
+    }
+
     fn rebuild_match(&self) {
         self.app_match
             .store(Arc::new(build_match(self.apps.entries())));
@@ -145,10 +177,16 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     if let Err(err) = apps.load_cache(&cache_dir) {
         tracing::warn!(%err, "app cache unreadable");
     }
+    let vault = Arc::new(SecretVault::new(
+        Arc::new(KeyringBackend),
+        Arc::new(JsonMeta::open(data.join("secret_meta.json"))),
+    ));
+    let keys: Arc<dyn KeySource> = Arc::new(VaultKeys(vault.clone()));
+    let hub = ProviderHub::from_config(&config.load().providers, &keys);
     let ctx = FeatureCtx {
         config: config.clone(),
         store: store.clone(),
-        providers: Arc::new(ArcSwap::from_pointee(ProviderHub::new(Vec::new()))),
+        providers: Arc::new(ArcSwap::from_pointee(hub)),
         http: reqwest::Client::builder()
             .build()
             .context("building http client")?,
@@ -164,6 +202,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         files: Arc::new(FileIndex::new()),
         overlay: ArcSwap::from_pointee(Overlay::new()),
         watch: Mutex::new(None),
+        vault,
         scan_cancel: Arc::new(AtomicBool::new(false)),
         registry: Arc::new(Registry::new()),
         ctx,
@@ -171,6 +210,9 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         last_results: Mutex::new(HashMap::new()),
         last_input: Mutex::new(None),
         latest_seq: AtomicU64::new(0),
+        keys,
+        config_path,
+        config_write: Mutex::new(()),
         cache_dir,
     });
     app.manage(state);
