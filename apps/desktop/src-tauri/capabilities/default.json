@@ -15,13 +15,11 @@
     "allow-copy-path",
     "allow-open-link",
     "allow-run-system-command",
-    "allow-kill-process",
     "allow-ask-stream",
     "allow-cancel-ask",
     "allow-resize-launcher",
     "allow-get-first-run",
     "allow-complete-first-run",
-    "allow-register-hotkey",
     "allow-probe-providers"
   ]
 }
