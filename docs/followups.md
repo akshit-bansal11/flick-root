@@ -11,3 +11,12 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - launcher-core/src/matcher.rs: `Pattern::parse` enables fzf syntax (`!`, `^`, `'`, `$`) for app names; consider `Atom::new` plain fuzzy.
 - src-tauri/src/hotkey.rs:13: every registered shortcut toggles the launcher; the Explain hotkey (F09) needs its own dispatch.
 - desktop reducer: first Enter on a guarded command emits `launch`, the second `confirm`; Rust must enforce the two-press guard in both commands.
+
+## W2 review (5c1219e..9e653b6)
+
+- apps/desktop/src/query/markdown.test.ts: add isSafeUrl cases for `JaVaScRiPt:` and `java\tscript:` (behavior already correct via WHATWG URL).
+- apps/desktop/src/query/Markdown.tsx:33: image alt text uses the `md-link` class and looks clickable.
+- apps/desktop/src/launcher/launcher.css:129: `10.5px` font size literal should be a token.
+- apps/desktop/vite.config.ts: `dedupe` + createRoot test workaround hide duplicate React copies (T3.0 pins one version).
+- Cargo.toml: reqwest switched from rustls-tls to native-tls (+ form, query); record in ADR-006/011 docs and architecture.md.
+- crates/index-files/src/scan.rs:104-114: when `b.push` returns None the stack isn't pushed and children attach to the grandparent (arena overflow only).
