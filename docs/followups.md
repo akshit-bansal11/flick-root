@@ -53,3 +53,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - W5 review NIT: icons.rs:385 data_url clones entry.id per row on the keystroke path, and warm() memoises every icon with no cap (was 512); key the memo by Arc<str> or a borrowed id.
 - W5 review NIT: measure.ps1:56 single-instance check matches only the same exe path (an installed copy elsewhere would catch the hotkeys); .DESCRIPTION says SendInput but the script uses keybd_event.
 - W5 review NIT: firstrun/Detect.tsx:9 TITLES duplicates Rust preset titles; return the title in ProbeResult.
+- P5.3: WebView2 GPU-process commits 700–1,500 MB private during startup; test `additionalBrowserArgs` (keep Tauri's default --disable-features list, add --disable-gpu / --in-process-gpu) with release builds and measure.ps1. Launcher-only idle after settle ≈ 410 MB WS / 290 MB private vs the 120 MB budget; WebView2 alone may exceed it (KICKOFF §9: record if unmet).
