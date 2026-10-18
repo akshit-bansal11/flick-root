@@ -1,0 +1,76 @@
+.pv-group {
+  margin: var(--l-sp-10) 0 var(--l-sp-4);
+  color: var(--l-muted-strong);
+  font-size: var(--l-fs-group);
+  text-transform: uppercase;
+}
+.pv-row {
+  padding: var(--l-sp-5) 0;
+  border-bottom: var(--l-border);
+  list-style: none;
+}
+.pv-head,
+.pv-key,
+.pv-opts label {
+  display: flex;
+  align-items: center;
+  gap: var(--l-sp-6);
+}
+.pv-head > span:first-of-type {
+  flex: 1;
+}
+.pv-opts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-4);
+  padding: var(--l-sp-5) 0 0 var(--l-sp-10);
+}
+.pv-opts input {
+  flex: 1;
+  min-height: var(--l-tile-row);
+  padding: 0 var(--l-sp-4);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  background: var(--l-surface);
+  color: var(--l-text);
+  font: inherit;
+}
+.pv-key {
+  padding: var(--l-sp-4) 0 0 var(--l-sp-10);
+  font-size: var(--l-fs-sub);
+}
+.pv-warn {
+  color: var(--l-warn);
+}
+.pv-danger {
+  color: var(--l-err);
+}
+.pv-shell button,
+.pv-links button {
+  padding: var(--l-sp-2) var(--l-sp-6);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  background: var(--l-surface);
+  color: var(--l-text);
+  font: inherit;
+  cursor: pointer;
+}
+.pv-links {
+  padding: 0;
+  list-style: none;
+}
+.pv-links .pv-link {
+  color: var(--l-accent-text);
+}
+.pv-shell button:focus-visible,
+.pv-shell input:focus-visible,
+.pv-links button:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pv-shell * {
+    transition: none;
+    animation: none;
+  }
+}
