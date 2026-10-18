@@ -25,7 +25,7 @@ The Add key warning, shown every time a secret is added or replaced, and Save st
 
 In v0.0.1:
 
-- The warning text above is the text in `apps/desktop/src/settings/AddKeyDialog.tsx`, with the checkbox label "I understand the risk and have set a usage limit.". The brand name `Flick` appears only in the product name (`tauri.conf.json`, `productName`). The brand constant in `crates/launcher-core/src/brand.rs` is `flick`.
+- The warning text above is the text in `apps/desktop/src/settings/AddKeyDialog.tsx`, with the checkbox label "I understand the risk and have set a usage limit.". The product name in the warning comes from `APP_DISPLAY_NAME` in `apps/desktop/src/brand.ts`; the Rust brand constants live in `crates/launcher-core/src/brand.rs`, and the bundle name in `tauri.conf.json` (`productName`).
 - `set_secret` also takes `acknowledged: bool` and rejects `false` (`apps/desktop/src-tauri/src/commands/secrets.rs`), so the rule holds even if the UI is wrong.
 - The shipped CSP in `apps/desktop/src-tauri/tauri.conf.json` is: `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'`. Two directives go beyond rule 3: `style-src 'self' 'unsafe-inline'` and `font-src 'self'`. This is a known deviation. An open followup asks whether `'unsafe-inline'` is needed, since React style props go through CSSOM and are not blocked by CSP.
 - Rule 5 in v0.0.1: the `Bearer` header string in `openai_compat.rs` is wrapped in `Zeroizing`, and the Anthropic header borrows the secret without an intermediate `String`. The copy inside reqwest's `HeaderValue` cannot be zeroized; that residual copy is accepted.

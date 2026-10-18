@@ -37,4 +37,4 @@ In v0.0.1:
 - Adding a new OpenAI-compatible service is a preset entry, not new code.
 - Local servers work with no account and no key.
 - Any Anthropic change to the request shape needs a change in the Anthropic wire code only.
-- The Bearer header copy is a known gap against ADR-011 rule 5 until it is wrapped.
+- The copy of the key inside reqwest's `HeaderValue` cannot be zeroized; this residual copy is accepted against ADR-011 rule 5.
