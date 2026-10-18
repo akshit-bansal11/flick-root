@@ -24,7 +24,7 @@ use std::sync::Arc;
 /// All built-in features.
 pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
     vec![
-        Arc::new(frecency::Frecency),
+        Arc::new(frecency::Frecency::default()),
         Arc::new(math::Math),
         Arc::new(syscmd::SysCmd),
         Arc::new(web::Web),
