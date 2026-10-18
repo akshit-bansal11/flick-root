@@ -13,6 +13,7 @@ thiserror = { workspace = true }
 nucleo-matcher = { workspace = true }
 rusqlite = { workspace = true }
 regex = { workspace = true }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
