@@ -16,8 +16,9 @@ Flick handles provider keys, OAuth tokens, webhook secrets and similar credentia
 6. A key is bound to the host it was entered for, and is sent only over HTTPS to that host (plain http only for localhost and 127.0.0.1). Changing a provider's base URL host deletes the stored key and asks for it again. Authenticated requests do not follow redirects.
 7. A tracing redaction layer masks key-like patterns and every stored secret value. The panic hook redacts too.
 8. Explain this and Quick capture block text that looks like a secret.
-
-The Add key warning, shown every time a secret is added or replaced, and Save stays disabled until the checkbox is ticked. Local providers without a key never show it:
+9. CI runs cargo-deny, cargo-audit and pnpm audit; lockfiles are committed; releases ship SHA-256 checksums.
+10. Every stored key has Test, Replace and Delete buttons and shows when it was last used.
+11. Residual risk is never zero, so every Add key dialog shows the warning below, and Save stays disabled until the checkbox is ticked. Local providers without a key never show it:
 
 > Your key is stored in Windows Credential Manager and is only sent to `<host>`. No storage is completely safe: malware on your account, a compromised extension or a breach at the provider could still expose it. Add it at your own risk. Before saving, set a spending or usage limit in your provider's dashboard, and use a key created only for Flick so you can revoke it on its own.
 >

@@ -54,3 +54,7 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - W5 review NIT: measure.ps1:56 single-instance check matches only the same exe path (an installed copy elsewhere would catch the hotkeys); .DESCRIPTION says SendInput but the script uses keybd_event.
 - W5 review NIT: firstrun/Detect.tsx:9 TITLES duplicates Rust preset titles; return the title in ProbeResult.
 - P5.3: WebView2 GPU-process commits 700–1,500 MB private during startup; test `additionalBrowserArgs` (keep Tauri's default --disable-features list, add --disable-gpu / --in-process-gpu) with release builds and measure.ps1. Launcher-only idle after settle ≈ 410 MB WS / 290 MB private vs the 120 MB budget; WebView2 alone may exceed it (KICKOFF §9: record if unmet).
+- Pre-release review NIT: settings.rs:94 re-registers the hotkey before update_config; if saving fails, the OS binding and config.toml disagree until restart (roll back to the old binding on error).
+- Pre-release review NIT: web lib/markdown.ts:9 scheme check misses tab/newline inside the scheme; strip [\t\n\r] first (trusted repo content, low risk).
+- Pre-release review NIT: web lib/markdown.ts:12 relative links to files not on the site (LICENSE, docs/adr/, followups.md) become broken site paths; point them at REPO_URL/blob/main/<path>.
+- Pre-release review NIT: apps/web/package.json @types/node ^20 while CI uses Node 24; bump to ^24.
