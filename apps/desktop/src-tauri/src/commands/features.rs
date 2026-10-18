@@ -174,7 +174,12 @@ pub async fn set_mode_enabled(
         let s = Arc::clone(&state);
         tauri::async_runtime::spawn(async move { state::start_find(&s).await });
     } else if is_find && !enabled {
-        state::stop_find(&state);
+        let s = Arc::clone(&state);
+        blocking(move || {
+            state::stop_find(&s);
+            Ok(())
+        })
+        .await?;
     }
     if let Err(err) = app.emit(
         "settings://changed",

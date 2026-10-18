@@ -187,6 +187,8 @@ pub trait MetaStore: Send + Sync {
     fn get(&self, name: &str) -> Result<Option<SecretMeta>, VaultError>;
     /// Remove one; absent is fine.
     fn remove(&self, name: &str) -> Result<(), VaultError>;
+    /// Set `last_used` in place under the store's own lock; no-op for a missing name.
+    fn touch(&self, name: &str, last_used: i64) -> Result<(), VaultError>;
     /// All entries.
     fn list(&self) -> Result<Vec<SecretMeta>, VaultError>;
 }
@@ -205,6 +207,12 @@ impl MetaStore for MemoryMeta {
     }
     fn remove(&self, name: &str) -> Result<(), VaultError> {
         lock(&self.0).remove(name);
+        Ok(())
+    }
+    fn touch(&self, name: &str, last_used: i64) -> Result<(), VaultError> {
+        if let Some(m) = lock(&self.0).get_mut(name) {
+            m.last_used = Some(last_used);
+        }
         Ok(())
     }
     fn list(&self) -> Result<Vec<SecretMeta>, VaultError> {
@@ -363,10 +371,7 @@ fn flush_pending(
 ) -> Result<(), VaultError> {
     let drained: Vec<_> = lock(pending).drain().collect();
     for (name, at) in drained {
-        if let Some(mut m) = meta.get(&name)? {
-            m.last_used = Some(at);
-            meta.put(m)?;
-        }
+        meta.touch(&name, at)?;
     }
     Ok(())
 }
@@ -429,5 +434,26 @@ mod tests {
             v.with_secret(&name, |_| ()),
             Err(VaultError::NotFound)
         ));
+    }
+
+    #[test]
+    fn flush_does_not_resurrect_deleted_or_revert_added_at() {
+        let meta = MemoryMeta::default();
+        let pending = Mutex::new(HashMap::from([("provider.x@x.test".to_owned(), 9)]));
+        // Deleted after the pending insert: nothing comes back.
+        flush_pending(&meta, &pending).unwrap();
+        assert!(meta.list().unwrap().is_empty());
+        // Re-set after take: added_at survives, last_used updates.
+        meta.put(SecretMeta {
+            name: "provider.x@x.test".into(),
+            host: "x.test".into(),
+            added_at: 77,
+            last_used: None,
+        })
+        .unwrap();
+        lock(&pending).insert("provider.x@x.test".into(), 9);
+        flush_pending(&meta, &pending).unwrap();
+        let m = meta.get("provider.x@x.test").unwrap().unwrap();
+        assert_eq!((m.added_at, m.last_used), (77, Some(9)));
     }
 }

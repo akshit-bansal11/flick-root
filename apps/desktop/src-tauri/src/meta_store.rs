@@ -86,6 +86,14 @@ impl MetaStore for JsonMeta {
         }
         Ok(())
     }
+    fn touch(&self, name: &str, last_used: i64) -> Result<(), VaultError> {
+        let mut m = self.map.lock();
+        match m.get_mut(name) {
+            Some(e) => e.last_used = Some(last_used),
+            None => return Ok(()),
+        }
+        self.save(&m)
+    }
     fn list(&self) -> Result<Vec<SecretMeta>, VaultError> {
         Ok(self.map.lock().values().cloned().collect())
     }

@@ -294,8 +294,14 @@ pub(crate) async fn start_find(s: &Arc<AppState>) {
     let res = tauri::async_runtime::spawn_blocking(move || {
         let live = || !cancel.load(Ordering::Relaxed) && st.config.load().modes.find.enabled;
         match snapshot::load(&st.snapshot_path()) {
-            Ok(Some(store)) if live() => st.files.replace(store),
-            Ok(_) => {}
+            Ok(Some(store)) => {
+                // Check and replace under the watch lock stop_find takes after cancelling.
+                let _watch = st.watch.lock();
+                if live() {
+                    st.files.replace(store);
+                }
+            }
+            Ok(None) => {}
             Err(err) => tracing::warn!(%err, "file snapshot unreadable"),
         }
         let roots = roots_for(&st.config.load());
