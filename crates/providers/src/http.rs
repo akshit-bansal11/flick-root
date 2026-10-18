@@ -1,1 +1,66 @@
-//! Shared HTTP client factory.
+//! Host-bound HTTP clients (ADR-011): no redirects with credentials, https only.
+
+use crate::secret::{SecretName, SecretVault};
+use crate::{ProviderConfig, ProviderError};
+use std::time::Duration;
+use url::{Host, Url};
+
+fn build(policy: reqwest::redirect::Policy) -> reqwest::Client {
+    reqwest::Client::builder()
+        .redirect(policy)
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .unwrap_or_default()
+}
+
+/// Client for requests that carry a key: never follows redirects.
+pub fn authed_client() -> reqwest::Client {
+    build(reqwest::redirect::Policy::none())
+}
+
+/// Client for unauthenticated calls: follows at most 5 redirects.
+pub fn plain_client() -> reqwest::Client {
+    build(reqwest::redirect::Policy::limited(5))
+}
+
+/// Allow only `bound_host`, over https (http only for loopback).
+pub fn check_url(url: &Url, bound_host: &str) -> Result<(), ProviderError> {
+    let host = url.host_str().unwrap_or_default();
+    if !host.eq_ignore_ascii_case(bound_host) {
+        return Err(ProviderError::HostMismatch {
+            bound: bound_host.to_owned(),
+            actual: host.to_owned(),
+        });
+    }
+    let loopback = match url.host() {
+        Some(Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    };
+    match url.scheme() {
+        "https" => Ok(()),
+        "http" if loopback => Ok(()),
+        _ => Err(ProviderError::InsecureUrl {
+            host: host.to_owned(),
+        }),
+    }
+}
+
+/// Call when a provider's base URL changes. If the host changed, the key bound
+/// to the old host is deleted (ADR-011 rule 6). Returns true when the user
+/// must enter a key again.
+pub fn on_base_url_change(
+    vault: &SecretVault,
+    old_cfg: &ProviderConfig,
+    new_cfg: &ProviderConfig,
+) -> Result<bool, ProviderError> {
+    if old_cfg.base_url.host_str() == new_cfg.base_url.host_str() {
+        return Ok(false);
+    }
+    let Some(old_host) = old_cfg.key_host.as_deref() else {
+        return Ok(false);
+    };
+    vault.delete(&SecretName::provider(&old_cfg.id, old_host)?)?;
+    Ok(true)
+}
