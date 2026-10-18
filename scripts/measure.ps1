@@ -3,8 +3,8 @@
 Measures cold start, hotkey-to-visible latency and idle memory/CPU against the budgets.
 .DESCRIPTION
 Starts the app (never a second instance), times start to the "ready" log line, sends the
-global hotkey with SendInput, parses hotkey_to_shown_ms from app.log, then samples idle
-RAM (app plus msedgewebview2 children) and CPU. Stops only the process it started.
+global hotkey with keybd_event, parses hotkey_to_shown_ms from app.log, waits for the process tree (descendants of our PID only) to settle below 1% of one core,
+then samples idle RAM and CPU. Stops only the process it started.
 Budgets: cold start <= 600 ms, hotkey p95 <= 50 ms, idle RAM <= 120 MB.
 Run: pwsh -File scripts/measure.ps1 [-Exe path] [-Toggles 50] [-Hotkey Alt+Space]
 .PARAMETER Exe
@@ -98,16 +98,49 @@ function Read-LogFrom([long]$offset) {
 }
 function Get-LogLength { if (Test-Path -LiteralPath $logPath) { (Get-Item -LiteralPath $logPath).Length } else { 0 } }
 
+function Get-Tree([int]$rootPid) {
+    $all = Get-CimInstance Win32_Process
+    $ids = [System.Collections.Generic.HashSet[int]]::new()
+    $null = $ids.Add($rootPid)
+    do {
+        $before = $ids.Count
+        foreach ($p in $all) { if ($ids.Contains([int]$p.ParentProcessId)) { $null = $ids.Add([int]$p.ProcessId) } }
+    } while ($ids.Count -ne $before)
+    $cmd = @{}; foreach ($p in $all) { $cmd[[int]$p.ProcessId] = [string]$p.CommandLine }
+    foreach ($pr in @(Get-Process -Id @($ids) -ErrorAction SilentlyContinue)) {
+        $role = if ($pr.Id -eq $rootPid) { 'app' } elseif ($cmd[$pr.Id] -match '--type=([\w-]+)') { $Matches[1] } elseif ($pr.ProcessName -eq 'msedgewebview2') { 'browser' } else { $pr.ProcessName }
+        [pscustomobject]@{ Pid = $pr.Id; Role = $role; WS = [math]::Round($pr.WorkingSet64 / 1MB, 1); Private = [math]::Round($pr.PrivateMemorySize64 / 1MB, 1); Cpu = $pr.CPU }
+    }
+}
+
+$why = @{
+    'cold start ms'    = 'no "ready" log line within 10 s'
+    'hotkey p95 ms'    = 'no hotkey_to_shown_ms lines captured'
+    'idle RAM MB (ws)' = 'process tree not sampled (app exited or measurement aborted)'
+}
 $startLen = Get-LogLength
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $proc = Start-Process -FilePath $Exe -PassThru
-$coldMs = $null; $p95 = $null; $ws = $null
+$coldMs = $null; $p95 = $null; $ws = $null; $settled = $false
 try {
     while ($sw.ElapsedMilliseconds -lt 10000) {
-        if ((Read-LogFrom $startLen) -match '(?m)\bready\s*$') { $coldMs = $sw.Elapsed.TotalMilliseconds; break }
+        if ((Read-LogFrom $startLen) -match '(?m)(\bready\s*$|phase="?ready\b)') { $coldMs = $sw.Elapsed.TotalMilliseconds; break }
         Start-Sleep -Milliseconds 20
     }
     if ($null -eq $coldMs) { Write-Output 'Cold start: "ready" not seen within 10 s' }
+
+    # Settle: WebView2 bursts CPU for ~25-30 s after launch; wait for the tree to go quiet
+    $settleSw = [System.Diagnostics.Stopwatch]::StartNew(); $quiet = 0
+    $prev = @{}; foreach ($t in Get-Tree $proc.Id) { $prev[$t.Pid] = $t.Cpu }
+    while ($settleSw.Elapsed.TotalSeconds -lt 90) {
+        Start-Sleep -Seconds 1
+        $delta = 0.0; $cur = @{}
+        foreach ($t in Get-Tree $proc.Id) { $cur[$t.Pid] = $t.Cpu; if ($prev.ContainsKey($t.Pid)) { $delta += $t.Cpu - $prev[$t.Pid] } }
+        $prev = $cur
+        if ($delta -lt 0.01) { $quiet++ } else { $quiet = 0 }
+        if ($quiet -ge 5) { $settled = $true; break }
+    }
+    Write-Output ('Settle: {0} after {1:N0} s' -f $(if ($settled) { 'settled' } else { 'NOT SETTLED' }), $settleSw.Elapsed.TotalSeconds)
 
     # Toggles
     Start-Sleep -Milliseconds 1000
@@ -129,33 +162,31 @@ try {
 
     # Idle: launcher should be hidden after an even number of toggles
     Start-Sleep -Seconds 10
-    $all = Get-CimInstance Win32_Process
-    $ids = [System.Collections.Generic.HashSet[int]]::new()
-    $null = $ids.Add($proc.Id)
-    do {
-        $before = $ids.Count
-        foreach ($p in $all) { if ($ids.Contains([int]$p.ParentProcessId)) { $null = $ids.Add([int]$p.ProcessId) } }
-    } while ($ids.Count -ne $before)
-    $tree = @(Get-Process -Id @($ids) -ErrorAction SilentlyContinue)
-    $ws = ($tree | Measure-Object WorkingSet64 -Sum).Sum / 1MB
-    $priv = ($tree | Measure-Object PrivateMemorySize64 -Sum).Sum / 1MB
-    $cpu0 = ($tree | Measure-Object CPU -Sum).Sum
+    $t0 = @(Get-Tree $proc.Id)
     Start-Sleep -Seconds 5
-    $tree = @(Get-Process -Id @($ids) -ErrorAction SilentlyContinue)
-    $cpuPct = (($tree | Measure-Object CPU -Sum).Sum - $cpu0) / 5 * 100 / [Environment]::ProcessorCount
-    Write-Output ('Idle: {0} procs, working set {1:N0} MB, private {2:N0} MB, CPU {3:N2}%' -f $tree.Count, $ws, $priv, $cpuPct)
+    $t1 = @(Get-Tree $proc.Id)
+    $c0 = ($t0 | Measure-Object Cpu -Sum).Sum
+    $cpuPct = if ($t1) { (($t1 | Measure-Object Cpu -Sum).Sum - $c0) / 5 * 100 / [Environment]::ProcessorCount } else { $null }
+    $tree = $t1
+    $ws = ($tree | Measure-Object WS -Sum).Sum
+    $priv = ($tree | Measure-Object Private -Sum).Sum
+    $privNoGpu = ($tree | Where-Object Role -ne 'gpu-process' | Measure-Object Private -Sum).Sum
+    $tree | Select-Object Pid, Role, WS, Private | Format-Table -AutoSize | Out-String | Write-Output
+    Write-Output ('Idle: {0} procs, total WS {1:N0} MB (budget compares this), total private {2:N0} MB, private excl. gpu-process {3:N0} MB, CPU {4:N2}% of machine (5 s)' -f $tree.Count, $ws, $priv, $privNoGpu, $cpuPct)
+    if (-not $settled) { $ws = $null; $why['idle RAM MB (ws)'] = 'not settled within 90 s' }
 }
 finally {
-    if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+    if ($proc) {
+        $kids = @(Get-Tree $proc.Id | Where-Object Pid -ne $proc.Id | Select-Object -ExpandProperty Pid)
+        if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+        Start-Sleep -Seconds 5
+        $left = @($kids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
+        if ($left) { Write-Output "Lingering child PIDs 5 s after exit (not killed): $($left -join ', ')" }
+    }
 }
 
 $over = $false
 $na = @()
-$why = @{
-    'cold start ms'    = 'no "ready" log line within 10 s'
-    'hotkey p95 ms'    = 'no hotkey_to_shown_ms lines captured'
-    'idle RAM MB (ws)' = 'process tree not sampled (app exited or measurement aborted)'
-}
 $rows = @(
     [pscustomobject]@{ Metric = 'cold start ms'; Value = $coldMs; Budget = 600; Note = '' }
     [pscustomobject]@{ Metric = 'hotkey p95 ms'; Value = $p95; Budget = 50; Note = $(if ($notComparable) { 'not comparable (first run)' } else { '' }) }
