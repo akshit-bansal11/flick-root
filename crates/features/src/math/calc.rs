@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 /// Inputs longer than this are never math.
 const MAX_LEN: usize = 200;
 /// Evaluation budget; fend aborts when it is exceeded.
-const BUDGET: Duration = Duration::from_millis(5);
+const BUDGET: Duration = Duration::from_millis(if cfg!(debug_assertions) { 50 } else { 5 });
+/// Per-thread warm-up limit; runs once, off the keystroke deadline.
+const WARMUP: Duration = Duration::from_secs(2);
 
 /// Currency words and symbols; those expressions wait for the rates feature (T4.4).
 const CURRENCY_WORDS: &[&str] = &[
@@ -15,10 +17,18 @@ const CURRENCY_WORDS: &[&str] = &[
 ];
 
 thread_local! {
-    /// Context built once per thread.
-    static TEMPLATE: fend_core::Context = fend_core::Context::new();
+    /// Context built and warmed once per thread, so first-use setup (unit tables) is outside the deadline.
+    static TEMPLATE: fend_core::Context = {
+        let mut ctx = fend_core::Context::new();
+        let int = Deadline(Instant::now() + WARMUP);
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            let _ = fend_core::evaluate_with_interrupt("1 kg to lb", &mut ctx, &int);
+        }));
+        ctx
+    };
 }
 
+/// Interrupt that fires once the instant has passed.
 struct Deadline(Instant);
 
 impl fend_core::Interrupt for Deadline {
@@ -49,6 +59,8 @@ pub fn evaluate(text: &str) -> Option<String> {
     if !plausible(t) || is_currency(t) {
         return None;
     }
+    // Force the warm context to exist before the clock starts.
+    catch_unwind(|| TEMPLATE.with(|_| ())).ok()?;
     let int = Deadline(Instant::now() + BUDGET);
     // Preview evaluation never mutates the context, so one per thread is shared and variables cannot persist.
     let res = catch_unwind(AssertUnwindSafe(|| {
