@@ -3,6 +3,7 @@ import { resizeLauncher } from "../ipc";
 import { QueryView } from "../query/QueryView";
 import { Actions } from "./Actions";
 import { InputBar } from "./InputBar";
+import { Overlay, useOverlay } from "./Overlay";
 import { Results } from "./Results";
 import { useLauncher } from "./useLauncher";
 
@@ -29,6 +30,7 @@ export function Launcher() {
     };
   }, []);
 
+  const overlay = useOverlay();
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
 
@@ -42,6 +44,7 @@ export function Launcher() {
         onChange={setText}
         inputRef={inputRef}
       />
+      {overlay && <Overlay />}
       {state.mode === "query" ? (
         <QueryView
           question={q.status === "idle" ? "" : state.input}

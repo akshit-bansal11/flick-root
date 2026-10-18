@@ -1,0 +1,21 @@
+.overlay {
+  padding: var(--l-sp-6) var(--l-sp-8);
+  border-top: var(--l-border);
+  color: var(--l-text);
+  font-size: var(--l-fs-sub);
+  animation: overlay-in calc(100ms * var(--motion-scale)) var(--l-motion-ease);
+}
+
+.overlay kbd {
+  font: 500 var(--l-fs-meta) var(--l-mono);
+  color: var(--l-accent-text);
+  border: var(--l-border);
+  border-radius: var(--l-r2);
+  padding: 0 var(--l-sp-2);
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}

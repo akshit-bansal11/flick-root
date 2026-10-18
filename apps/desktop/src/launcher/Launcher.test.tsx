@@ -49,6 +49,7 @@ async function mount() {
 }
 
 beforeEach(() => {
+  localStorage.setItem("prefixes-overlay-seen", "1");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal(
     "ResizeObserver",
@@ -59,6 +60,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  localStorage.clear();
   act(() => root?.unmount());
   document.body.replaceChildren();
   vi.clearAllMocks();
