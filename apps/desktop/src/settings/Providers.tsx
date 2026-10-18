@@ -13,7 +13,7 @@ const GROUPS: [ProviderGroup, string][] = [
 
 function hostOf(url: string): string {
   try {
-    return new URL(url).host;
+    return new URL(url).hostname;
   } catch {
     return "";
   }
@@ -33,16 +33,18 @@ function statusText(p: ProviderView, probe?: ProbeResult): string {
 interface RowProps {
   p: ProviderView;
   probe?: ProbeResult;
-  index: number;
-  count: number;
+  canUp: boolean;
+  canDown: boolean;
   onMove: (dir: -1 | 1) => void;
   reload: () => void;
 }
 
-function Row({ p, probe, index, count, onMove, reload }: RowProps) {
+function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(p.base_url);
   const [model, setModel] = useState(p.model);
+  useEffect(() => setUrl(p.base_url), [p.base_url]);
+  useEffect(() => setModel(p.model), [p.model]);
   const [dialog, setDialog] = useState<"add" | "replace" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const hostChanged = hostOf(url) !== hostOf(p.base_url);
@@ -105,7 +107,7 @@ function Row({ p, probe, index, count, onMove, reload }: RowProps) {
             <button
               type="button"
               aria-label={`Move ${p.title} up`}
-              disabled={index === 0}
+              disabled={!canUp}
               onClick={() => onMove(-1)}
             >
               ↑
@@ -113,7 +115,7 @@ function Row({ p, probe, index, count, onMove, reload }: RowProps) {
             <button
               type="button"
               aria-label={`Move ${p.title} down`}
-              disabled={index === count - 1}
+              disabled={!canDown}
               onClick={() => onMove(1)}
             >
               ↓
@@ -134,8 +136,8 @@ function Row({ p, probe, index, count, onMove, reload }: RowProps) {
           keyless={!p.key_required}
           mode={dialog}
           onCancel={() => setDialog(null)}
-          onSave={async (value) => {
-            await api.setSecret(p.key?.name ?? secretName(p), value, true);
+          onSave={async (value, acknowledged) => {
+            await api.setSecret(p.key?.name ?? secretName(p), value, acknowledged);
             setDialog(null);
             reload();
           }}
@@ -166,10 +168,14 @@ export function Providers() {
   };
 
   const move = async (i: number, dir: -1 | 1) => {
+    const g = list[i]?.group;
+    let j = i + dir;
+    while (list[j] && list[j]?.group !== g) j += dir;
+    if (!list[j]) return;
     const ids = list.map((p) => p.id);
     const [id] = ids.splice(i, 1);
     if (id === undefined) return;
-    ids.splice(i + dir, 0, id);
+    ids.splice(j, 0, id);
     try {
       await api.setProviderOrder(ids);
       reload();
@@ -199,8 +205,8 @@ export function Providers() {
                   key={p.id}
                   p={p}
                   probe={probes[p.id]}
-                  index={i}
-                  count={list.length}
+                  canUp={list.slice(0, i).some((x) => x.group === g)}
+                  canDown={list.slice(i + 1).some((x) => x.group === g)}
                   onMove={(d) => move(i, d)}
                   reload={reload}
                 />

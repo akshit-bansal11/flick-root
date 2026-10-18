@@ -67,7 +67,7 @@ describe("AddKeyDialog", () => {
     await act(async () => {
       fireEvent.click(save());
     });
-    expect(onSave).toHaveBeenCalledWith("sk-1");
+    expect(onSave).toHaveBeenCalledWith("sk-1", true);
     expect(key().value).toBe("");
   });
 
@@ -79,6 +79,16 @@ describe("AddKeyDialog", () => {
       fireEvent.click(save());
     });
     expect(screen.getByRole("alert").textContent).toBe("bad key");
+  });
+
+  it("shows the message of a {code,message} rejection", async () => {
+    mount({ onSave: () => Promise.reject({ code: "host_unbound", message: "host not bound" }) });
+    fireEvent.change(key(), { target: { value: "x" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    await act(async () => {
+      fireEvent.click(save());
+    });
+    expect(screen.getByRole("alert").textContent).toBe("host not bound");
   });
 
   it("cancels on Escape", () => {

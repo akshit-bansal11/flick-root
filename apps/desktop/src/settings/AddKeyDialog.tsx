@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { APP_DISPLAY_NAME } from "../brand";
+import { errorText } from "./types";
 import "./dialog.css";
 
 interface Props {
@@ -7,7 +8,7 @@ interface Props {
   host: string;
   keyless: boolean;
   mode: "add" | "replace";
-  onSave: (value: string) => Promise<void>;
+  onSave: (value: string, acknowledged: true) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -40,10 +41,10 @@ function Dialog({ providerName, host, mode, onSave, onCancel }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await onSave(value);
+      await onSave(value, true);
       setValue("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }

@@ -59,10 +59,17 @@ const list: ProviderView[] = [
   },
 ];
 
+const ported = {
+  ...list[1],
+  id: "ported",
+  base_url: "https://api.acme.test:8443/v1",
+} as ProviderView;
+const second = { ...list[1], id: "second", title: "Second" } as ProviderView;
+
 let root: Root | undefined;
 let container: HTMLElement | undefined;
-async function mount() {
-  vi.mocked(api.listProviders).mockResolvedValue(list);
+async function mount(l: ProviderView[] = list) {
+  vi.mocked(api.listProviders).mockResolvedValue(l);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -104,5 +111,34 @@ describe("Providers", () => {
       target: { value: "https://other.example/v1" },
     });
     expect(screen.getByRole("alert").textContent).toMatch(/deletes the stored key/);
+  });
+
+  it("binds the secret to the hostname without the port", async () => {
+    await mount([ported]);
+    await click("Add key");
+    fireEvent.change(screen.getByLabelText("API key"), { target: { value: "k" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /understand/ }));
+    await click("Save");
+    expect(api.setSecret).toHaveBeenLastCalledWith("provider.ported@api.acme.test", "k", true);
+  });
+
+  it("does not warn on a port-only change", async () => {
+    const keyed = { ...list[2], base_url: "https://api.anthropic.com:443/x" } as ProviderView;
+    await mount([keyed]);
+    await click("Options");
+    fireEvent.change(screen.getByLabelText("Base URL"), {
+      target: { value: "https://api.anthropic.com:8443/x" },
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps reordering within a group", async () => {
+    await mount([list[1] as ProviderView, list[0] as ProviderView, second]);
+    await click("Options", 1);
+    expect(
+      (screen.getByRole("button", { name: "Move OpenAI up" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    await click("Move OpenAI down");
+    expect(api.setProviderOrder).toHaveBeenCalledWith(["ollama", "second", "openai"]);
   });
 });
