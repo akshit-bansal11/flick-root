@@ -27,6 +27,9 @@ const inMode = (mode: Mode, extra: Partial<State> = {}): State => ({
   ...extra,
 });
 
+const streaming = (extra: Partial<State> = {}): State =>
+  inMode("query", { query: { ...initialState().query, status: "streaming" }, ...extra });
+
 describe("reducer", () => {
   it("empty command input on shown searches most-used", () => {
     const r = reduce(initialState(), { type: "shown" });
@@ -172,7 +175,7 @@ describe("reducer", () => {
   it("Query Enter submits the question with effort", () => {
     const s = inMode("query", { input: " why? " });
     const r = reduce(s, k("Enter"));
-    expect(r.effects[0]).toEqual({ type: "ask", text: "why?", effort: "fast" });
+    expect(r.effects[0]).toEqual({ type: "ask", token: 1, text: "why?", effort: "fast" });
     expect(r.state.query.status).toBe("streaming");
   });
 
@@ -186,7 +189,7 @@ describe("reducer", () => {
       query: { ...initialState().query, status: "streaming" },
     });
     let r = reduce(s, k("Escape"));
-    expect(r.effects).toEqual([{ type: "cancelAsk" }]);
+    expect(r.effects).toEqual([{ type: "cancelAsk", token: 0 }]);
     expect(r.state.input).toBe("q");
     s = r.state;
     r = reduce(s, k("Escape"));
@@ -216,21 +219,58 @@ describe("reducer", () => {
   });
 
   it("ask events build the answer and finish", () => {
-    let s = inMode("query");
-    s = reduce(s, { type: "ask", event: { type: "started", provider: "p", model: "m" } }).state;
-    s = reduce(s, { type: "ask", event: { type: "delta", text: "He" } }).state;
-    s = reduce(s, { type: "ask", event: { type: "delta", text: "llo" } }).state;
-    s = reduce(s, { type: "ask", event: { type: "done", provider: "p" } }).state;
+    let s = streaming();
+    s = reduce(s, {
+      type: "ask",
+      token: 0,
+      event: { type: "started", provider: "p", model: "m" },
+    }).state;
+    s = reduce(s, { type: "ask", token: 0, event: { type: "delta", text: "He" } }).state;
+    s = reduce(s, { type: "ask", token: 0, event: { type: "delta", text: "llo" } }).state;
+    s = reduce(s, { type: "ask", token: 0, event: { type: "done", provider: "p" } }).state;
     expect(s.query).toMatchObject({ status: "done", text: "Hello", provider: "p" });
   });
 
   it("ask error sets error state; no_provider opens settings", () => {
-    const r = reduce(inMode("query"), {
+    const r = reduce(streaming(), {
       type: "ask",
+      token: 0,
       event: { type: "error", code: "no_provider", message: "none" },
     });
     expect(r.state.query.status).toBe("error");
     expect(r.effects).toContainEqual({ type: "openSettings", section: "providers" });
+  });
+
+  it("late delta after Esc is ignored", () => {
+    const s = reduce(streaming(), k("Escape")).state;
+    const r = reduce(s, { type: "ask", token: 0, event: { type: "delta", text: "old" } });
+    expect(r.state.query.text).toBe("");
+  });
+
+  it("late done after hidden is ignored", () => {
+    const s = reduce(streaming(), { type: "hidden" }).state;
+    const r = reduce(s, { type: "ask", token: 0, event: { type: "done", provider: "p" } });
+    expect(r.state.query.status).toBe("idle");
+  });
+
+  it("hidden while streaming emits cancelAsk", () => {
+    expect(reduce(streaming(), { type: "hidden" }).effects).toEqual([
+      { type: "cancelAsk", token: 0 },
+    ]);
+  });
+
+  it("Tab away while streaming emits cancelAsk", () => {
+    expect(reduce(streaming(), k("Tab")).effects[0]).toEqual({ type: "cancelAsk", token: 0 });
+  });
+
+  it("second question cancels the first and ignores its events", () => {
+    const r = reduce(streaming({ input: "next" }), k("Enter"));
+    expect(r.effects.slice(0, 2)).toEqual([
+      { type: "cancelAsk", token: 0 },
+      { type: "ask", token: 1, text: "next", effort: "fast" },
+    ]);
+    const late = reduce(r.state, { type: "ask", token: 0, event: { type: "delta", text: "x" } });
+    expect(late.state.query.text).toBe("");
   });
 
   it("needsConfirm then Enter on same item confirms", () => {

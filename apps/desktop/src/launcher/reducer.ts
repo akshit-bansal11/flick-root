@@ -22,6 +22,8 @@ export interface State {
   enabledModes: Mode[];
   input: string;
   seq: number;
+  /** Id of the current ask; events carrying another token are stale and ignored. */
+  askToken: number;
   items: Item[];
   selected: number;
   query: QueryState;
@@ -34,7 +36,7 @@ export type Event =
   | { type: "key"; key: KeyInput }
   | { type: "text"; text: string }
   | { type: "results"; seq: number; items: Item[] }
-  | { type: "ask"; event: AskEvent }
+  | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "shown" }
@@ -46,8 +48,8 @@ export type Effect =
   | { type: "confirm"; commandId: string; token: string }
   | { type: "reveal"; itemId: string }
   | { type: "copyPath"; itemId: string }
-  | { type: "ask"; text: string; effort: Effort }
-  | { type: "cancelAsk" }
+  | { type: "ask"; token: number; text: string; effort: Effort }
+  | { type: "cancelAsk"; token: number }
   | { type: "nextProvider" }
   | { type: "hide" }
   | { type: "resize" }
@@ -66,6 +68,7 @@ export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
   enabledModes,
   input: "",
   seq: 0,
+  askToken: 0,
   items: [],
   selected: 0,
   query: { status: "idle", text: "", provider: null, effort: "fast", error: null },
@@ -85,7 +88,8 @@ function search(s: State, mode: Mode, input: string): Result {
 }
 
 function switchMode(s: State, mode: Mode, input: string): Result {
-  const cancel: Effect[] = s.query.status === "streaming" ? [{ type: "cancelAsk" }] : [];
+  const cancel: Effect[] =
+    s.query.status === "streaming" ? [{ type: "cancelAsk", token: s.askToken }] : [];
   const cleared: State = {
     ...s,
     items: [],
@@ -121,10 +125,18 @@ function move(s: State, delta: number): Result {
 function enter(s: State, k: KeyInput): Result {
   if (s.mode === "query") {
     const text = s.input.trim();
-    if (!text || s.query.status === "streaming") return out(s);
+    if (!text) return out(s);
+    const token = s.askToken + 1;
+    const cancel: Effect[] =
+      s.query.status === "streaming" ? [{ type: "cancelAsk", token: s.askToken }] : [];
     return out(
-      { ...s, query: { ...s.query, status: "streaming", text: "", provider: null, error: null } },
-      { type: "ask", text, effort: s.query.effort },
+      {
+        ...s,
+        askToken: token,
+        query: { ...s.query, status: "streaming", text: "", provider: null, error: null },
+      },
+      ...cancel,
+      { type: "ask", token, text, effort: s.query.effort },
       { type: "resize" },
     );
   }
@@ -146,7 +158,10 @@ function enter(s: State, k: KeyInput): Result {
 
 function onEscape(s: State): Result {
   if (s.query.status === "streaming") {
-    return out({ ...s, query: { ...s.query, status: "idle" } }, { type: "cancelAsk" });
+    return out(
+      { ...s, query: { ...s.query, status: "idle" } },
+      { type: "cancelAsk", token: s.askToken },
+    );
   }
   if (s.input !== "") return textChange(s, "");
   return out(s, { type: "hide" });
@@ -181,8 +196,9 @@ function key(s: State, k: KeyInput): Result {
   return out(s);
 }
 
-function ask(s: State, e: AskEvent): Result {
+function ask(s: State, token: number, e: AskEvent): Result {
   const q = s.query;
+  if (q.status !== "streaming" || token !== s.askToken) return out(s);
   switch (e.type) {
     case "started":
       return out({ ...s, query: { ...q, provider: e.provider } });
@@ -231,14 +247,23 @@ export function reduce(s: State, ev: Event): Result {
       if (ev.seq !== s.seq) return out(s);
       return out({ ...s, items: ev.items, selected: 0 }, { type: "resize" });
     case "ask":
-      return ask(s, ev.event);
+      return ask(s, ev.token, ev.event);
     case "outcome":
       return outcome(s, ev.commandId, ev.outcome);
     case "enabledModes":
       return out({ ...s, enabledModes: ev.modes });
     case "shown":
-      return search({ ...initialState(s.enabledModes), seq: s.seq, visible: true }, "command", "");
+      return search(
+        { ...initialState(s.enabledModes), seq: s.seq, askToken: s.askToken, visible: true },
+        "command",
+        "",
+      );
     case "hidden":
-      return out({ ...initialState(s.enabledModes), seq: s.seq });
+      return out(
+        { ...initialState(s.enabledModes), seq: s.seq, askToken: s.askToken },
+        ...(s.query.status === "streaming"
+          ? [{ type: "cancelAsk", token: s.askToken } as const]
+          : []),
+      );
   }
 }

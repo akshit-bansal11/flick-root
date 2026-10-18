@@ -9,7 +9,8 @@ const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
   const [state, setState] = useState<State>(() => initialState());
   const stateRef = useRef(state);
-  const askId = useRef<string | null>(null);
+  const ask = useRef<{ token: number; id: string | null }>({ token: 0, id: null });
+  const cancelled = useRef(new Set<number>());
 
   const dispatch = useCallback((ev: Event): boolean => {
     const prev = stateRef.current;
@@ -51,15 +52,20 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
         case "ask":
           ipc
             .askStream({ text: e.text, effort: e.effort }, (event) =>
-              dispatch({ type: "ask", event }),
+              dispatch({ type: "ask", token: e.token, event }),
             )
             .then((id) => {
-              askId.current = id;
+              if (cancelled.current.delete(e.token)) ipc.cancelAsk(id).catch(warn);
+              else ask.current = { token: e.token, id };
             })
             .catch(warn);
+          ask.current = { token: e.token, id: null };
           break;
         case "cancelAsk":
-          if (askId.current) ipc.cancelAsk(askId.current).catch(warn);
+          // Id not back yet: cancel as soon as it arrives.
+          if (ask.current.token === e.token && ask.current.id)
+            ipc.cancelAsk(ask.current.id).catch(warn);
+          else cancelled.current.add(e.token);
           break;
         // Resize is driven by the ResizeObserver in Launcher; provider switching is T2.8.
         case "resize":

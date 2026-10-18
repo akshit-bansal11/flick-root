@@ -1,10 +1,13 @@
-// The only module that talks to Tauri. Rust arg names are snake_case; Tauri expects camelCase keys here.
+// The only module that talks to Tauri.
+// Contract: every Rust command takes FLAT parameters named exactly as the camelCase keys sent here
+// (Tauri converts snake_case params), e.g. `search(seq, mode, text)` and
+// `ask_stream(text, attachment, effort, on_event)`. Rust must not wrap them in a struct parameter.
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { AskEvent, AskRequest, Mode, Outcome, SearchResponse, ShownPayload } from "./types";
 
 export const search = (req: { seq: number; mode: Mode; text: string }) =>
-  invoke<SearchResponse>("search", req);
+  invoke<SearchResponse>("search", { seq: req.seq, mode: req.mode, text: req.text });
 
 export const launch = (itemId: string, admin: boolean) =>
   invoke<Outcome>("launch", { itemId, admin });
@@ -17,9 +20,15 @@ export const runSystemCommand = (commandId: string, confirmToken?: string) =>
   invoke<Outcome>("run_system_command", { commandId, confirmToken });
 
 export function askStream(req: AskRequest, onEvent: (e: AskEvent) => void): Promise<string> {
+  // One Channel per call, so only this ask's events reach onEvent; the caller tags them with its token.
   const onEventChannel = new Channel<AskEvent>();
   onEventChannel.onmessage = onEvent;
-  return invoke<string>("ask_stream", { ...req, onEvent: onEventChannel });
+  return invoke<string>("ask_stream", {
+    text: req.text,
+    attachment: req.attachment,
+    effort: req.effort,
+    onEvent: onEventChannel,
+  });
 }
 
 export const cancelAsk = (askId: string) => invoke<void>("cancel_ask", { askId });
