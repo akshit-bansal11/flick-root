@@ -7,8 +7,9 @@ use crate::{KeySource, ProviderConfig, ProviderError};
 use secrecy::{ExposeSecret, SecretString};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Vault errors. Messages never carry secret values.
 #[derive(thiserror::Error, Debug)]
@@ -241,12 +242,21 @@ fn now() -> i64 {
 pub struct SecretVault {
     backend: Arc<dyn SecretBackend>,
     meta: Arc<dyn MetaStore>,
+    /// Unflushed `last_used` times by entry name.
+    pending: Arc<Mutex<HashMap<String, i64>>>,
+    /// Whether a background flush is already scheduled.
+    scheduled: Arc<AtomicBool>,
 }
 
 impl SecretVault {
     /// Build a vault over a backend and a metadata store.
     pub fn new(backend: Arc<dyn SecretBackend>, meta: Arc<dyn MetaStore>) -> Self {
-        Self { backend, meta }
+        Self {
+            backend,
+            meta,
+            pending: Arc::default(),
+            scheduled: Arc::default(),
+        }
     }
 
     /// Store a secret bound to the host in its name. Rejects empty or multi-line values.
@@ -257,6 +267,7 @@ impl SecretVault {
         }
         let value = SecretString::from(v.to_owned());
         self.backend.set(name, &value)?;
+        lock(&self.pending).remove(name.as_str());
         self.meta.put(SecretMeta {
             name: name.as_str().to_owned(),
             host: name.host().to_owned(),
@@ -268,6 +279,7 @@ impl SecretVault {
     /// Delete the value and its metadata.
     pub fn delete(&self, name: &SecretName) -> Result<(), VaultError> {
         self.backend.delete(name)?;
+        lock(&self.pending).remove(name.as_str());
         self.meta.remove(name.as_str())
     }
 
@@ -285,7 +297,10 @@ impl SecretVault {
             last4,
             host: name.host().to_owned(),
             added_at: m.as_ref().map(|m| m.added_at),
-            last_used: m.and_then(|m| m.last_used),
+            last_used: lock(&self.pending)
+                .get(name.as_str())
+                .copied()
+                .or_else(|| m.and_then(|m| m.last_used)),
         })
     }
 
@@ -309,20 +324,53 @@ impl SecretVault {
         Ok(f(&v))
     }
 
-    /// Crate-internal read for key sources; records the use.
+    /// Crate-internal read for key sources; records the use in memory and persists it
+    /// later, coalesced, on a background thread.
+    // ponytail: the credential read itself is still synchronous because `KeySource` is a
+    // sync trait; making it async (spawn_blocking) touches every wire adapter.
     pub(crate) fn take(&self, name: &SecretName) -> Result<Option<SecretString>, VaultError> {
         let v = self.backend.get(name)?;
-        let meta = if v.is_some() {
-            self.meta.get(name.as_str())?
-        } else {
-            None
-        };
-        if let Some(mut m) = meta {
-            m.last_used = Some(now());
-            self.meta.put(m)?;
+        if v.is_some() {
+            lock(&self.pending).insert(name.as_str().to_owned(), now());
+            if !self.scheduled.swap(true, Ordering::AcqRel) {
+                let (meta, pending, scheduled) = (
+                    Arc::clone(&self.meta),
+                    Arc::clone(&self.pending),
+                    Arc::clone(&self.scheduled),
+                );
+                std::thread::spawn(move || {
+                    std::thread::sleep(FLUSH_DELAY);
+                    scheduled.store(false, Ordering::Release);
+                    if flush_pending(&*meta, &pending).is_err() {
+                        tracing::warn!("secret last_used flush failed");
+                    }
+                });
+            }
         }
         Ok(v)
     }
+
+    /// Persist pending `last_used` updates now (call on shutdown).
+    pub fn flush(&self) -> Result<(), VaultError> {
+        flush_pending(&*self.meta, &self.pending)
+    }
+}
+
+/// How long `last_used` updates are held in memory before one coalesced write.
+const FLUSH_DELAY: Duration = Duration::from_secs(5);
+
+fn flush_pending(
+    meta: &dyn MetaStore,
+    pending: &Mutex<HashMap<String, i64>>,
+) -> Result<(), VaultError> {
+    let drained: Vec<_> = lock(pending).drain().collect();
+    for (name, at) in drained {
+        if let Some(mut m) = meta.get(&name)? {
+            m.last_used = Some(at);
+            meta.put(m)?;
+        }
+    }
+    Ok(())
 }
 
 /// [`KeySource`] backed by the vault: `provider.<id>@<key_host>`.
@@ -372,6 +420,12 @@ mod tests {
             .unwrap();
         assert_eq!(got, "sk-fake-0123456789abcdef");
         assert!(v.info(&name).unwrap().last_used.is_some());
+        // take() must not touch the meta store synchronously; flush() persists it.
+        let meta = v.meta.get(name.as_str()).unwrap().unwrap();
+        assert_eq!(meta.last_used, None);
+        v.flush().unwrap();
+        let meta = v.meta.get(name.as_str()).unwrap().unwrap();
+        assert!(meta.last_used.is_some());
         v.delete(&name).unwrap();
         assert!(matches!(
             v.with_secret(&name, |_| ()),

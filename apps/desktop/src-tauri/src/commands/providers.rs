@@ -206,6 +206,12 @@ fn invalid_url() -> CommandError {
     )
 }
 
+/// Whether the base-URL host differs; the key binding then moves to the new host even
+/// when no key was stored for the old one.
+fn host_changed(old: &ProviderConfig, new: &ProviderConfig) -> bool {
+    old.base_url.host_str() != new.base_url.host_str()
+}
+
 /// Applies `patch` to provider `id` in `cfg`. On a host change the key bound to the old
 /// host is deleted (ADR-011 rule 6) and the binding moves to the new host. Returns true
 /// when the user must enter a key again.
@@ -246,7 +252,7 @@ pub(crate) fn apply_patch(
         if let (Some(o), Some(n)) = (provider_cfg(id, &old), provider_cfg(id, &new)) {
             key_needed = http::on_base_url_change(vault, &o, &n)
                 .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
-            if key_needed {
+            if host_changed(&o, &n) {
                 new.key_host = Some(host);
             }
         }
@@ -352,6 +358,18 @@ mod tests {
         );
         let e = entry_of(&cfg, "openrouter").unwrap();
         assert!(view(&v, &cfg, "openrouter", &e).key.is_none());
+    }
+
+    #[test]
+    fn host_change_without_key_still_binds_new_host() {
+        let v = vault();
+        let mut cfg = Config::default();
+        apply_patch(&v, &mut cfg, "ollama", url_patch("http://localhost:1/v1")).unwrap();
+        apply_patch(&v, &mut cfg, "ollama", url_patch("http://127.0.0.1:2/v1")).unwrap();
+        assert_eq!(
+            cfg.providers.entries["ollama"].key_host.as_deref(),
+            Some("127.0.0.1")
+        );
     }
 
     #[test]
