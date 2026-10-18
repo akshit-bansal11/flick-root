@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Rust format
+        run: cargo fmt --all --check
+
+      # tauri::generate_context! needs frontendDist (apps/desktop/dist) to exist before clippy.
+      - name: Build desktop frontend
+        run: pnpm --filter desktop build
+
+      - name: Rust clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test
+
+      - name: Install cargo-deny and cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny,cargo-audit
+
+      - name: cargo deny
+        run: cargo deny check
+
+      - name: cargo audit
+        run: cargo audit
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: JS tests
+        run: pnpm test
+
+      - name: pnpm audit (production)
+        run: pnpm audit --prod
+
+      - name: Web build
+        run: pnpm --filter web build

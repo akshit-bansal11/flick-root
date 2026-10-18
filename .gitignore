@@ -1,0 +1,12 @@
+target/
+node_modules/
+.agent/
+dist/
+.next/
+out/
+*.log
+.env
+.env.*
+.vercel/
+apps/desktop/src-tauri/gen/schemas/
+*.tsbuildinfo

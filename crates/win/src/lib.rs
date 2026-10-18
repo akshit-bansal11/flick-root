@@ -1,0 +1,1 @@
+//! Win32 and WinRT wrappers used by several crates: power and session, recycle bin, Explorer restart, radios, media session, port tables and UI Automation. Allowed unsafe code, each block with a SAFETY comment.

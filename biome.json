@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": false },
+  "files": {
+    "includes": [
+      "**",
+      "!**/target",
+      "!**/node_modules",
+      "!**/.next",
+      "!**/dist",
+      "!apps/desktop/src-tauri/gen",
+      "!apps/web/next-env.d.ts",
+      "!apps/web/public",
+      "!.agent",
+      "!docs/spec/design-lab.html"
+    ]
+  },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "linter": { "enabled": true }
+}

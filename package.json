@@ -1,0 +1,14 @@
+{
+  "name": "workspace-root",
+  "private": true,
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "pnpm -r --if-present test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15"
+  }
+}
