@@ -34,3 +34,5 @@ arc-swap = { workspace = true }
 url = { workspace = true }
 reqwest = { workspace = true }
 tauri-plugin-clipboard-manager = "2.5.0"
+tokio-util = { workspace = true }
+futures = { workspace = true }

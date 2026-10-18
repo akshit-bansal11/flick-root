@@ -49,6 +49,8 @@ pub fn run() {
             window::hide_launcher,
             tray::open_settings,
             commands::search::search,
+            commands::ask::ask_stream,
+            commands::ask::cancel_ask,
             commands::launch::launch,
             commands::launch::reveal,
             commands::launch::copy_path,
