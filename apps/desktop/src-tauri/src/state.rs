@@ -140,6 +140,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         tracing::warn!(%err, "emit failed");
     }
     let cache_dir = cache::cache_dir().context("locating cache dir")?;
+    std::fs::create_dir_all(&cache_dir).context("creating cache dir")?;
     let apps = Arc::new(AppIndex::new());
     if let Err(err) = apps.load_cache(&cache_dir) {
         tracing::warn!(%err, "app cache unreadable");

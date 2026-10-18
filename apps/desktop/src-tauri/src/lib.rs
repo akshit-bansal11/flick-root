@@ -4,19 +4,25 @@ mod commands;
 mod error;
 mod hotkey;
 mod icons;
+mod logging;
 mod state;
 mod tray;
 mod window;
 
-use tracing_subscriber::EnvFilter;
-
 /// Builds and runs the Tauri application; logs and exits nonzero on failure.
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    logging::install_panic_hook();
+    let log_dir = launcher_core::config::local_data_dir()
+        .ok()
+        .map(|d| d.join("logs"));
+    // Held for the app's lifetime; flushes on drop.
+    let _log_guard = match logging::init(log_dir) {
+        Ok(g) => Some(g),
+        Err(err) => {
+            eprintln!("logging init failed: {err}");
+            None
+        }
+    };
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_launcher(app, "second-instance");
