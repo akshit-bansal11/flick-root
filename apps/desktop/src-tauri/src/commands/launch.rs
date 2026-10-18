@@ -93,6 +93,14 @@ fn path_of(it: &Item) -> Option<PathBuf> {
     }
 }
 
+/// The text to copy when the item's action is `CopyResult` (`payload.value`).
+fn copy_value(it: &Item) -> Option<String> {
+    if !it.actions.contains(&ActionKind::CopyResult) {
+        return None;
+    }
+    it.payload.get("value")?.as_str().map(str::to_owned)
+}
+
 /// Launches or opens a result and hides the launcher when appropriate.
 #[tauri::command]
 pub async fn launch(
@@ -122,6 +130,11 @@ pub async fn launch(
             blocking_com(move || ia::open_path(&p)).await?;
             Outcome::HideLauncher
         }
+        IdRef::Other if copy_value(&it).is_some() => {
+            let value = copy_value(&it).unwrap_or_default();
+            app.clipboard().write_text(value).map_err(internal)?;
+            Outcome::Copied
+        }
         IdRef::Other => {
             let f = state.registry.get(&it.source).await.ok_or_else(not_found)?;
             let kind = if admin {
@@ -146,18 +159,11 @@ pub async fn launch(
     Ok(outcome)
 }
 
+/// Frecency (via `on_chosen`) owns history writes; the shell only notifies features.
 fn record(state: &AppState, it: &Item) {
     if let Some(input) = state.last_input.lock().clone() {
         state.registry.on_chosen_all(&input, it);
     }
-    let kind = serde_json::to_value(it.kind)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_default();
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(0));
-    state.store.record_launch(&it.id.0, &kind, None, ts);
 }
 
 /// Shows a result in Explorer.

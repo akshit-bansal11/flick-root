@@ -88,6 +88,15 @@ fn refusal(text: &str, attachment: Option<&str>, no_provider: bool) -> Option<As
     no_provider.then(|| error("no_provider", "no provider is enabled"))
 }
 
+/// Query mode gate: errors with `mode_disabled` when the mode is off.
+fn check_enabled(enabled: bool) -> Result<(), CommandError> {
+    if enabled {
+        Ok(())
+    } else {
+        Err(CommandError::new("mode_disabled", "Query mode is off"))
+    }
+}
+
 fn request(text: &str, attachment: Option<&str>, effort: &str) -> Request {
     let content = match attachment {
         Some(a) if !a.is_empty() => format!("{text}\n\n{a}"),
@@ -116,6 +125,7 @@ pub async fn ask_stream(
     effort: String,
     on_event: Channel<AskEvent>,
 ) -> Result<String, CommandError> {
+    check_enabled(state.config.load().modes.query.enabled)?;
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed).to_string();
     let hub = state.ctx.providers.load_full();
     if let Some(e) = refusal(&text, attachment.as_deref(), hub.is_empty()) {
@@ -176,6 +186,12 @@ mod tests {
         assert_eq!(code(refusal(key, None, true)), "secret_blocked");
         assert_eq!(code(refusal("hello", None, true)), "no_provider");
         assert!(refusal("hello", None, false).is_none());
+    }
+
+    #[test]
+    fn query_gate() {
+        assert!(check_enabled(true).is_ok());
+        assert_eq!(check_enabled(false).unwrap_err().code, "mode_disabled");
     }
 
     #[test]
