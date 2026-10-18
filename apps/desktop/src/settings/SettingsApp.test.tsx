@@ -1,11 +1,14 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "./api";
-import { SettingsApp } from "./SettingsApp";
+import type { PageId } from "./Nav";
+import { resolveView, SettingsApp } from "./SettingsApp";
 import type { SettingsView } from "./types";
 
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }));
+vi.mock("../firstrun/FirstRun", () => ({ FirstRun: () => null }));
 vi.mock("./api", () => ({
   getSettings: vi.fn(),
   setGeneral: vi.fn(),
@@ -29,6 +32,11 @@ const settings: SettingsView = {
 
 let root: Root | undefined;
 
+function Harness() {
+  const [page, setPage] = useState<PageId>("general");
+  return <SettingsApp page={page} onPage={setPage} />;
+}
+
 async function mount() {
   vi.mocked(api.getSettings).mockResolvedValue(settings);
   vi.mocked(api.listFeatures).mockResolvedValue({
@@ -37,7 +45,7 @@ async function mount() {
   });
   const container = document.body.appendChild(document.createElement("div"));
   root = createRoot(container);
-  act(() => root?.render(<SettingsApp />));
+  act(() => root?.render(<Harness />));
   await act(async () => {});
 }
 
@@ -81,5 +89,15 @@ describe("SettingsApp", () => {
     });
     expect(api.clearHistory).toHaveBeenCalledWith("all");
     expect(screen.queryByRole("button", { name: "Confirm clear" })).toBeNull();
+  });
+});
+
+describe("resolveView", () => {
+  it("maps sections, aliases and unknowns", () => {
+    expect(resolveView("#first-run", null)).toBe("first-run");
+    expect(resolveView("providers", "general")).toBe("providers");
+    expect(resolveView("ai-providers", "general")).toBe("providers");
+    expect(resolveView("nope", "about")).toBe("about");
+    expect(resolveView(null, null)).toBeNull();
   });
 });
