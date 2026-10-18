@@ -10,6 +10,7 @@ pub mod openai_compat;
 pub mod presets;
 pub mod secret;
 pub mod sse;
+pub(crate) mod stream;
 pub mod types;
 
 use async_trait::async_trait;

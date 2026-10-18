@@ -29,11 +29,7 @@ fn client(server: &MockServer, keys: Arc<dyn KeySource>) -> Anthropic {
         key_host: None,
         supports_effort: true,
     };
-    let http = reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(5))
-        .build()
-        .unwrap();
-    Anthropic::new(cfg, http, keys)
+    Anthropic::new(cfg, keys).unwrap()
 }
 
 fn req(effort: Effort) -> Request {

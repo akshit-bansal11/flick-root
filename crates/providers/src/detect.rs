@@ -33,7 +33,9 @@ pub async fn detect_local(timeout: Duration) -> Vec<Detected> {
 
 /// Probe explicit `(preset_id, base_url)` targets; injectable for tests.
 pub async fn detect_targets(targets: &[(String, String)], timeout: Duration) -> Vec<Detected> {
-    let client = plain_client();
+    let Ok(client) = plain_client() else {
+        return vec![];
+    };
     join_all(targets.iter().map(|(id, base)| {
         let client = client.clone();
         async move {

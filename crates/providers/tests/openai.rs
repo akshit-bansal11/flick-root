@@ -28,7 +28,7 @@ fn client(server: &MockServer, effort: bool, keys: Arc<dyn KeySource>) -> OpenAi
         key_host: None,
         supports_effort: effort,
     };
-    OpenAiCompat::new(cfg, OpenAiCompat::default_http().unwrap(), keys)
+    OpenAiCompat::new(cfg, keys).unwrap()
 }
 
 fn req(effort: Effort) -> Request {
@@ -232,4 +232,23 @@ async fn oversize_sse_event_is_decode_error() {
         out.last(),
         Some(Err(ProviderError::Decode("sse event too large")))
     ));
+}
+
+#[tokio::test]
+async fn keyed_request_never_follows_redirect() {
+    let target = MockServer::start().await;
+    let s = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("location", format!("{}/v1/chat/completions", target.uri())),
+        )
+        .mount(&s)
+        .await;
+    let out: Vec<_> = client(&s, false, Arc::new(FakeKey))
+        .stream(req(Effort::Fast), CancellationToken::new())
+        .collect()
+        .await;
+    assert!(matches!(out[0], Err(ProviderError::Status { code: 302 })));
+    assert!(target.received_requests().await.unwrap().is_empty());
 }

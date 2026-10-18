@@ -5,26 +5,24 @@
 //! adaptive thinking; `thinking.type = "enabled"` with `budget_tokens` is
 //! rejected with a 400 on these models, so it is never sent.
 
-use crate::http::{self, check_status, net_err, read_capped};
-use crate::sse::{SseEvent, SseParser};
+use crate::http;
+use crate::sse::SseEvent;
+use crate::stream::{self, WireState};
 use crate::{
     Delta, Effort, KeySource, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role,
     Usage,
 };
 use async_trait::async_trait;
-use futures::stream::{BoxStream, StreamExt};
+use futures::stream::BoxStream;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
-use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 const SYSTEM_PROMPT: &str = "Answer directly and briefly. Markdown is allowed.";
 /// Value of the `anthropic-version` header (per the Messages API docs).
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
-/// Cap for the `/v1/models` probe body.
-const MAX_PROBE_BYTES: usize = 1 << 20;
 
 /// Client for the Anthropic Messages API.
 pub struct Anthropic {
@@ -34,53 +32,29 @@ pub struct Anthropic {
 }
 
 impl Anthropic {
-    /// Build a client; `http` should use a 5 s connect timeout and no overall timeout.
-    pub fn new(cfg: ProviderConfig, http: reqwest::Client, keys: Arc<dyn KeySource>) -> Self {
-        Self { cfg, http, keys }
+    /// Build a client with the no-redirect, 2 s connect-timeout authed HTTP client.
+    pub fn new(cfg: ProviderConfig, keys: Arc<dyn KeySource>) -> Result<Self, ProviderError> {
+        Ok(Self {
+            cfg,
+            http: http::authed_client()?,
+            keys,
+        })
     }
 
     /// Probe with a caller-given timeout.
     pub async fn probe_with(&self, timeout: Duration) -> ProbeResult {
-        let start = Instant::now();
-        let res = tokio::time::timeout(timeout, self.list_models()).await;
-        let (reachable, models, error) = match res {
-            Ok(Ok(m)) => (true, m, None),
-            Ok(Err(e)) => (false, vec![], Some(e.to_string())),
-            Err(_) => (false, vec![], Some("timed out".to_owned())),
-        };
-        ProbeResult {
-            id: self.cfg.id.clone(),
-            reachable,
-            models,
-            ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
-            error,
-        }
+        stream::probe(&self.cfg.id, timeout, self.list_models()).await
     }
 
     async fn list_models(&self) -> Result<Vec<String>, ProviderError> {
-        if self.keys.key_for(&self.cfg)?.is_none() {
-            return Err(ProviderError::NoKey {
-                host: host_of(&self.cfg),
-            });
-        }
+        // The key is read once, inside `authorize`; no key means no probe.
         let rb = authorize(
             &self.cfg,
             &*self.keys,
             self.http.get(url(&self.cfg, "v1/models")),
+            true,
         )?;
-        let resp = rb.send().await.map_err(net_err)?;
-        check_status(&resp)?;
-        let body = read_capped(resp, MAX_PROBE_BYTES).await?;
-        let v: Value =
-            serde_json::from_slice(&body).map_err(|_| ProviderError::Decode("models json"))?;
-        Ok(v["data"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|m| m["id"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default())
+        stream::list_models(rb).await
     }
 }
 
@@ -93,14 +67,20 @@ fn url(cfg: &ProviderConfig, path: &str) -> String {
 }
 
 /// Set the version header and, when a key exists, the sensitive `x-api-key` header.
+/// With `require_key`, a missing key is `NoKey`.
 fn authorize(
     cfg: &ProviderConfig,
     keys: &dyn KeySource,
     rb: reqwest::RequestBuilder,
+    require_key: bool,
 ) -> Result<reqwest::RequestBuilder, ProviderError> {
     let rb = rb.header("anthropic-version", ANTHROPIC_VERSION);
     let Some(key) = http::authorize(cfg, keys)? else {
-        return Ok(rb);
+        return if require_key {
+            Err(ProviderError::NoKey { host: host_of(cfg) })
+        } else {
+            Ok(rb)
+        };
     };
     Ok(rb.header("x-api-key", http::sensitive(key.expose_secret())?))
 }
@@ -132,15 +112,10 @@ fn build_body(cfg: &ProviderConfig, req: &Request) -> Result<Value, ProviderErro
     Ok(body)
 }
 
-struct State {
-    bytes: BoxStream<'static, Result<bytes::Bytes, reqwest::Error>>,
-    parser: SseParser,
-    pending: VecDeque<SseEvent>,
-    cancel: CancellationToken,
+#[derive(Default)]
+struct Wire {
     usage: Usage,
     thinking: bool,
-    out: VecDeque<Delta>,
-    done: bool,
 }
 
 fn set_u32(dst: &mut u32, v: &Value) {
@@ -149,11 +124,23 @@ fn set_u32(dst: &mut u32, v: &Value) {
     }
 }
 
-impl State {
-    /// Turn one event into zero or more deltas.
-    fn handle(&mut self, ev: SseEvent) -> Result<(), ProviderError> {
-        let v: Value =
-            serde_json::from_str(&ev.data).map_err(|_| ProviderError::Decode("event json"))?;
+impl Wire {
+    fn mark_thinking(&mut self, out: &mut Vec<Result<Delta, ProviderError>>) {
+        if !self.thinking {
+            self.thinking = true;
+            out.push(Ok(Delta::Thinking));
+        }
+    }
+}
+
+impl WireState for Wire {
+    const ENDED: &'static str = "stream ended without message_stop";
+
+    fn handle(&mut self, ev: SseEvent) -> Vec<Result<Delta, ProviderError>> {
+        let Ok(v) = serde_json::from_str::<Value>(&ev.data) else {
+            return vec![Err(ProviderError::Decode("event json"))];
+        };
+        let mut out = Vec::new();
         match v["type"].as_str().unwrap_or_default() {
             "message_start" => {
                 let u = &v["message"]["usage"];
@@ -161,17 +148,17 @@ impl State {
                 set_u32(&mut self.usage.completion_tokens, &u["output_tokens"]);
             }
             "content_block_start" if v["content_block"]["type"] == "thinking" => {
-                self.mark_thinking()
+                self.mark_thinking(&mut out);
             }
             "content_block_delta" => {
                 let d = &v["delta"];
                 match d["type"].as_str().unwrap_or_default() {
                     "text_delta" => {
                         if let Some(t) = d["text"].as_str().filter(|s| !s.is_empty()) {
-                            self.out.push_back(Delta::Text(t.to_owned()));
+                            out.push(Ok(Delta::Text(t.to_owned())));
                         }
                     }
-                    "thinking_delta" => self.mark_thinking(),
+                    "thinking_delta" => self.mark_thinking(&mut out),
                     _ => {} // signature_delta and unknown deltas
                 }
             }
@@ -181,78 +168,19 @@ impl State {
                 set_u32(&mut self.usage.prompt_tokens, &u["input_tokens"]);
                 set_u32(&mut self.usage.completion_tokens, &u["output_tokens"]);
             }
-            "message_stop" => {
-                self.out.push_back(Delta::Done(self.usage));
-                self.done = true;
-            }
+            "message_stop" => out.push(Ok(Delta::Done(self.usage))),
             "error" => {
                 // Map to the HTTP status the same condition would carry; never keep the message.
-                return Err(match v["error"]["type"].as_str() {
+                out.push(Err(match v["error"]["type"].as_str() {
                     Some("overloaded_error") => ProviderError::Status { code: 529 },
                     Some("api_error") => ProviderError::Status { code: 500 },
                     Some("rate_limit_error") => ProviderError::Status { code: 429 },
                     _ => ProviderError::Decode("stream error event"),
-                });
+                }));
             }
             _ => {} // ping and unknown events
         }
-        Ok(())
-    }
-
-    fn mark_thinking(&mut self) {
-        if !self.thinking {
-            self.thinking = true;
-            self.out.push_back(Delta::Thinking);
-        }
-    }
-
-    async fn next(&mut self) -> Option<Result<Delta, ProviderError>> {
-        loop {
-            if self.cancel.is_cancelled() {
-                if self.done {
-                    return None;
-                }
-                self.done = true;
-                self.out.clear();
-                return Some(Err(ProviderError::Cancelled));
-            }
-            if let Some(d) = self.out.pop_front() {
-                return Some(Ok(d));
-            }
-            if self.done {
-                return None;
-            }
-            if let Some(ev) = self.pending.pop_front() {
-                if let Err(e) = self.handle(ev) {
-                    self.done = true;
-                    return Some(Err(e));
-                }
-                continue;
-            }
-            let chunk = tokio::select! {
-                () = self.cancel.cancelled() => continue,
-                c = self.bytes.next() => c,
-            };
-            match chunk {
-                Some(Ok(b)) => match self.parser.push(&b) {
-                    Ok(evs) => self.pending.extend(evs),
-                    Err(e) => {
-                        self.done = true;
-                        return Some(Err(e));
-                    }
-                },
-                Some(Err(e)) => {
-                    self.done = true;
-                    return Some(Err(net_err(e)));
-                }
-                None => {
-                    self.done = true;
-                    return Some(Err(ProviderError::Decode(
-                        "stream ended without message_stop",
-                    )));
-                }
-            }
-        }
+        out
     }
 }
 
@@ -267,38 +195,15 @@ impl Provider for Anthropic {
         req: Request,
         cancel: CancellationToken,
     ) -> BoxStream<'static, Result<Delta, ProviderError>> {
-        let http = self.http.clone();
-        let cfg = self.cfg.clone();
-        let keys = self.keys.clone();
-        let endpoint = url(&cfg, "v1/messages");
-        futures::stream::once(async move {
-            let body = build_body(&cfg, &req)?;
-            let rb = authorize(&cfg, &*keys, http.post(endpoint).json(&body))?;
-            let resp = tokio::select! {
-                () = cancel.cancelled() => return Err(ProviderError::Cancelled),
-                r = rb.send() => r.map_err(net_err)?,
-            };
-            check_status(&resp)?;
-            Ok(State {
-                bytes: resp.bytes_stream().boxed(),
-                parser: SseParser::default(),
-                pending: VecDeque::new(),
-                cancel,
-                usage: Usage::default(),
-                thinking: false,
-                out: VecDeque::new(),
-                done: false,
-            })
-        })
-        .flat_map(|r| match r {
-            Err(e) => futures::stream::once(async move { Err(e) }).boxed(),
-            Ok(st) => futures::stream::unfold(st, |mut st| async move {
-                let item = st.next().await?;
-                Some((item, st))
-            })
-            .boxed(),
-        })
-        .boxed()
+        let rb = build_body(&self.cfg, &req).and_then(|body| {
+            authorize(
+                &self.cfg,
+                &*self.keys,
+                self.http.post(url(&self.cfg, "v1/messages")).json(&body),
+                false,
+            )
+        });
+        stream::start(rb, Wire::default(), cancel)
     }
 
     async fn probe(&self) -> ProbeResult {

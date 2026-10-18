@@ -26,11 +26,7 @@ fn cfg(id: &str, base: &str) -> ProviderConfig {
 }
 
 fn http(id: &str, s: &MockServer) -> Arc<dyn Provider> {
-    Arc::new(OpenAiCompat::new(
-        cfg(id, &format!("{}/v1", s.uri())),
-        OpenAiCompat::default_http().unwrap(),
-        Arc::new(NoKeys),
-    ))
+    Arc::new(OpenAiCompat::new(cfg(id, &format!("{}/v1", s.uri())), Arc::new(NoKeys)).unwrap())
 }
 
 async fn server(resp: ResponseTemplate) -> MockServer {
@@ -171,4 +167,17 @@ async fn cancel_stops_silently() {
     cancel.cancel();
     let rest = tokio::time::timeout(Duration::from_secs(2), s.next()).await;
     assert!(matches!(rest, Ok(None)));
+}
+
+#[tokio::test]
+async fn stalled_server_times_out_and_falls_back() {
+    let a = server(ok_body().set_delay(Duration::from_secs(5))).await;
+    let b = server(ok_body()).await;
+    let hub = ProviderHub::new(vec![http("a", &a), http("b", &b)])
+        .with_first_token_timeout(Duration::from_millis(300));
+    let ev = collect(&hub).await;
+    assert!(
+        matches!(&ev[1], HubEvent::Fallback { from, reason, .. } if from == "a" && reason.contains("first token"))
+    );
+    assert!(matches!(ev.last(), Some(HubEvent::Done { provider }) if provider == "b"));
 }

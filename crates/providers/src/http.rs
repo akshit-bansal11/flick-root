@@ -6,22 +6,34 @@ use secrecy::SecretString;
 use std::time::Duration;
 use url::{Host, Url};
 
-fn build(policy: reqwest::redirect::Policy) -> reqwest::Client {
+/// Connect timeout for every client (AFD section 6).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
+
+fn build(policy: reqwest::redirect::Policy) -> Result<reqwest::Client, ProviderError> {
     reqwest::Client::builder()
         .redirect(policy)
-        .connect_timeout(Duration::from_secs(5))
+        .connect_timeout(CONNECT_TIMEOUT)
         .build()
-        .unwrap_or_default()
+        .map_err(|_| ProviderError::Decode("http client build failed"))
 }
 
 /// Client for requests that carry a key: never follows redirects.
-pub fn authed_client() -> reqwest::Client {
+pub fn authed_client() -> Result<reqwest::Client, ProviderError> {
     build(reqwest::redirect::Policy::none())
 }
 
 /// Client for unauthenticated calls: follows at most 5 redirects.
-pub fn plain_client() -> reqwest::Client {
+pub fn plain_client() -> Result<reqwest::Client, ProviderError> {
     build(reqwest::redirect::Policy::limited(5))
+}
+
+fn is_loopback(url: &Url) -> bool {
+    match url.host() {
+        Some(Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    }
 }
 
 /// Allow only `bound_host`, over https (http only for loopback).
@@ -33,15 +45,9 @@ pub fn check_url(url: &Url, bound_host: &str) -> Result<(), ProviderError> {
             actual: host.to_owned(),
         });
     }
-    let loopback = match url.host() {
-        Some(Host::Domain(d)) => d.eq_ignore_ascii_case("localhost"),
-        Some(Host::Ipv4(ip)) => ip.is_loopback(),
-        Some(Host::Ipv6(ip)) => ip.is_loopback(),
-        None => false,
-    };
     match url.scheme() {
         "https" => Ok(()),
-        "http" if loopback => Ok(()),
+        "http" if is_loopback(url) => Ok(()),
         _ => Err(ProviderError::InsecureUrl {
             host: host.to_owned(),
         }),
@@ -116,18 +122,10 @@ pub(crate) fn authorize(
     let Some(key) = keys.key_for(cfg)? else {
         return Ok(None);
     };
-    let host = cfg.base_url.host_str().unwrap_or_default().to_owned();
-    if let Some(bound) = &cfg.key_host
-        && !bound.eq_ignore_ascii_case(&host)
-    {
-        return Err(ProviderError::HostMismatch {
-            bound: bound.clone(),
-            actual: host,
-        });
-    }
-    let loopback = matches!(host.as_str(), "localhost" | "127.0.0.1" | "[::1]");
-    if cfg.base_url.scheme() != "https" && !loopback {
-        return Err(ProviderError::InsecureUrl { host });
+    let host = cfg.base_url.host_str().unwrap_or_default();
+    match &cfg.key_host {
+        Some(bound) => check_url(&cfg.base_url, bound)?,
+        None => check_url(&cfg.base_url, host)?,
     }
     Ok(Some(key))
 }

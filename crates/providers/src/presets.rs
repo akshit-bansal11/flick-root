@@ -150,7 +150,6 @@ pub fn build_provider(
     entry: &ProviderEntry,
     preset: &Preset,
     keys: Arc<dyn KeySource>,
-    http: reqwest::Client,
 ) -> Result<Box<dyn Provider>, ProviderError> {
     let base_url: Url = entry
         .base_url
@@ -165,8 +164,8 @@ pub fn build_provider(
         supports_effort: preset.supports_effort,
     };
     match preset.wire {
-        Wire::OpenAi => Ok(Box::new(OpenAiCompat::new(cfg, http, keys))),
-        Wire::Anthropic => Ok(Box::new(Anthropic::new(cfg, http, keys))),
+        Wire::OpenAi => Ok(Box::new(OpenAiCompat::new(cfg, keys)?)),
+        Wire::Anthropic => Ok(Box::new(Anthropic::new(cfg, keys)?)),
     }
 }
 
@@ -202,8 +201,7 @@ mod tests {
             ..Default::default()
         };
         let keys: Arc<dyn KeySource> = Arc::new(crate::auth::NoKeys);
-        let p =
-            build_provider("anthropic", &entry, pr, keys, reqwest::Client::new()).expect("build");
+        let p = build_provider("anthropic", &entry, pr, keys).expect("build");
         assert_eq!(p.config().wire, Wire::Anthropic);
     }
 }
