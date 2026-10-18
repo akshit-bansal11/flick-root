@@ -1,0 +1,81 @@
+.key-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--l-scrim);
+}
+.key-dialog {
+  width: min(480px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-6);
+  padding: var(--l-sp-9);
+  background: var(--l-surface);
+  color: var(--l-text);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  box-shadow: var(--l-shadow);
+  font-family: var(--l-ui);
+  font-size: var(--l-fs);
+  line-height: var(--l-lh);
+  animation: key-dialog-in calc(120ms * var(--motion-scale)) var(--l-motion-ease);
+}
+.key-dialog h2 {
+  margin: 0;
+  font-size: var(--l-fs-title);
+}
+.key-dialog p {
+  margin: 0;
+  color: var(--l-muted-strong);
+}
+.key-dialog input[type="password"] {
+  padding: var(--l-sp-4) var(--l-sp-6);
+  background: var(--l-bg);
+  color: var(--l-text);
+  border: var(--l-border);
+  border-radius: var(--l-r2);
+  font-family: var(--l-mono);
+}
+.key-dialog-ack {
+  display: flex;
+  gap: var(--l-sp-4);
+  align-items: center;
+}
+.key-dialog p.key-dialog-error {
+  color: var(--l-err);
+}
+.key-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--l-sp-4);
+}
+.key-dialog button {
+  padding: var(--l-sp-3) var(--l-sp-8);
+  background: var(--l-surface);
+  color: var(--l-text);
+  border: var(--l-border);
+  border-radius: var(--l-r2);
+  font: inherit;
+}
+.key-dialog button:last-child {
+  background: var(--l-accent);
+  color: var(--l-ink);
+}
+.key-dialog button:disabled {
+  opacity: 0.5;
+}
+.key-dialog :focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 1px;
+}
+@keyframes key-dialog-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .key-dialog {
+    animation: none;
+  }
+}
