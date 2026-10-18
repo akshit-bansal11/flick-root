@@ -54,3 +54,7 @@ harness = false
 [[bench]]
 name = "projects"
 harness = false
+
+[[bench]]
+name = "command_all"
+harness = false
