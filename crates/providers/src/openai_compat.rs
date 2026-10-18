@@ -8,12 +8,14 @@ use crate::{
     Request, Role, Usage,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use futures::stream::BoxStream;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
+use zeroize::Zeroizing;
 
 const SYSTEM_PROMPT: &str = "Answer directly and briefly. Markdown is allowed.";
 
@@ -48,25 +50,21 @@ impl OpenAiCompat {
     }
 
     async fn list_models(&self) -> Result<Vec<String>, ProviderError> {
-        stream::list_models(authorize(
-            &self.cfg,
-            &*self.keys,
-            self.http.get(self.url("models")),
-        )?)
-        .await
+        let rb = authorize(&self.cfg, &self.keys, self.http.get(self.url("models"))).await?;
+        stream::list_models(rb).await
     }
 }
 
 /// Set the sensitive bearer header when a key exists.
-fn authorize(
+async fn authorize(
     cfg: &ProviderConfig,
-    keys: &dyn KeySource,
+    keys: &Arc<dyn KeySource>,
     rb: reqwest::RequestBuilder,
 ) -> Result<reqwest::RequestBuilder, ProviderError> {
-    let Some(key) = http::authorize(cfg, keys)? else {
+    let Some(key) = http::authorize(cfg, keys).await? else {
         return Ok(rb);
     };
-    let value = http::sensitive(&format!("Bearer {}", key.expose_secret()))?;
+    let value = http::sensitive(&Zeroizing::new(format!("Bearer {}", key.expose_secret())))?;
     Ok(rb.header(reqwest::header::AUTHORIZATION, value))
 }
 
@@ -147,14 +145,14 @@ impl Provider for OpenAiCompat {
         req: Request,
         cancel: CancellationToken,
     ) -> BoxStream<'static, Result<Delta, ProviderError>> {
-        let rb = authorize(
-            &self.cfg,
-            &*self.keys,
-            self.http
-                .post(self.url("chat/completions"))
-                .json(&build_body(&self.cfg, &req)),
-        );
-        stream::start(rb, Wire::default(), cancel)
+        let (cfg, keys, http) = (self.cfg.clone(), Arc::clone(&self.keys), self.http.clone());
+        let post = self.url("chat/completions");
+        futures::stream::once(async move {
+            let rb = authorize(&cfg, &keys, http.post(post).json(&build_body(&cfg, &req))).await;
+            stream::start(rb, Wire::default(), cancel)
+        })
+        .flatten()
+        .boxed()
     }
 
     async fn probe(&self) -> ProbeResult {

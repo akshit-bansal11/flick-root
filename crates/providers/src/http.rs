@@ -3,6 +3,7 @@
 use crate::secret::{SecretName, SecretVault};
 use crate::{KeySource, ProviderConfig, ProviderError};
 use secrecy::SecretString;
+use std::sync::Arc;
 use std::time::Duration;
 use url::{Host, Url};
 
@@ -115,11 +116,18 @@ pub(crate) fn check_status(resp: &reqwest::Response) -> Result<(), ProviderError
 
 /// Fetch the key (if any) and validate host binding and scheme. The caller sets
 /// its own sensitive header from the returned key.
-pub(crate) fn authorize(
+///
+/// The lookup runs on the blocking pool (Credential Manager is synchronous); the key
+/// crosses that boundary only as a `SecretString`.
+pub(crate) async fn authorize(
     cfg: &ProviderConfig,
-    keys: &dyn KeySource,
+    keys: &Arc<dyn KeySource>,
 ) -> Result<Option<SecretString>, ProviderError> {
-    let Some(key) = keys.key_for(cfg)? else {
+    let (c, k) = (cfg.clone(), Arc::clone(keys));
+    let found = tokio::task::spawn_blocking(move || k.key_for(&c))
+        .await
+        .map_err(|_| ProviderError::Decode("key lookup task failed"))??;
+    let Some(key) = found else {
         return Ok(None);
     };
     let host = cfg.base_url.host_str().unwrap_or_default();

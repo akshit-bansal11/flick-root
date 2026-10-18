@@ -13,6 +13,7 @@ use crate::{
     Usage,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use futures::stream::BoxStream;
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
@@ -50,10 +51,11 @@ impl Anthropic {
         // The key is read once, inside `authorize`; no key means no probe.
         let rb = authorize(
             &self.cfg,
-            &*self.keys,
+            &self.keys,
             self.http.get(url(&self.cfg, "v1/models")),
             true,
-        )?;
+        )
+        .await?;
         stream::list_models(rb).await
     }
 }
@@ -68,14 +70,14 @@ fn url(cfg: &ProviderConfig, path: &str) -> String {
 
 /// Set the version header and, when a key exists, the sensitive `x-api-key` header.
 /// With `require_key`, a missing key is `NoKey`.
-fn authorize(
+async fn authorize(
     cfg: &ProviderConfig,
-    keys: &dyn KeySource,
+    keys: &Arc<dyn KeySource>,
     rb: reqwest::RequestBuilder,
     require_key: bool,
 ) -> Result<reqwest::RequestBuilder, ProviderError> {
     let rb = rb.header("anthropic-version", ANTHROPIC_VERSION);
-    let Some(key) = http::authorize(cfg, keys)? else {
+    let Some(key) = http::authorize(cfg, keys).await? else {
         return if require_key {
             Err(ProviderError::NoKey { host: host_of(cfg) })
         } else {
@@ -195,15 +197,19 @@ impl Provider for Anthropic {
         req: Request,
         cancel: CancellationToken,
     ) -> BoxStream<'static, Result<Delta, ProviderError>> {
-        let rb = build_body(&self.cfg, &req).and_then(|body| {
-            authorize(
-                &self.cfg,
-                &*self.keys,
-                self.http.post(url(&self.cfg, "v1/messages")).json(&body),
-                false,
-            )
-        });
-        stream::start(rb, Wire::default(), cancel)
+        let (cfg, keys, http) = (self.cfg.clone(), Arc::clone(&self.keys), self.http.clone());
+        futures::stream::once(async move {
+            let rb = match build_body(&cfg, &req) {
+                Ok(body) => {
+                    let rb = http.post(url(&cfg, "v1/messages")).json(&body);
+                    authorize(&cfg, &keys, rb, false).await
+                }
+                Err(e) => Err(e),
+            };
+            stream::start(rb, Wire::default(), cancel)
+        })
+        .flatten()
+        .boxed()
     }
 
     async fn probe(&self) -> ProbeResult {

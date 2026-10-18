@@ -325,9 +325,7 @@ impl SecretVault {
     }
 
     /// Crate-internal read for key sources; records the use in memory and persists it
-    /// later, coalesced, on a background thread.
-    // ponytail: the credential read itself is still synchronous because `KeySource` is a
-    // sync trait; making it async (spawn_blocking) touches every wire adapter.
+    /// later, coalesced, on a background thread. Blocking: call via `spawn_blocking`.
     pub(crate) fn take(&self, name: &SecretName) -> Result<Option<SecretString>, VaultError> {
         let v = self.backend.get(name)?;
         if v.is_some() {
