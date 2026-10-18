@@ -4,11 +4,12 @@ import { Tile } from "./Tile";
 interface Props {
   item: Item;
   id: string;
+  index: number;
   selected: boolean;
-  onActivate: (itemId: string) => void;
+  onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
 }
 
-export function ResultRow({ item, id, selected, onActivate }: Props) {
+export function ResultRow({ item, id, index, selected, onActivate }: Props) {
   return (
     <div
       id={id}
@@ -18,7 +19,7 @@ export function ResultRow({ item, id, selected, onActivate }: Props) {
       className={selected ? "row sel" : "row"}
       onMouseDown={(e) => {
         e.preventDefault();
-        onActivate(item.id);
+        onActivate(index, { ctrl: e.ctrlKey, shift: e.shiftKey });
       }}
     >
       <Tile item={item} />

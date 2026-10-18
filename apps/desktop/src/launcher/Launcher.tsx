@@ -51,6 +51,7 @@ export function Launcher() {
           error={noProvider ? null : q.error}
           noProvider={noProvider}
           thinking={q.thinking}
+          streaming={q.status === "streaming"}
           reasoning={q.reasoning}
           onToggleEffort={toggleEffort}
           onOpenSettings={() => openSettings("providers")}

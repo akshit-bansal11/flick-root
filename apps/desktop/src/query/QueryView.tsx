@@ -11,6 +11,7 @@ interface Props {
   /** False when the active provider has no reasoning control; hides the pill. */
   reasoning?: boolean;
   thinking?: boolean;
+  streaming?: boolean;
   text: string;
   error: string | null;
   noProvider: boolean;
@@ -43,7 +44,7 @@ export function QueryView(p: Props) {
       </div>
       {p.thinking && !p.text && <div className="query-thinking">thinking…</div>}
       {p.text && (
-        <div data-answer>
+        <div data-answer aria-live="polite" aria-busy={p.streaming}>
           <Markdown text={p.text} onOpenLink={p.onOpenLink} />
         </div>
       )}

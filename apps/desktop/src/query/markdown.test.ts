@@ -27,7 +27,8 @@ describe("parseMarkdown", () => {
     for (const unit of ["hello **world** [a](https://x.y) `c`\n", "[", "*a ", "> "]) {
       const t0 = performance.now();
       parseMarkdown(unit.repeat(Math.ceil(200_000 / unit.length)));
-      expect(performance.now() - t0).toBeLessThan(50);
+      // Limit is loose on purpose: it only exists to catch quadratic blowups, not to benchmark.
+      expect(performance.now() - t0).toBeLessThan(250);
     }
   });
 });

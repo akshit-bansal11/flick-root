@@ -113,12 +113,8 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   const setText = useCallback((text: string) => dispatch({ type: "text", text }), [dispatch]);
   const activate = useCallback(
-    (itemId: string) => {
-      ipc
-        .launch(itemId, false)
-        .then((o) => dispatch({ type: "outcome", commandId: itemId, outcome: o }))
-        .catch(warn);
-    },
+    (index: number, mods: { ctrl?: boolean; shift?: boolean } = {}) =>
+      dispatch({ type: "activate", index, ...mods }),
     [dispatch],
   );
 

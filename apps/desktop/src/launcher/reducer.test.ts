@@ -285,6 +285,26 @@ describe("reducer", () => {
     expect(r.state.pendingConfirm).toBeNull();
   });
 
+  it("clicking a guarded item twice launches then confirms", () => {
+    let s = withItems(initialState(), 3);
+    const first = reduce(s, { type: "activate", index: 1 });
+    expect(first.state.selected).toBe(1);
+    expect(first.effects).toEqual([{ type: "launch", itemId: "i1", admin: false }]);
+    s = reduce(first.state, {
+      type: "outcome",
+      commandId: "i1",
+      outcome: { type: "needsConfirm", token: "t", expiresMs: 3000 },
+    }).state;
+    const second = reduce(s, { type: "activate", index: 1 });
+    expect(second.effects).toEqual([{ type: "confirm", commandId: "i1", token: "t" }]);
+  });
+
+  it("activate with ctrl reveals the clicked row", () => {
+    const r = reduce(withItems(initialState(), 3), { type: "activate", index: 2, ctrl: true });
+    expect(r.state.selected).toBe(2);
+    expect(r.effects).toEqual([{ type: "reveal", itemId: "i2" }]);
+  });
+
   it("showItems outcome replaces the list", () => {
     const r = reduce(initialState(), {
       type: "outcome",

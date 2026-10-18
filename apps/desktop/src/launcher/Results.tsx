@@ -8,7 +8,7 @@ const MAX_ROWS = 5;
 interface Props {
   items: Item[];
   selected: number;
-  onActivate: (itemId: string) => void;
+  onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
 }
 
 export function Results({ items, selected, onActivate }: Props) {
@@ -20,6 +20,7 @@ export function Results({ items, selected, onActivate }: Props) {
         <ResultRow
           key={item.id}
           item={item}
+          index={start + k}
           id={optionId(start + k)}
           selected={start + k === selected}
           onActivate={onActivate}

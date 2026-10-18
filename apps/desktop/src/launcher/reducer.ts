@@ -39,6 +39,7 @@ export interface State {
 
 export type Event =
   | { type: "key"; key: KeyInput }
+  | { type: "activate"; index: number; ctrl?: boolean; shift?: boolean }
   | { type: "text"; text: string }
   | { type: "results"; seq: number; items: Item[] }
   | { type: "ask"; token: number; event: AskEvent }
@@ -173,6 +174,11 @@ function enter(s: State, k: KeyInput): Result {
       { type: "resize" },
     );
   }
+  return openSelected(s, k);
+}
+
+/** Enter on the selected row, shared by keyboard and mouse activation. */
+function openSelected(s: State, k: Pick<KeyInput, "ctrl" | "shift">): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
   if (k.ctrl && k.shift) {
@@ -283,6 +289,12 @@ export function reduce(s: State, ev: Event): Result {
   switch (ev.type) {
     case "key":
       return key(s, ev.key);
+    case "activate":
+      if (!s.items[ev.index]) return out(s);
+      return openSelected(
+        { ...s, selected: ev.index },
+        { ctrl: ev.ctrl ?? false, shift: ev.shift ?? false },
+      );
     case "text":
       return textChange(s, ev.text);
     case "results":
