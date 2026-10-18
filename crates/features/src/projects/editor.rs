@@ -38,8 +38,8 @@ impl Editor {
         }
     }
 
-    /// Command that opens `path` in this editor.
-    pub fn open_spec(&self, path: &Path) -> Spec {
+    /// Command that opens `path` in this editor. Errors on a custom command with an unclosed quote.
+    pub fn open_spec(&self, path: &Path) -> Result<Spec, String> {
         let dir = path.to_string_lossy().into_owned();
         // VS Code and Cursor ship `.cmd` shims, which CreateProcess only finds with the extension.
         let (program, mut args) = match self {
@@ -47,13 +47,29 @@ impl Editor {
             Self::Cursor => ("cursor.cmd".to_owned(), vec![]),
             Self::Zed => ("zed".to_owned(), vec![]),
             Self::Custom(cmd) => {
-                let mut parts = cmd.split_whitespace().map(str::to_owned);
-                let program = parts.next().unwrap_or_else(|| "code.cmd".to_owned());
+                let cmd = cmd.trim();
+                let (program, rest) = match cmd.strip_prefix('"') {
+                    Some(q) => {
+                        let (prog, rest) = q
+                            .split_once('"')
+                            .filter(|(p, _)| !p.is_empty())
+                            .ok_or_else(|| {
+                                format!("editor command has an unclosed or empty quote: {cmd}")
+                            })?;
+                        (Some(prog.to_owned()), rest)
+                    }
+                    None => (None, cmd),
+                };
+                let mut parts = rest.split_whitespace().map(str::to_owned);
+                let program = match program {
+                    Some(p) => p,
+                    None => parts.next().unwrap_or_else(|| "code.cmd".to_owned()),
+                };
                 (program, parts.collect())
             }
         };
         args.push(dir);
-        Spec { program, args }
+        Ok(Spec { program, args })
     }
 }
 
@@ -93,7 +109,7 @@ mod tests {
     #[test]
     fn builds_args_with_spaces_and_ampersand() {
         let p = Path::new("D:\\dev\\my app & more");
-        let s = Editor::VsCode.open_spec(p);
+        let s = Editor::VsCode.open_spec(p).unwrap();
         assert_eq!(s.program, "code.cmd");
         assert_eq!(s.args, ["D:\\dev\\my app & more"]);
         let t = terminal_spec(p).unwrap();
@@ -106,8 +122,29 @@ mod tests {
         assert_eq!(Editor::parse(""), Editor::VsCode);
         assert_eq!(Editor::parse("cursor"), Editor::Cursor);
         assert_eq!(Editor::parse("zed"), Editor::Zed);
-        let s = Editor::parse("sub.exe -n").open_spec(Path::new("C:\\x y"));
+        let s = Editor::parse("sub.exe -n")
+            .open_spec(Path::new("C:\\x y"))
+            .unwrap();
         assert_eq!(s.program, "sub.exe");
         assert_eq!(s.args, ["-n", "C:\\x y"]);
+    }
+
+    #[test]
+    fn quoted_custom_program() {
+        let dir = Path::new(r"C:\x y");
+        let s = Editor::parse(r#""C:\Program Files\Sublime Text\subl.exe" -n -a"#)
+            .open_spec(dir)
+            .unwrap();
+        assert_eq!(s.program, r"C:\Program Files\Sublime Text\subl.exe");
+        assert_eq!(s.args, ["-n", "-a", r"C:\x y"]);
+        assert!(
+            Editor::parse(r#""C:\Program Files\subl.exe -n"#)
+                .open_spec(dir)
+                .is_err()
+        );
+        assert!(Editor::parse(r#""" -n"#).open_spec(dir).is_err());
+        let s = Editor::Custom(String::new()).open_spec(dir).unwrap();
+        assert_eq!(s.program, "code.cmd");
+        assert_eq!(s.args, [r"C:\x y"]);
     }
 }

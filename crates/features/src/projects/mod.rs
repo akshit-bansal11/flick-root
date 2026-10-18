@@ -67,7 +67,11 @@ fn depth_from(opts: &toml::Table) -> usize {
 }
 
 /// Scan results plus VS Code recents (existing folders only), deduped by normalized path.
-fn merge(mut found: Vec<Project>, recents: Vec<PathBuf>) -> Vec<Project> {
+fn merge(
+    mut found: Vec<Project>,
+    recents: Vec<PathBuf>,
+    cancelled: &dyn Fn() -> bool,
+) -> Vec<Project> {
     let key = |p: &Path| {
         p.to_string_lossy()
             .trim_end_matches(['\\', '/'])
@@ -75,6 +79,9 @@ fn merge(mut found: Vec<Project>, recents: Vec<PathBuf>) -> Vec<Project> {
     };
     let mut seen: std::collections::HashSet<String> = found.iter().map(|p| key(&p.path)).collect();
     for path in recents {
+        if cancelled() {
+            break;
+        }
         let Some(name) = path.file_name().map(|n| n.to_string_lossy().into_owned()) else {
             continue;
         };
@@ -188,7 +195,7 @@ impl Feature for Projects {
                 let recents = vscode::default_db()
                     .map(|db| vscode::recent_folders(&db))
                     .unwrap_or_default();
-                merge(found, recents)
+                merge(found, recents, &|| t.is_cancelled())
             })
             .await;
             match found {
@@ -210,8 +217,7 @@ impl Feature for Projects {
         }
     }
     fn query(&self, input: &Input) -> Vec<Item> {
-        let (action, q) =
-            keyword(input.text.trim()).map_or(("open", input.text.trim()), |(a, r)| (a, r));
+        let (action, q) = keyword(input.text.trim()).unwrap_or(("open", input.text.trim()));
         if q.is_empty() {
             return Vec::new();
         }
@@ -260,7 +266,12 @@ impl Feature for Projects {
             .to_owned();
         let act = item.payload.get("action").and_then(|a| a.as_str());
         let spec = match act {
-            Some("code") => Some(self.editor.lock().open_spec(Path::new(&path))),
+            Some("code") => Some(
+                self.editor
+                    .lock()
+                    .open_spec(Path::new(&path))
+                    .map_err(FeatureError::Other)?,
+            ),
             Some("term") => Some(editor::terminal_spec(Path::new(&path)).ok_or_else(|| {
                 FeatureError::Other("terminal cannot open a folder name containing ';'".into())
             })?),
@@ -390,7 +401,7 @@ mod tests {
             path: a.clone(),
         }];
         let upper = PathBuf::from(a.to_string_lossy().to_uppercase());
-        let m = merge(found, vec![upper, b, d.path().join("gone")]);
+        let m = merge(found, vec![upper, b, d.path().join("gone")], &|| false);
         assert_eq!(names(&m), ["A", "b"]);
     }
 
