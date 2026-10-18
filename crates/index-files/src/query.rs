@@ -1,7 +1,7 @@
 //! Fuzzy query over the file store and overlay for Find mode.
 
 use crate::store::FileStore;
-use crate::watch::Overlay;
+use crate::watch::{Overlay, bit};
 use nucleo_matcher::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 use rayon::prelude::*;
@@ -116,7 +116,7 @@ pub fn query(store: &FileStore, overlay: &Overlay, q: &FindQuery) -> Vec<FileHit
         return Vec::new();
     }
     let ov = overlay.read();
-    let removed = &ov.removed;
+    let gone = (!ov.removed.is_empty()).then(|| overlay.gone_bits(store, &ov));
     let mut cands: Vec<(u32, usize)> = store
         .entries
         .par_chunks(CHUNK)
@@ -128,7 +128,9 @@ pub fn query(store: &FileStore, overlay: &Overlay, q: &FindQuery) -> Vec<FileHit
                 for (off, e) in chunk.iter().enumerate() {
                     let idx = ci * CHUNK + off;
                     let name = store.name(idx);
-                    if !q.passes(name, e.is_dir, e.root, e.modified_min) {
+                    if gone.as_deref().is_some_and(|g| bit(g, idx))
+                        || !q.passes(name, e.is_dir, e.root, e.modified_min)
+                    {
                         continue;
                     }
                     let score = if recency {
@@ -137,11 +139,6 @@ pub fn query(store: &FileStore, overlay: &Overlay, q: &FindQuery) -> Vec<FileHit
                         sc.score(name, store.parent(idx).map_or("", |p| store.name(p)))
                     };
                     let Some(score) = score else { continue };
-                    if !removed.is_empty()
-                        && store.path_of(idx).ancestors().any(|a| removed.contains(a))
-                    {
-                        continue;
-                    }
                     v.push((score, idx));
                 }
                 if v.len() > q.limit {

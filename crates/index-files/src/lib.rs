@@ -1,5 +1,7 @@
 //! File index: scan, skip rules, filesystem watcher, snapshot persistence and query over indexed paths for Find mode.
 
+use std::sync::Arc;
+
 pub mod error;
 pub mod query;
 pub mod scan;
@@ -17,7 +19,13 @@ pub use watch::{Overlay, WatchHandle};
 impl FileIndex {
     /// Start watching `roots`; the handle's overlay feeds [`FileIndex::find`].
     pub fn watch(roots: &[Root]) -> Result<WatchHandle, FilesError> {
-        WatchHandle::start(roots)
+        WatchHandle::start(roots, None)
+    }
+
+    /// Like [`FileIndex::watch`], but compacts into this index in the background when the
+    /// overlay grows past [`watch::COMPACT_AT`].
+    pub fn watch_auto(self: &Arc<Self>, roots: &[Root]) -> Result<WatchHandle, FilesError> {
+        WatchHandle::start(roots, Some(Arc::clone(self)))
     }
 
     /// Query the current store merged with `overlay`.
@@ -25,9 +33,11 @@ impl FileIndex {
         query(&self.load(), overlay, q)
     }
 
-    /// Fold `overlay` into a new store and publish it. Call when the overlay passes ~5,000 entries.
+    /// Fold `overlay` into a new store and publish it. Holds the overlay's write lock so no
+    /// event is lost between fold and clear (ponytail: queries stall during the fold).
     pub fn compact(&self, overlay: &Overlay) {
-        self.replace(watch::fold(&self.load(), overlay));
-        overlay.clear();
+        let mut g = overlay.write();
+        self.replace(watch::fold(&self.load(), &g));
+        g.reset();
     }
 }

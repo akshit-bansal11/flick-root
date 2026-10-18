@@ -90,10 +90,7 @@ fn build() -> FileStore {
     b.finish(roots)
 }
 
-fn bench(c: &mut Criterion) {
-    let store = build();
-    let ov = Overlay::new();
-    println!("store entries: {}", store.len());
+fn report(c: &mut Criterion, store: &FileStore, ov: &Overlay, label: &str) {
     for text in ["rep", "report", "inv 2024", "png", "budget xlsx", "a"] {
         let q = FindQuery {
             text: text.into(),
@@ -103,16 +100,43 @@ fn bench(c: &mut Criterion) {
         let mut t: Vec<f64> = (0..200)
             .map(|_| {
                 let s = Instant::now();
-                black_box(query(&store, &ov, &q));
+                black_box(query(store, ov, &q));
                 s.elapsed().as_secs_f64() * 1000.0
             })
             .collect();
         t.sort_by(f64::total_cmp);
-        println!("p95 {text:>12}: {:.2} ms (budget 25)", t[189]);
-        c.bench_function(&format!("find/{text}"), |b| {
-            b.iter(|| black_box(query(&store, &ov, &q)));
+        println!("p95 [{label}] {text:>12}: {:.2} ms (budget 25)", t[189]);
+        c.bench_function(&format!("find/{label}/{text}"), |b| {
+            b.iter(|| black_box(query(store, ov, &q)));
         });
     }
+}
+
+fn bench(c: &mut Criterion) {
+    let store = build();
+    println!("store entries: {}", store.len());
+    report(c, &store, &Overlay::new(), "empty");
+
+    // Non-empty overlay: 1,000 removals spread over the tree plus 1,000 real adds.
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let mut roots = store.roots().to_vec();
+    roots.push(Root {
+        id: 6,
+        path: tmp.path().to_path_buf(),
+        label: "tmp".into(),
+    });
+    let ov = Overlay::new();
+    let mut r = Lcg(7);
+    for _ in 0..1000 {
+        ov.apply_path(&roots, &store.path_of(r.next(store.len())));
+    }
+    for n in 0..1000 {
+        let p = tmp.path().join(format!("report_added_{n}.txt"));
+        std::fs::write(&p, "x").expect("write");
+        ov.apply_path(&roots, &p);
+    }
+    println!("overlay entries: {}", ov.len());
+    report(c, &store, &ov, "overlay");
 }
 
 criterion_group!(benches, bench);
