@@ -3,6 +3,9 @@
 //! One dedicated std thread owns the write connection and receives [`WriteMsg`] over an mpsc
 //! channel; reads use a separate query-only connection behind a mutex. All methods are
 //! synchronous: async callers must wrap them in `tokio::task::spawn_blocking`.
+//! Writes are batched for up to 2 s (write-behind); reads see only committed data, so they can
+//! be up to 2 s stale. Features therefore keep their own in-memory frecency and update it on
+//! launch. Call [`Store::shutdown`] on app exit so the last batch is committed.
 //! Write failures on the store thread never panic; see [`Store::error_count`] and
 //! [`Store::last_error`].
 
@@ -459,9 +462,12 @@ impl Store {
         });
     }
 
-    /// Delete data in `scope`.
+    /// Delete data in `scope`. Unlike other writes this commits immediately (it blocks like
+    /// [`Store::flush`]) so a privacy clear is never lost to the write-behind window or a crash.
     pub fn clear(&self, scope: ClearScope) {
-        self.send(WriteMsg::Clear(scope));
+        if self.send(WriteMsg::Clear(scope)) {
+            self.flush();
+        }
     }
 
     /// Insert or refresh an NL cache entry.

@@ -1,4 +1,6 @@
 //! Secret detector used by Explain (block before sending) and the redactor.
+//! Key patterns use `\b`, so a key glued to a letter or digit (`risk-assessment`) is ignored;
+//! match ranges start at the key itself, which the redactor relies on.
 //! Choice: 40-char hex strings (git SHAs) are not secrets: hex entropy is at most 4.0
 //! and in practice below it, and a letters-and-digits mix is also required.
 
@@ -31,15 +33,15 @@ pub enum SecretKind {
 }
 
 const PATTERNS: [(SecretKind, &str); 9] = [
-    (SecretKind::Anthropic, r"sk-ant-[A-Za-z0-9_-]{8,}"),
-    (SecretKind::OpenAi, r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
+    (SecretKind::Anthropic, r"\bsk-ant-[A-Za-z0-9_-]{8,}"),
+    (SecretKind::OpenAi, r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
     (
         SecretKind::GitHub,
-        r"(?:gh[pos]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})",
+        r"\b(?:gh[pos]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})",
     ),
     (SecretKind::Aws, r"\bAKIA[0-9A-Z]{16}\b"),
-    (SecretKind::Slack, r"xox[abprs]-[A-Za-z0-9-]{10,}"),
-    (SecretKind::Google, r"AIza[0-9A-Za-z_-]{35}"),
+    (SecretKind::Slack, r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
+    (SecretKind::Google, r"\bAIza[0-9A-Za-z_-]{35}"),
     (SecretKind::Bearer, r"\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
     (
         SecretKind::Jwt,
@@ -83,14 +85,13 @@ fn entropy(s: &str) -> f64 {
 }
 
 fn generic(text: &str) -> bool {
-    text.split_whitespace().any(|w| {
-        w.len() >= 32
-            && w.bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"_-+/=".contains(&b))
-            && w.bytes().any(|b| b.is_ascii_alphabetic())
-            && w.bytes().any(|b| b.is_ascii_digit())
-            && entropy(w) >= 4.0
-    })
+    text.split(|c: char| !(c.is_ascii_alphanumeric() || "_-+/=".contains(c)))
+        .any(|w| {
+            w.len() >= 32
+                && w.bytes().any(|b| b.is_ascii_alphabetic())
+                && w.bytes().any(|b| b.is_ascii_digit())
+                && entropy(w) >= 4.0
+        })
 }
 
 /// Return the kind of secret `text` appears to contain, if any.
@@ -129,6 +130,35 @@ mod tests {
     }
 
     #[test]
+    fn keys_after_separator_and_quoted_json() {
+        assert_eq!(
+            looks_secret("key=sk-proj-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN"),
+            Some(OpenAi)
+        );
+        assert_eq!(
+            looks_secret(r#"  "api_key": "aB3xK9mQ2vL7nP4wR8tY6uI1oE5zC0dF","#),
+            Some(Generic)
+        );
+    }
+
+    #[test]
+    fn keys_detected_at_start_and_after_separators() {
+        let keys = [
+            ("sk-ant-api03-abcdefghijkl", Anthropic),
+            ("sk-proj-abcdefghijklmnopqrstuvwx", OpenAi),
+            ("ghp_abcdefghijklmnopqrstuvwxyz0123", GitHub),
+            ("xoxb-1234567890-abcdef", Slack),
+            ("AIzaSyA1234567890abcdefghijklmnopqrstuvw", Google),
+        ];
+        for (k, kind) in keys {
+            for prefix in ["", " ", "=", "\"", ": \""] {
+                let t = format!("{prefix}{k}");
+                assert_eq!(looks_secret(&t), Some(kind), "{t}");
+            }
+        }
+    }
+
+    #[test]
     fn no_false_positives() {
         for t in [
             "",
@@ -138,6 +168,7 @@ mod tests {
             "https://example.com/some/path?q=hello",
             "thisisalongwordwithoutanydigitsatallokay",
             "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "risk-assessment-template-final.docx",
         ] {
             assert_eq!(looks_secret(t), None, "{t}");
         }

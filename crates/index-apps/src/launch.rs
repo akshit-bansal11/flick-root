@@ -27,12 +27,19 @@ fn wide(s: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     s.as_ref().encode_wide().chain(Some(0)).collect()
 }
 
-fn shell_execute(file: &str, verb: &str, name: &str) -> Result<(), AppsError> {
+/// `asynchronous` sets `SEE_MASK_ASYNCOK` (normal launches, 30 ms budget). It must stay off for
+/// `runas`: the call could return before the UAC prompt, hiding a cancel.
+fn shell_execute(file: &str, verb: &str, name: &str, asynchronous: bool) -> Result<(), AppsError> {
     let file = wide(file);
     let verb = wide(verb);
+    let mask = if asynchronous {
+        SEE_MASK_FLAG_NO_UI | SEE_MASK_ASYNCOK
+    } else {
+        SEE_MASK_FLAG_NO_UI
+    };
     let mut info = SHELLEXECUTEINFOW {
         cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as u32,
-        fMask: SEE_MASK_FLAG_NO_UI | SEE_MASK_ASYNCOK,
+        fMask: mask,
         lpVerb: PCWSTR(verb.as_ptr()),
         lpFile: PCWSTR(file.as_ptr()),
         nShow: SW_SHOWNORMAL.0,
@@ -52,7 +59,8 @@ fn shell_execute(file: &str, verb: &str, name: &str) -> Result<(), AppsError> {
 }
 
 /// Launch an app via `shell:AppsFolder\<parsing_name>`. Needs COM on the calling thread: call in
-/// `spawn_blocking` with a `ComGuard`. A cancelled UAC prompt returns `AppsError::Cancelled`.
+/// `spawn_blocking` with a `ComGuard`. `Normal` returns without waiting for the app; `Admin` blocks
+/// until the UAC prompt is answered, and a cancelled prompt returns `AppsError::Cancelled`.
 pub fn launch(entry: &AppEntry, how: LaunchKind) -> Result<(), AppsError> {
     let verb = match how {
         LaunchKind::Normal => "open",
@@ -62,13 +70,14 @@ pub fn launch(entry: &AppEntry, how: LaunchKind) -> Result<(), AppsError> {
         &format!("shell:AppsFolder\\{}", entry.parsing_name),
         verb,
         &entry.name,
+        how == LaunchKind::Normal,
     )
 }
 
 /// Open a file, folder or URL with its default handler. Same threading rules as [`launch`].
 pub fn open_path(path: &Path) -> Result<(), AppsError> {
     let p = path.to_string_lossy();
-    shell_execute(&p, "open", &p)
+    shell_execute(&p, "open", &p, true)
 }
 
 /// Show a path selected in Explorer (spawned, not awaited).

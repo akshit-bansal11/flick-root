@@ -98,3 +98,14 @@ fn concurrent_reads_while_writing() {
     assert_eq!(s.error_count(), 0);
     s.shutdown();
 }
+
+#[test]
+fn clear_commits_without_flush() {
+    let d = tempfile::tempdir().unwrap();
+    let s = open(&d);
+    s.record_launch("app:a", "app", None, 1);
+    s.flush();
+    assert_eq!(s.load_frecency().unwrap().len(), 1);
+    s.clear(ClearScope::Frecency);
+    assert!(s.load_frecency().unwrap().is_empty());
+}
