@@ -17,7 +17,7 @@ use launcher_core::store::{ClearScope, Store};
 use launcher_core::{Action, Input, Item, Mode, Outcome};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Handle;
 
@@ -56,7 +56,46 @@ fn squash(s: f64) -> f32 {
 }
 
 type Scores = HashMap<String, Score>;
-type Prefixes = HashMap<String, Option<String>>;
+/// Most prefixes kept in memory. Misses (`None`) are evicted first, then the map is cleared;
+/// anything dropped is re-read from the store on the next keystroke that needs it.
+const PREFIX_CAP: usize = 512;
+
+/// Bounded prefix cache, mutated in place (no per-keystroke map clone).
+#[derive(Default)]
+struct Prefixes(RwLock<HashMap<String, Option<String>>>);
+
+impl Prefixes {
+    fn read(&self) -> RwLockReadGuard<'_, HashMap<String, Option<String>>> {
+        self.0.read().unwrap_or_else(PoisonError::into_inner)
+    }
+    fn write(&self) -> RwLockWriteGuard<'_, HashMap<String, Option<String>>> {
+        self.0.write().unwrap_or_else(PoisonError::into_inner)
+    }
+    /// True when `prefix` was learned to resolve to `key`.
+    fn is_choice(&self, prefix: &str, key: &str) -> bool {
+        self.read()
+            .get(prefix)
+            .is_some_and(|k| k.as_deref() == Some(key))
+    }
+    /// Inserts `value`, keeping existing entries when `only_if_absent`, and enforces the cap.
+    fn put(&self, prefix: &str, value: Option<String>, only_if_absent: bool) {
+        let mut m = self.write();
+        if m.len() >= PREFIX_CAP && !m.contains_key(prefix) {
+            m.retain(|_, v| v.is_some());
+            if m.len() >= PREFIX_CAP {
+                m.clear();
+            }
+        }
+        if only_if_absent {
+            m.entry(prefix.to_owned()).or_insert(value);
+        } else {
+            m.insert(prefix.to_owned(), value);
+        }
+    }
+    fn clear(&self) {
+        self.write().clear();
+    }
+}
 
 struct Inner {
     store: Arc<Store>,
@@ -66,7 +105,7 @@ struct Inner {
     learning: bool,
     scores: ArcSwap<Scores>,
     /// Lowercased prefix to remembered item key. `None` means looked up, nothing learned.
-    prefixes: ArcSwap<Prefixes>,
+    prefixes: Prefixes,
 }
 
 impl Inner {
@@ -81,12 +120,7 @@ impl Inner {
             } else {
                 Cow::Borrowed(&input.text)
             };
-            if self
-                .prefixes
-                .load()
-                .get(p.as_ref())
-                .is_some_and(|k| k.as_deref() == Some(item.id.0.as_str()))
-            {
+            if self.prefixes.is_choice(p.as_ref(), &item.id.0) {
                 b += PREFIX_BOOST;
             }
         }
@@ -112,11 +146,7 @@ impl Inner {
         let prefix =
             (self.learning && !input.text.trim().is_empty()).then(|| input.text.to_lowercase());
         if let Some(p) = &prefix {
-            self.prefixes.rcu(|m| {
-                let mut m = Prefixes::clone(m);
-                m.insert(p.clone(), Some(key.clone()));
-                m
-            });
+            self.prefixes.put(p, Some(key.clone()), false);
         }
         let kind = format!("{:?}", item.kind).to_lowercase();
         self.store
@@ -128,25 +158,18 @@ impl Inner {
 
     /// Starts a one-off store lookup of the learned choice for `prefix` unless one is cached.
     fn ensure_prefix(self: &Arc<Self>, prefix: String) {
-        if self.prefixes.load().contains_key(&prefix) {
+        if self.prefixes.read().contains_key(&prefix) {
             return;
         }
-        self.prefixes.rcu(|m| {
-            let mut m = Prefixes::clone(m);
-            m.entry(prefix.clone()).or_insert(None);
-            m
-        });
+        // The `None` marker stops repeat lookups while this one runs; it is the first thing evicted.
+        self.prefixes.put(&prefix, None, true);
         let me = self.clone();
         let _g = self.handle.enter();
         self.tasks.spawn(async move {
             let (st, p) = (me.store.clone(), prefix.clone());
             if let Ok(Ok(Some(k))) = tokio::task::spawn_blocking(move || st.prefix_choice(&p)).await
             {
-                me.prefixes.rcu(|m| {
-                    let mut m = Prefixes::clone(m);
-                    m.insert(prefix.clone(), Some(k.clone()));
-                    m
-                });
+                me.prefixes.put(&prefix, Some(k), false);
             }
         });
     }
@@ -164,7 +187,7 @@ impl Frecency {
         if let Some(i) = self.inner.load().as_ref() {
             i.store.clear(ClearScope::Frecency);
             i.scores.store(Arc::default());
-            i.prefixes.store(Arc::default());
+            i.prefixes.clear();
         }
     }
 }
@@ -257,7 +280,7 @@ impl Feature for Frecency {
             half_life: days as f64,
             learning,
             scores: ArcSwap::default(),
-            prefixes: ArcSwap::default(),
+            prefixes: Prefixes::default(),
         });
         let (me, st) = (inner.clone(), ctx.store);
         ctx.tasks.spawn(async move {
@@ -402,6 +425,20 @@ mod tests {
         // Empty input: frecency alone.
         let e = f.rank_boost(&input(""), &b);
         assert!(e > 0.0 && e < FRECENCY_MAX);
+    }
+
+    #[tokio::test]
+    async fn prefix_cache_is_bounded_and_keeps_learned() {
+        let (f, _c) = started(true);
+        f.on_chosen(&input("ed"), &item("b"));
+        let g = f.inner.load();
+        let i = g.as_ref().as_ref().unwrap();
+        for n in 0..10_000 {
+            i.prefixes.put(&format!("p{n}"), None, true);
+            assert!(i.prefixes.read().len() <= PREFIX_CAP);
+        }
+        // Misses were evicted before the learned entry.
+        assert!(f.rank_boost(&input("ed"), &item("b")) >= PREFIX_BOOST);
     }
 
     #[tokio::test]
