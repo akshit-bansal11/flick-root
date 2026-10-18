@@ -1,0 +1,150 @@
+//! Secret detector used by Explain (block before sending) and the redactor.
+//! Choice: 40-char hex strings (git SHAs) are not secrets: hex entropy is at most 4.0
+//! and in practice below it, and a letters-and-digits mix is also required.
+
+use regex::Regex;
+use std::sync::LazyLock;
+
+/// Kind of secret that was recognised.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecretKind {
+    /// Anthropic `sk-ant-` key.
+    Anthropic,
+    /// OpenAI-style `sk-` key.
+    OpenAi,
+    /// GitHub token.
+    GitHub,
+    /// AWS access key id.
+    Aws,
+    /// Slack token.
+    Slack,
+    /// Google API key.
+    Google,
+    /// `Bearer` authorization token.
+    Bearer,
+    /// JSON web token.
+    Jwt,
+    /// PEM private key header.
+    PrivateKey,
+    /// Long high-entropy token.
+    Generic,
+}
+
+const PATTERNS: [(SecretKind, &str); 9] = [
+    (SecretKind::Anthropic, r"sk-ant-[A-Za-z0-9_-]{8,}"),
+    (SecretKind::OpenAi, r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}"),
+    (
+        SecretKind::GitHub,
+        r"(?:gh[pos]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})",
+    ),
+    (SecretKind::Aws, r"\bAKIA[0-9A-Z]{16}\b"),
+    (SecretKind::Slack, r"xox[abprs]-[A-Za-z0-9-]{10,}"),
+    (SecretKind::Google, r"AIza[0-9A-Za-z_-]{35}"),
+    (SecretKind::Bearer, r"\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
+    (
+        SecretKind::Jwt,
+        r"eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}",
+    ),
+    (
+        SecretKind::PrivateKey,
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
+    ),
+];
+
+static COMPILED: LazyLock<Vec<(SecretKind, Regex)>> = LazyLock::new(|| {
+    PATTERNS
+        .iter()
+        .filter_map(|(k, p)| Regex::new(p).ok().map(|r| (*k, r)))
+        .collect()
+});
+
+static REGEXES: LazyLock<Vec<Regex>> =
+    LazyLock::new(|| COMPILED.iter().map(|(_, r)| r.clone()).collect());
+
+/// Compiled provider-key patterns, for the redactor.
+pub fn key_patterns() -> &'static [Regex] {
+    &REGEXES
+}
+
+fn entropy(s: &str) -> f64 {
+    let mut counts = [0u32; 256];
+    for b in s.bytes() {
+        counts[b as usize] += 1;
+    }
+    let n = s.len() as f64;
+    counts
+        .iter()
+        .filter(|c| **c > 0)
+        .map(|c| {
+            let p = f64::from(*c) / n;
+            -p * p.log2()
+        })
+        .sum()
+}
+
+fn generic(text: &str) -> bool {
+    text.split_whitespace().any(|w| {
+        w.len() >= 32
+            && w.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_-+/=".contains(&b))
+            && w.bytes().any(|b| b.is_ascii_alphabetic())
+            && w.bytes().any(|b| b.is_ascii_digit())
+            && entropy(w) >= 4.0
+    })
+}
+
+/// Return the kind of secret `text` appears to contain, if any.
+pub fn looks_secret(text: &str) -> Option<SecretKind> {
+    COMPILED
+        .iter()
+        .find(|(_, r)| r.is_match(text))
+        .map(|(k, _)| *k)
+        .or_else(|| generic(text).then_some(SecretKind::Generic))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use SecretKind::*;
+
+    #[test]
+    fn detects_each_kind() {
+        let cases = [
+            ("sk-ant-api03-abcdefghijkl", Anthropic),
+            ("key sk-proj-abcdefghijklmnopqrstuvwx", OpenAi),
+            ("sk-abcdefghijklmnopqrstuvwx", OpenAi),
+            ("ghp_abcdefghijklmnopqrstuvwxyz0123", GitHub),
+            ("github_pat_abcdefghijklmnopqrstuv", GitHub),
+            ("AKIAABCDEFGHIJKLMNOP", Aws),
+            ("xoxb-1234567890-abcdef", Slack),
+            ("AIzaSyA1234567890abcdefghijklmnopqrstuvw", Google),
+            ("Authorization: Bearer abcdefghijklmnop1234", Bearer),
+            ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl", Jwt),
+            ("-----BEGIN RSA PRIVATE KEY-----", PrivateKey),
+            ("aB3xK9mQ2vL7nP4wR8tY6uI1oE5zC0dF", Generic),
+        ];
+        for (t, k) in cases {
+            assert_eq!(looks_secret(t), Some(k), "{t}");
+        }
+    }
+
+    #[test]
+    fn no_false_positives() {
+        for t in [
+            "",
+            "the quick brown fox jumps over the lazy dog, twice",
+            r"C:\Users\someone\Documents\report-final-version-2.docx",
+            "/home/user/projects/launcher/src/main.rs",
+            "https://example.com/some/path?q=hello",
+            "thisisalongwordwithoutanydigitsatallokay",
+            "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+        ] {
+            assert_eq!(looks_secret(t), None, "{t}");
+        }
+    }
+
+    #[test]
+    fn patterns_compile() {
+        assert_eq!(key_patterns().len(), PATTERNS.len());
+    }
+}
