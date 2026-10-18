@@ -10,6 +10,8 @@ mod state;
 mod tray;
 mod window;
 
+use tauri::Manager;
+
 /// Builds and runs the Tauri application; logs and exits nonzero on failure.
 pub fn run() {
     logging::install_panic_hook();
@@ -39,8 +41,20 @@ pub fn run() {
             state::init(app)?;
             state::start(app.handle());
             tray::setup(app)?;
-            // A conflict is already logged and emitted; keep running.
-            let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
+            // A conflict is already logged and emitted; fall back to the default.
+            let saved = app
+                .state::<std::sync::Arc<state::AppState>>()
+                .config
+                .load()
+                .general
+                .hotkey
+                .clone();
+            if hotkey::register(app.handle(), "launcher", &saved).is_err()
+                && saved != hotkey::DEFAULT
+            {
+                tracing::warn!(saved, "saved hotkey failed, using default");
+                let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
+            }
             tracing::info!("ready");
             Ok(())
         })

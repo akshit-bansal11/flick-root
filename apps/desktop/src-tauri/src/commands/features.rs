@@ -1,4 +1,5 @@
 //! Feature, mode and system-command commands (BSD section 4).
+use super::blocking;
 use crate::error::CommandError;
 use crate::state::{self, AppState};
 use features::{FeatureError, FeatureState, FeatureView};
@@ -61,12 +62,20 @@ fn changed(app: &AppHandle, v: &FeatureView) {
 }
 
 /// Writes only `[features.<id>]` so concurrent provider/general edits are not clobbered.
-fn persist(state: &AppState, id: &str, cfg: launcher_core::Config) -> Result<(), CommandError> {
+async fn persist(
+    state: &Arc<AppState>,
+    id: &str,
+    cfg: launcher_core::Config,
+) -> Result<(), CommandError> {
     let table = cfg.features.get(id).cloned().unwrap_or_default();
-    state.update_config(|c| {
-        c.features.insert(id.to_string(), table);
-        Ok(())
+    let (s, id) = (Arc::clone(state), id.to_string());
+    blocking(move || {
+        s.update_config(|c| {
+            c.features.insert(id, table);
+            Ok(())
+        })
     })
+    .await
 }
 
 /// Lists every feature with its schema and options.
@@ -91,7 +100,7 @@ pub async fn set_feature_enabled(
         .set_enabled(&id, enabled, &state.ctx)
         .await
         .map_err(map_err)?;
-    persist(&state, &id, cfg)?;
+    persist(&state, &id, cfg).await?;
     let v = view(&state, &id).await?;
     changed(&app, &v);
     if enabled && v.status == FeatureState::Failed {
@@ -117,7 +126,7 @@ pub async fn set_feature_options(
         .set_options(&id, table, &state.ctx)
         .await
         .map_err(map_err)?;
-    persist(&state, &id, cfg)?;
+    persist(&state, &id, cfg).await?;
     let v = view(&state, &id).await?;
     changed(&app, &v);
     Ok(v)
@@ -149,14 +158,18 @@ pub async fn set_mode_enabled(
     check_mode(&mode)?;
     let is_find = mode == "find";
     let was = state.config.load().modes.find.enabled;
-    state.update_config(|c| {
-        if is_find {
-            c.modes.find.enabled = enabled;
-        } else {
-            c.modes.query.enabled = enabled;
-        }
-        Ok(())
-    })?;
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|c| {
+            if is_find {
+                c.modes.find.enabled = enabled;
+            } else {
+                c.modes.query.enabled = enabled;
+            }
+            Ok(())
+        })
+    })
+    .await?;
     if is_find && enabled && !was {
         let s = Arc::clone(&state);
         tauri::async_runtime::spawn(async move { state::start_find(&s).await });

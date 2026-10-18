@@ -32,6 +32,25 @@ pub struct AppMatch {
     pub index: MatchIndex,
 }
 
+/// Cancel flag of the current Find run; starting a run cancels the previous one.
+#[derive(Default)]
+pub struct FindRun(Mutex<Arc<AtomicBool>>);
+
+impl FindRun {
+    /// Cancels the previous run and returns the new run's flag.
+    pub fn begin(&self) -> Arc<AtomicBool> {
+        let mut cur = self.0.lock();
+        cur.store(true, Ordering::Relaxed);
+        *cur = Arc::new(AtomicBool::new(false));
+        cur.clone()
+    }
+
+    /// Cancels the current run.
+    pub fn cancel(&self) {
+        self.0.lock().store(true, Ordering::Relaxed);
+    }
+}
+
 /// Everything commands and tasks share.
 pub struct AppState {
     /// Live config.
@@ -52,8 +71,8 @@ pub struct AppState {
     pub watch: Mutex<Option<WatchHandle>>,
     /// Write-only secret vault (Credential Manager plus metadata).
     pub vault: Arc<SecretVault>,
-    /// Stops a running scan on exit.
-    pub scan_cancel: Arc<AtomicBool>,
+    /// Cancels the running Find scan (on Find off, a new run, or exit).
+    pub find_run: FindRun,
     /// Feature registry.
     pub registry: Arc<Registry>,
     /// Handles given to features.
@@ -203,7 +222,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         overlay: ArcSwap::from_pointee(Overlay::new()),
         watch: Mutex::new(None),
         vault,
-        scan_cancel: Arc::new(AtomicBool::new(false)),
+        find_run: FindRun::default(),
         registry: Arc::new(Registry::new()),
         ctx,
         icons: Icons::new(index_apps::icons::IconCache::new(&cache_dir)),
@@ -251,11 +270,13 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
         st.rebuild_match();
         // Icons after the list is usable; ensure skips files that exist.
         let _com = index_apps::com::ComGuard::new().map_err(index_apps::AppsError::Enumerate)?;
-        for e in st.apps.entries().iter() {
+        let entries = st.apps.entries();
+        for e in entries.iter() {
             if let Err(err) = st.icons.cache().ensure(e) {
                 tracing::debug!(%err, app = %e.name, "icon extraction failed");
             }
         }
+        st.icons.warm(&entries, crate::icons::ICON_PX);
         Ok::<_, index_apps::AppsError>(stats)
     })
     .await;
@@ -269,19 +290,26 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
 /// Loads the snapshot, scans the roots and starts the watcher (Find on, or a reindex).
 pub(crate) async fn start_find(s: &Arc<AppState>) {
     let st = s.clone();
+    let cancel = st.find_run.begin();
     let res = tauri::async_runtime::spawn_blocking(move || {
+        let live = || !cancel.load(Ordering::Relaxed) && st.config.load().modes.find.enabled;
         match snapshot::load(&st.snapshot_path()) {
-            Ok(Some(store)) => st.files.replace(store),
-            Ok(None) => {}
+            Ok(Some(store)) if live() => st.files.replace(store),
+            Ok(_) => {}
             Err(err) => tracing::warn!(%err, "file snapshot unreadable"),
         }
         let roots = roots_for(&st.config.load());
-        let store = scan(&roots, &st.scan_cancel, |_| {})?;
+        let store = scan(&roots, &cancel, |_| {})?;
+        // stop_find cancels, then takes this lock: checking under it leaves no window.
+        let mut watch = st.watch.lock();
+        if !live() {
+            return Ok(());
+        }
         st.files.replace(store);
         st.save_snapshot();
         let handle = st.files.watch_auto(&roots)?;
         st.overlay.store(handle.overlay());
-        *st.watch.lock() = Some(handle);
+        *watch = Some(handle);
         Ok::<_, index_files::FilesError>(())
     })
     .await;
@@ -294,6 +322,7 @@ pub(crate) async fn start_find(s: &Arc<AppState>) {
 
 /// Find off: drops the watcher and frees the file index memory.
 pub(crate) fn stop_find(s: &AppState) {
+    s.find_run.cancel();
     s.watch.lock().take();
     s.overlay.store(Arc::new(Overlay::new()));
     s.files
@@ -305,9 +334,29 @@ pub fn shutdown(app: &AppHandle) {
     let Some(state) = app.try_state::<Arc<AppState>>() else {
         return;
     };
-    state.scan_cancel.store(true, Ordering::Relaxed);
+    state.find_run.cancel();
     state.watch.lock().take();
     tauri::async_runtime::block_on(state.registry.stop_all());
     state.store.shutdown();
+    if let Err(err) = state.vault.flush() {
+        tracing::warn!(%err, "secret metadata flush failed");
+    }
     state.save_snapshot();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn begin_cancels_previous_run() {
+        let run = FindRun::default();
+        let a = run.begin();
+        assert!(!a.load(Ordering::Relaxed));
+        let b = run.begin();
+        assert!(a.load(Ordering::Relaxed));
+        assert!(!b.load(Ordering::Relaxed));
+        run.cancel();
+        assert!(b.load(Ordering::Relaxed));
+    }
 }

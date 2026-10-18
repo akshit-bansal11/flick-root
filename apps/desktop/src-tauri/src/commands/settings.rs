@@ -102,22 +102,26 @@ pub async fn set_general(
         autostart::set_autostart(&app, on)
             .map_err(|e| CommandError::new("autostart_failed", format!("{e:#}")))?;
     }
-    state.update_config(|c| {
-        if let Some(h) = hotkey_launcher {
-            c.general.hotkey = h;
-        }
-        // ponytail: explain hotkey is stored only; its binding lands with the Explain feature.
-        if let Some(h) = hotkey_explain {
-            c.general.explain_hotkey = h;
-        }
-        if let Some(t) = theme {
-            c.general.theme = t;
-        }
-        if let Some(on) = launch_at_startup {
-            c.general.launch_at_startup = on;
-        }
-        Ok(())
-    })?;
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|c| {
+            if let Some(h) = hotkey_launcher {
+                c.general.hotkey = h;
+            }
+            // ponytail: explain hotkey is stored only; its binding lands with the Explain feature.
+            if let Some(h) = hotkey_explain {
+                c.general.explain_hotkey = h;
+            }
+            if let Some(t) = theme {
+                c.general.theme = t;
+            }
+            if let Some(on) = launch_at_startup {
+                c.general.launch_at_startup = on;
+            }
+            Ok(())
+        })
+    })
+    .await?;
     changed(&app, "general");
     Ok(settings_view(&app, &state))
 }
@@ -129,16 +133,20 @@ pub async fn set_roots(
     state: State<'_, Arc<AppState>>,
     roots: Vec<String>,
 ) -> Result<SettingsView, CommandError> {
-    if let Some(bad) = roots.iter().find(|r| !Path::new(r).is_dir()) {
-        return Err(CommandError::new(
-            "invalid_path",
-            format!("not a folder: {bad}"),
-        ));
-    }
-    state.update_config(|c| {
-        c.modes.find.extra_roots = roots;
-        Ok(())
-    })?;
+    let s = Arc::clone(&state);
+    blocking(move || {
+        if let Some(bad) = roots.iter().find(|r| !Path::new(r).is_dir()) {
+            return Err(CommandError::new(
+                "invalid_path",
+                format!("not a folder: {bad}"),
+            ));
+        }
+        s.update_config(|c| {
+            c.modes.find.extra_roots = roots;
+            Ok(())
+        })
+    })
+    .await?;
     if state.config.load().modes.find.enabled {
         let s = Arc::clone(&state);
         tauri::async_runtime::spawn(async move { state::start_find(&s).await });
@@ -167,7 +175,12 @@ pub async fn clear_history(
     scope: String,
 ) -> Result<(), CommandError> {
     let sc = scope_of(&scope)?;
-    state.store.clear(sc);
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.store.clear(sc);
+        Ok(())
+    })
+    .await?;
     // The registry cannot downcast to the frecency feature, so tell it by event.
     if sc != ClearScope::NlCache
         && let Err(err) = app.emit("history://cleared", serde_json::json!({ "scope": scope }))
