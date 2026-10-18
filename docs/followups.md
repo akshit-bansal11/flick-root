@@ -41,3 +41,9 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - F3.1: Enter on a math/currency result copies and returns Outcome::Copied, but reducer.ts outcome() has no 'copied' case, so the launcher shows no feedback; add a brief 'Copied' state (W5).
 - T4.4 math: run state (rates task + loaded rates) lives in a process-wide static because lib.rs builds Math as a unit value; move into the struct with Math::default() like Frecency (same as the Web followup).
 - T4.4 rates: the 64 KB body cap is checked after resp.text() reads the whole body; stream with a capped reader if the endpoint ever becomes configurable.
+- F3.2 ranking: app scores are scaled relative to the top app (≤ 0.9), so a weak project match (s/(s+200) ≈ 0.67) can outrank an exact app match scoring ~75% of the top app; rank boosts apply after. Tune with real data in T5.6 (e.g. exact-prefix bonus for apps).
+- F3.3: icons::ICON_PX (pub, icons.rs) and a private ICON_PX = 32 in commands/search.rs duplicate one value; use the icons const.
+- F4.2/T4.4: the math bench's currency case runs with no rates loaded, so it times the reject path; T5.6 must seed rates for a real conversion timing.
+- F3.6: no hub test drives NoKey / HostMismatch / InsecureUrl through stream(); add one with an erroring KeySource expecting Error "provider_error" and no Fallback. Hub::run also sends Started for providers[0] before stream() runs, so Started can precede an authorize failure.
+- T5.2: General.tsx has an inline `.s-switch` button duplicating settings/Toggle.tsx; switch General to Toggle.
+- T5.3: provider enable control is a native checkbox (Biome rejected role="switch" without aria-checked); restyle to the Win11 pill via Toggle.tsx for consistency.
