@@ -49,3 +49,44 @@ fn debug_hides_secret() {
     r.register(b"super-secret-value");
     assert!(!format!("{r:?}").contains("super-secret"));
 }
+
+const BODY: &str = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj";
+
+#[test]
+fn pem_block_body_masked() {
+    let r = Redactor::new();
+    let t = format!("a -----BEGIN PRIVATE KEY-----\n{BODY}\n-----END PRIVATE KEY----- z");
+    assert_eq!(r.redact(&t), "a [REDACTED] z");
+}
+
+#[test]
+fn pem_without_end_masks_to_end() {
+    let r = Redactor::new();
+    let t = format!("x -----BEGIN RSA PRIVATE KEY-----\n{BODY}\nmore");
+    assert_eq!(r.redact(&t), "x [REDACTED]");
+}
+
+#[test]
+fn literal_overlapping_key_pattern_fully_masked() {
+    let r = Redactor::new();
+    let tail = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9";
+    r.register(format!("{tail}-extra").as_bytes());
+    let t = format!("k sk-ant-api03-{tail}-extra-more done");
+    let out = r.redact(&t);
+    assert_eq!(out, "k [REDACTED] done");
+}
+
+#[test]
+fn adjacent_secrets_merge() {
+    let r = Redactor::new();
+    r.register(b"hunter2-hunter2");
+    r.register(b"other-secret-1");
+    assert_eq!(r.redact("hunter2-hunter2other-secret-1!"), "[REDACTED]!");
+}
+
+#[test]
+fn multibyte_text_stays_valid() {
+    let r = Redactor::new();
+    r.register("pässwörd-ключ".as_bytes());
+    assert_eq!(r.redact("é日本 pässwörd-ключ 😀"), "é日本 [REDACTED] 😀");
+}
