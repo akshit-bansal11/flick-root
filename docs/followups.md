@@ -21,3 +21,7 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - Cargo.toml: reqwest switched from rustls-tls to native-tls (+ form, query); record in ADR-006/011 docs and architecture.md.
 - crates/index-files/src/scan.rs:104-114: when `b.push` returns None the stack isn't pushed and children attach to the grandparent (arena overflow only).
 - index-files/src/watch.rs: compaction busy flag is reset only after compact() returns; a panic inside compact would block further compactions (use a drop guard).
+- crates/features/src/web/mod.rs keeps shortcut state in a module-level static RwLock because lib.rs built Web as a unit value; move it into the struct (like Frecency::default()) — two instances would share state.
+- T3.9: secret metadata lives in local_data_dir()/secret_meta.json (name, host, added_at, last_used only) because Store has no secret_meta accessors; move it to the SQLite table.
+- T3.9: keys stored in an earlier session are not registered with the log redactor until set again (VaultKeys has no register-on-use hook); add one.
+- T4.1: Settings must call `Frecency::clear_history()` for the "Clear history" button; learned prefixes from earlier sessions apply from the second ranking of that prefix (lazy lookup).
