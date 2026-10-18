@@ -2,9 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Launcher window: listen to events and launcher commands only",
-  "windows": [
-    "launcher"
-  ],
+  "windows": ["launcher"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
