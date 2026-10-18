@@ -14,6 +14,7 @@ use tauri::Manager;
 
 /// Builds and runs the Tauri application; logs and exits nonzero on failure.
 pub fn run() {
+    state::mark_start();
     logging::install_panic_hook();
     let log_dir = launcher_core::config::local_data_dir()
         .ok()
@@ -37,10 +38,13 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(hotkey::plugin())
         .setup(|app| {
+            state::phase("setup start");
             window::setup(app)?;
+            state::phase("launcher window ready");
             state::init(app)?;
             state::start(app.handle());
             tray::setup(app)?;
+            state::phase("tray built");
             // A conflict is already logged and emitted; fall back to the default.
             let saved = app
                 .state::<std::sync::Arc<state::AppState>>()
@@ -53,18 +57,24 @@ pub fn run() {
                 tracing::warn!(saved, "saved hotkey failed, using default");
                 let _ = hotkey::rebind_launcher(app.handle(), hotkey::DEFAULT);
             }
+            state::phase("hotkey registered");
             let first_run_done = app
                 .state::<std::sync::Arc<state::AppState>>()
                 .config
                 .load()
                 .general
                 .first_run_done;
-            if !first_run_done
-                && let Err(err) = tray::open_settings_window(app.handle(), Some("first-run"))
-            {
-                tracing::warn!(%err, "opening first-run failed");
+            if !first_run_done {
+                // Off the ready path: window creation blocks on the main thread's loop.
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(err) = tray::open_settings_window(&handle, Some("first-run")) {
+                        tracing::warn!(%err, "opening first-run failed");
+                    }
+                    state::phase("first-run window built");
+                });
             }
-            tracing::info!("ready");
+            state::phase("ready");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

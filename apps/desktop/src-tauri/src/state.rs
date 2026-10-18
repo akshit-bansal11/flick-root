@@ -18,11 +18,27 @@ use providers::secret::{KeyringBackend, SecretVault, VaultKeys};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
 const APP_REFRESH: Duration = Duration::from_secs(600);
+
+static START: OnceLock<Instant> = OnceLock::new();
+
+/// Records the process start; call first thing in `run`. Later calls are no-ops.
+pub fn mark_start() {
+    let _ = START.set(Instant::now());
+}
+
+/// Logs one startup phase with milliseconds since [`mark_start`].
+pub fn phase(name: &str) {
+    let ms = START
+        .get()
+        .map_or(0.0, |t| t.elapsed().as_secs_f64() * 1000.0);
+    tracing::info!(phase = name, ms, "startup");
+}
 
 /// Apps and the fuzzy index built over their names; swapped together.
 pub struct AppMatch {
@@ -181,10 +197,12 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
             Config::default()
         }),
     ));
+    phase("config loaded");
     let data = local_data_dir().context("locating data dir")?;
     std::fs::create_dir_all(&data).context("creating data dir")?;
     let (store, report) = Store::open(&data.join("store.db")).context("opening store")?;
     let store = Arc::new(store);
+    phase("store opened");
     if report.reset
         && let Err(err) = handle.emit("store://reset", serde_json::json!({}))
     {
@@ -196,6 +214,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     if let Err(err) = apps.load_cache(&cache_dir) {
         tracing::warn!(%err, "app cache unreadable");
     }
+    phase("app cache loaded");
     let vault = Arc::new(SecretVault::new(
         Arc::new(KeyringBackend),
         Arc::new(JsonMeta::open(data.join("secret_meta.json"))),
@@ -235,6 +254,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         cache_dir,
     });
     app.manage(state);
+    phase("state init done");
     Ok(())
 }
 
