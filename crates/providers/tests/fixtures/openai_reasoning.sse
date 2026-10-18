@@ -1,0 +1,10 @@
+data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}
+
+data: {"choices":[{"delta":{"reasoning_content":" more"}}]}
+
+data: {"choices":[{"delta":{"reasoning":"again"}}]}
+
+data: {"choices":[{"delta":{"content":"Answer"}}]}
+
+data: [DONE]
+
