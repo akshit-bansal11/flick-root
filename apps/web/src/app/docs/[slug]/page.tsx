@@ -5,8 +5,6 @@ import { DOCS, getDoc, readRepoFile } from "@/lib/content";
 import { renderMarkdown } from "@/lib/markdown";
 import styles from "../prose.module.css";
 
-export const dynamicParams = false;
-
 type Props = { params: Promise<{ slug: string }> };
 
 export const generateStaticParams = () => DOCS.map(({ slug }) => ({ slug }));
