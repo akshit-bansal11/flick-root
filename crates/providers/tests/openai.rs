@@ -183,3 +183,53 @@ async fn probe_lists_models() {
     assert!(r.reachable);
     assert_eq!(r.models, ["a", "b"]);
 }
+
+#[tokio::test]
+async fn probe_body_over_cap_is_decode_error() {
+    let s = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("a".repeat((1 << 20) + 1)))
+        .mount(&s)
+        .await;
+    let r = client(&s, false, Arc::new(NoKeys)).probe().await;
+    assert!(!r.reachable);
+    assert!(r.error.is_some_and(|e| e.contains("too large")));
+}
+
+#[tokio::test]
+async fn oversize_sse_line_is_decode_error() {
+    let s = MockServer::start().await;
+    mount(
+        &s,
+        sse(&format!(
+            "data: {}
+
+",
+            "a".repeat((1 << 20) + 1)
+        )),
+    )
+    .await;
+    let out = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast).await;
+    assert!(matches!(
+        out.last(),
+        Some(Err(ProviderError::Decode("sse line too long")))
+    ));
+}
+
+#[tokio::test]
+async fn oversize_sse_event_is_decode_error() {
+    let s = MockServer::start().await;
+    let body = format!(
+        "data: {}
+",
+        "a".repeat(1000)
+    )
+    .repeat(1100);
+    mount(&s, sse(&body)).await;
+    let out = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast).await;
+    assert!(matches!(
+        out.last(),
+        Some(Err(ProviderError::Decode("sse event too large")))
+    ));
+}

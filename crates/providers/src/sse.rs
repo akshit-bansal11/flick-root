@@ -1,7 +1,13 @@
 //! Incremental Server-Sent Events parser.
 
+use crate::ProviderError;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
+
+/// Longest accepted SSE line.
+pub const MAX_LINE_BYTES: usize = 1 << 20;
+/// Largest accepted accumulated event `data`.
+pub const MAX_EVENT_BYTES: usize = 1 << 20;
 
 /// One dispatched SSE event.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -24,7 +30,10 @@ pub struct SseParser {
 
 impl SseParser {
     /// Feed bytes (any split), returning completed events.
-    pub fn push(&mut self, chunk: &[u8]) -> Vec<SseEvent> {
+    ///
+    /// Errors with `Decode` when a line or an event exceeds its cap; the
+    /// parser must not be reused after an error.
+    pub fn push(&mut self, chunk: &[u8]) -> Result<Vec<SseEvent>, ProviderError> {
         let mut out = Vec::new();
         for &b in chunk {
             let lf = b == b'\n';
@@ -35,15 +44,20 @@ impl SseParser {
                 b'\r' | b'\n' => {
                     self.skip_lf = b == b'\r';
                     let line = std::mem::take(&mut self.line);
-                    self.end_line(&line, &mut out);
+                    self.end_line(&line, &mut out)?;
                 }
-                _ => self.line.push(b),
+                _ => {
+                    if self.line.len() >= MAX_LINE_BYTES {
+                        return Err(ProviderError::Decode("sse line too long"));
+                    }
+                    self.line.push(b);
+                }
             }
         }
-        out
+        Ok(out)
     }
 
-    fn end_line(&mut self, raw: &[u8], out: &mut Vec<SseEvent>) {
+    fn end_line(&mut self, raw: &[u8], out: &mut Vec<SseEvent>) -> Result<(), ProviderError> {
         let mut raw = raw;
         if !self.started {
             self.started = true;
@@ -57,10 +71,10 @@ impl SseParser {
                 });
             }
             self.event = None;
-            return;
+            return Ok(());
         }
         if raw[0] == b':' {
-            return;
+            return Ok(());
         }
         let line = String::from_utf8_lossy(raw);
         let (field, value) = match line.split_once(':') {
@@ -71,6 +85,9 @@ impl SseParser {
             "event" => self.event = Some(value.to_owned()),
             "data" => match &mut self.data {
                 Some(d) => {
+                    if d.len() + 1 + value.len() > MAX_EVENT_BYTES {
+                        return Err(ProviderError::Decode("sse event too large"));
+                    }
                     d.push('\n');
                     d.push_str(value);
                 }
@@ -78,6 +95,7 @@ impl SseParser {
             },
             _ => {}
         }
+        Ok(())
     }
 }
 
@@ -85,11 +103,15 @@ impl SseParser {
 pub fn events<S, E>(bytes: S) -> impl Stream<Item = Result<SseEvent, E>>
 where
     S: Stream<Item = Result<Bytes, E>>,
+    E: From<ProviderError>,
 {
     let mut p = SseParser::default();
     bytes.flat_map(move |r| {
         futures::stream::iter(match r {
-            Ok(b) => p.push(&b).into_iter().map(Ok).collect(),
+            Ok(b) => match p.push(&b) {
+                Ok(evs) => evs.into_iter().map(Ok).collect(),
+                Err(e) => vec![Err(e.into())],
+            },
             Err(e) => vec![Err(e)],
         })
     })
@@ -116,15 +138,15 @@ mod tests {
 
     #[test]
     fn whole() {
-        assert_eq!(SseParser::default().push(SAMPLE), expect());
+        assert_eq!(SseParser::default().push(SAMPLE).unwrap(), expect());
     }
 
     #[test]
     fn every_split_point() {
         for i in 0..=SAMPLE.len() {
             let mut p = SseParser::default();
-            let mut got = p.push(&SAMPLE[..i]);
-            got.extend(p.push(&SAMPLE[i..]));
+            let mut got = p.push(&SAMPLE[..i]).unwrap();
+            got.extend(p.push(&SAMPLE[i..]).unwrap());
             assert_eq!(got, expect(), "split at {i}");
         }
     }
@@ -132,7 +154,38 @@ mod tests {
     #[test]
     fn byte_at_a_time() {
         let mut p = SseParser::default();
-        let got: Vec<_> = SAMPLE.iter().flat_map(|b| p.push(&[*b])).collect();
+        let got: Vec<_> = SAMPLE.iter().flat_map(|b| p.push(&[*b]).unwrap()).collect();
         assert_eq!(got, expect());
+    }
+
+    #[test]
+    fn line_cap() {
+        let mut p = SseParser::default();
+        assert!(p.push(&vec![b'a'; MAX_LINE_BYTES]).is_ok());
+        assert!(matches!(
+            p.push(b"a"),
+            Err(ProviderError::Decode("sse line too long"))
+        ));
+    }
+
+    #[test]
+    fn event_cap() {
+        let mut p = SseParser::default();
+        let line = format!(
+            "data: {}
+",
+            "a".repeat(1000)
+        );
+        let mut res = Ok(vec![]);
+        for _ in 0..2000 {
+            res = p.push(line.as_bytes());
+            if res.is_err() {
+                break;
+            }
+        }
+        assert!(matches!(
+            res,
+            Err(ProviderError::Decode("sse event too large"))
+        ));
     }
 }

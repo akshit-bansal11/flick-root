@@ -67,10 +67,9 @@ impl OpenAiCompat {
         let rb = authorize(&self.cfg, &*self.keys, self.http.get(self.url("models")))?;
         let resp = rb.send().await.map_err(net_err)?;
         check_status(&resp)?;
-        let v: Value = resp
-            .json()
-            .await
-            .map_err(|_| ProviderError::Decode("models json"))?;
+        let body = read_capped(resp, MAX_PROBE_BYTES).await?;
+        let v: Value =
+            serde_json::from_slice(&body).map_err(|_| ProviderError::Decode("models json"))?;
         Ok(v["data"]
             .as_array()
             .map(|a| {
@@ -80,6 +79,24 @@ impl OpenAiCompat {
             })
             .unwrap_or_default())
     }
+}
+
+/// Cap for the `/models` probe body.
+const MAX_PROBE_BYTES: usize = 1 << 20;
+
+/// Read a response body as a stream, failing with `Decode` once it exceeds `max` bytes.
+pub(crate) async fn read_capped(
+    mut resp: reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, ProviderError> {
+    let mut buf = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(net_err)? {
+        if buf.len() + chunk.len() > max {
+            return Err(ProviderError::Decode("response too large"));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
 }
 
 fn net_err(e: reqwest::Error) -> ProviderError {
@@ -233,7 +250,13 @@ impl State {
                 c = self.bytes.next() => c,
             };
             match chunk {
-                Some(Ok(b)) => self.pending.extend(self.parser.push(&b)),
+                Some(Ok(b)) => match self.parser.push(&b) {
+                    Ok(evs) => self.pending.extend(evs),
+                    Err(e) => {
+                        self.done = true;
+                        return Some(Err(e));
+                    }
+                },
                 Some(Err(e)) => {
                     self.done = true;
                     return Some(Err(net_err(e)));
