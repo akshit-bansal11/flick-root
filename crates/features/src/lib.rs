@@ -26,7 +26,7 @@ pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
     vec![
         Arc::new(frecency::Frecency::default()),
         Arc::new(math::Math),
-        Arc::new(syscmd::SysCmd),
+        Arc::new(syscmd::SysCmd::default()),
         Arc::new(web::Web),
         Arc::new(projects::Projects),
     ]
