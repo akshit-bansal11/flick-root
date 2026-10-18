@@ -60,11 +60,9 @@ fn roundtrip_and_no_leak() {
     let v = vault();
     let name = n("provider.openrouter@openrouter.ai");
     v.set(&name, sec(FAKE)).unwrap();
-    assert_eq!(
-        v.with_secret(&name, |s| s.expose_secret().to_owned())
-            .unwrap(),
-        FAKE
-    );
+    let keys = VaultKeys(v.clone());
+    let c = cfg("https://openrouter.ai/api/v1", Some("openrouter.ai"));
+    assert_eq!(keys.key_for(&c).unwrap().unwrap().expose_secret(), FAKE);
     let info = v.info(&name).unwrap();
     assert!(info.present && info.last_used.is_some() && info.added_at.is_some());
     assert_eq!(info.last4.as_deref(), Some("cdef"));
@@ -80,10 +78,7 @@ fn roundtrip_and_no_leak() {
     }
     v.delete(&name).unwrap();
     assert!(!v.info(&name).unwrap().present);
-    assert!(matches!(
-        v.with_secret(&name, |_| ()),
-        Err(VaultError::NotFound)
-    ));
+    assert!(matches!(keys.key_for(&c), Err(ProviderError::NoKey { .. })));
 }
 
 #[test]
@@ -157,6 +152,7 @@ async fn authed_client_does_not_follow_redirects() {
         .mount(&a)
         .await;
     let r = authed_client()
+        .unwrap()
         .get(format!("{}/x", a.uri()))
         .header("authorization", "Bearer fake")
         .send()
@@ -184,10 +180,11 @@ fn host_change_deletes_key() {
 #[ignore = "touches the real Windows Credential Manager"]
 fn live_keyring_roundtrip() {
     let v = SecretVault::new(Arc::new(KeyringBackend), Arc::new(MemoryMeta::default()));
-    let name = n("test.selftest@localhost");
+    let v = Arc::new(v);
+    let name = n("provider.openrouter@localhost");
     v.set(&name, sec(FAKE)).unwrap();
-    let got = v.with_secret(&name, |s| s.expose_secret().to_owned());
+    let got = VaultKeys(v.clone()).key_for(&cfg("http://localhost:1/v1", Some("localhost")));
     v.delete(&name).unwrap();
-    assert_eq!(got.unwrap(), FAKE);
+    assert_eq!(got.unwrap().unwrap().expose_secret(), FAKE);
     assert!(!v.info(&name).unwrap().present);
 }

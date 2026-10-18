@@ -42,7 +42,10 @@ const PATTERNS: [(SecretKind, &str); 9] = [
     (SecretKind::Aws, r"\bAKIA[0-9A-Z]{16}\b"),
     (SecretKind::Slack, r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
     (SecretKind::Google, r"\bAIza[0-9A-Za-z_-]{35}"),
-    (SecretKind::Bearer, r"\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
+    (
+        SecretKind::Bearer,
+        r"\b(?i:bearer)\s+[A-Za-z0-9._~+/=-]{16,}",
+    ),
     (
         SecretKind::Jwt,
         r"eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}",
@@ -126,6 +129,26 @@ mod tests {
         ];
         for (t, k) in cases {
             assert_eq!(looks_secret(t), Some(k), "{t}");
+        }
+    }
+
+    #[test]
+    fn bearer_any_case() {
+        for t in [
+            "bearer abcdefghijklmnop1234",
+            "BEARER abcdefghijklmnop1234",
+            "Authorization: bEaReR abcdefghijklmnop1234",
+        ] {
+            assert_eq!(looks_secret(t), Some(Bearer), "{t}");
+        }
+    }
+
+    #[test]
+    fn key_patterns_start_with_word_boundary() {
+        for (k, p) in PATTERNS {
+            if !matches!(k, Jwt | PrivateKey) {
+                assert!(p.starts_with(r"\b"), "{k:?}: {p}");
+            }
         }
     }
 

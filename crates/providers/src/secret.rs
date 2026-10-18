@@ -1,8 +1,7 @@
 //! Secret vault per ADR-011: write-only from the outside, bound to one host.
 //!
-//! There is no public getter that returns a secret. The only ways to read one
-//! are [`SecretVault::with_secret`] (closure scope) and the crate-internal
-//! [`VaultKeys`] key source used at request time.
+//! There is no public getter that returns a secret. The only read path is the
+//! [`VaultKeys`] key source used at request time (host-bound).
 
 use crate::{KeySource, ProviderConfig, ProviderError};
 use secrecy::{ExposeSecret, SecretString};
@@ -252,10 +251,11 @@ impl SecretVault {
 
     /// Store a secret bound to the host in its name. Rejects empty or multi-line values.
     pub fn set(&self, name: &SecretName, value: SecretString) -> Result<(), VaultError> {
-        let v = value.expose_secret();
-        if v.trim().is_empty() || v.contains(['\n', '\r']) {
+        let v = value.expose_secret().trim();
+        if v.is_empty() || v.contains(['\n', '\r']) {
             return Err(VaultError::InvalidValue);
         }
+        let value = SecretString::from(v.to_owned());
         self.backend.set(name, &value)?;
         self.meta.put(SecretMeta {
             name: name.as_str().to_owned(),
@@ -298,8 +298,9 @@ impl SecretVault {
             .collect()
     }
 
-    /// Run `f` with the secret and record the use.
-    pub fn with_secret<R>(
+    /// Run `f` with the secret and record the use (tests only; no public read path).
+    #[cfg(test)]
+    pub(crate) fn with_secret<R>(
         &self,
         name: &SecretName,
         f: impl FnOnce(&SecretString) -> R,
@@ -347,5 +348,34 @@ impl KeySource for VaultKeys {
             .ok_or_else(|| ProviderError::NoKey {
                 host: bound.to_owned(),
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_stores_trimmed_and_reads_back() {
+        let v = SecretVault::new(
+            Arc::new(MemoryBackend::default()),
+            Arc::new(MemoryMeta::default()),
+        );
+        let name = SecretName::parse("provider.x@x.test").unwrap();
+        v.set(
+            &name,
+            SecretString::from("  sk-fake-0123456789abcdef \t".to_owned()),
+        )
+        .unwrap();
+        let got = v
+            .with_secret(&name, |s| s.expose_secret().to_owned())
+            .unwrap();
+        assert_eq!(got, "sk-fake-0123456789abcdef");
+        assert!(v.info(&name).unwrap().last_used.is_some());
+        v.delete(&name).unwrap();
+        assert!(matches!(
+            v.with_secret(&name, |_| ()),
+            Err(VaultError::NotFound)
+        ));
     }
 }
