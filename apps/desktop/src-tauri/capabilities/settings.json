@@ -1,7 +1,41 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "settings",
-  "description": "Capability for the Settings window",
-  "windows": ["settings"],
-  "permissions": ["core:default"]
+  "description": "Settings window: listen to events and settings commands only",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-open-settings",
+    "allow-open-link",
+    "allow-get-settings",
+    "allow-set-general",
+    "allow-set-roots",
+    "allow-register-hotkey",
+    "allow-clear-history",
+    "allow-list-features",
+    "allow-set-feature-enabled",
+    "allow-set-mode-enabled",
+    "allow-set-feature-options",
+    "allow-list-providers",
+    "allow-probe-providers",
+    "allow-set-provider",
+    "allow-set-provider-order",
+    "allow-set-secret",
+    "allow-delete-secret",
+    "allow-test-secret",
+    "allow-list-secrets",
+    "allow-list-engines",
+    "allow-probe-decision-engines",
+    "allow-set-engine",
+    "allow-connect-spotify",
+    "allow-disconnect-spotify",
+    "allow-test-capture-target",
+    "allow-reindex",
+    "allow-get-first-run",
+    "allow-complete-first-run",
+    "allow-get-about"
+  ]
 }
