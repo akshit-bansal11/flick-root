@@ -3,6 +3,7 @@ use crate::error::CommandError;
 
 pub mod ask;
 pub mod features;
+pub mod firstrun;
 pub mod launch;
 pub mod providers;
 pub mod search;

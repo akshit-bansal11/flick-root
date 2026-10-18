@@ -55,6 +55,17 @@ pub fn run() {
                 tracing::warn!(saved, "saved hotkey failed, using default");
                 let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
             }
+            let first_run_done = app
+                .state::<std::sync::Arc<state::AppState>>()
+                .config
+                .load()
+                .general
+                .first_run_done;
+            if !first_run_done
+                && let Err(err) = tray::open_settings_window(app.handle(), Some("first-run"))
+            {
+                tracing::warn!(%err, "opening first-run failed");
+            }
             tracing::info!("ready");
             Ok(())
         })
@@ -82,6 +93,8 @@ pub fn run() {
             commands::features::set_feature_options,
             commands::features::set_mode_enabled,
             commands::features::run_system_command,
+            commands::firstrun::get_first_run,
+            commands::firstrun::complete_first_run,
             commands::settings::get_settings,
             commands::settings::set_general,
             commands::settings::set_roots,
