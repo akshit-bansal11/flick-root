@@ -21,3 +21,16 @@ tauri-plugin-autostart = "2.7.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 anyhow = "1"
+launcher-core = { workspace = true }
+index-apps = { workspace = true }
+index-files = { workspace = true }
+features = { workspace = true }
+providers = { workspace = true }
+win = { workspace = true }
+tokio = { workspace = true }
+base64 = { workspace = true }
+parking_lot = { workspace = true }
+arc-swap = { workspace = true }
+url = { workspace = true }
+reqwest = { workspace = true }
+tauri-plugin-clipboard-manager = "2.5.0"
