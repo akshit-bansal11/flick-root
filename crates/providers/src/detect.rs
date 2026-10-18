@@ -1,7 +1,7 @@
 //! Local model server detection. Read-only: never changes config, never enables anything.
 
 use crate::http::plain_client;
-use crate::openai_compat::read_capped;
+use crate::http::read_capped;
 use crate::presets::{Group, PRESETS};
 use futures::future::join_all;
 use serde_json::Value;

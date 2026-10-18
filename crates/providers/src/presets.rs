@@ -1,5 +1,6 @@
 //! Built-in provider presets. None is recommended and none is enabled by default (ADR-006).
 
+use crate::anthropic::Anthropic;
 use crate::{KeySource, OpenAiCompat, Provider, ProviderConfig, ProviderError, Wire};
 use launcher_core::config::ProviderEntry;
 use std::sync::Arc;
@@ -165,8 +166,7 @@ pub fn build_provider(
     };
     match preset.wire {
         Wire::OpenAi => Ok(Box::new(OpenAiCompat::new(cfg, http, keys))),
-        // TODO(T2.4): wire crate::anthropic::Anthropic::new(cfg, http, keys) once it exists.
-        Wire::Anthropic => Err(ProviderError::Decode("anthropic wire not wired yet")),
+        Wire::Anthropic => Ok(Box::new(Anthropic::new(cfg, http, keys))),
     }
 }
 
@@ -192,5 +192,18 @@ mod tests {
         );
         assert!(PRESETS.iter().all(|p| !p.default_enabled()));
         assert_eq!(preset("custom").map(|p| p.default_base_url), Some(""));
+    }
+
+    #[test]
+    fn anthropic_preset_builds_anthropic_wire() {
+        let pr = preset("anthropic").expect("preset");
+        let entry = ProviderEntry {
+            base_url: pr.default_base_url.to_owned(),
+            ..Default::default()
+        };
+        let keys: Arc<dyn KeySource> = Arc::new(crate::auth::NoKeys);
+        let p =
+            build_provider("anthropic", &entry, pr, keys, reqwest::Client::new()).expect("build");
+        assert_eq!(p.config().wire, Wire::Anthropic);
     }
 }

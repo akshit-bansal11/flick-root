@@ -1,5 +1,6 @@
 //! OpenAI-compatible chat completions client (`/chat/completions`, SSE).
 
+use crate::http::{self, check_status, net_err, read_capped};
 use crate::sse::{SseEvent, SseParser};
 use crate::{
     Delta, Effort, KeySource, Message, ProbeResult, Provider, ProviderConfig, ProviderError,
@@ -84,72 +85,16 @@ impl OpenAiCompat {
 /// Cap for the `/models` probe body.
 const MAX_PROBE_BYTES: usize = 1 << 20;
 
-/// Read a response body as a stream, failing with `Decode` once it exceeds `max` bytes.
-pub(crate) async fn read_capped(
-    mut resp: reqwest::Response,
-    max: usize,
-) -> Result<Vec<u8>, ProviderError> {
-    let mut buf = Vec::new();
-    while let Some(chunk) = resp.chunk().await.map_err(net_err)? {
-        if buf.len() + chunk.len() > max {
-            return Err(ProviderError::Decode("response too large"));
-        }
-        buf.extend_from_slice(&chunk);
-    }
-    Ok(buf)
-}
-
-fn net_err(e: reqwest::Error) -> ProviderError {
-    if e.is_timeout() {
-        ProviderError::Timeout { phase: "response" }
-    } else {
-        // Only the kind, never the URL or body.
-        ProviderError::Network(
-            if e.is_connect() {
-                "connect failed"
-            } else {
-                "request failed"
-            }
-            .into(),
-        )
-    }
-}
-
-fn check_status(resp: &reqwest::Response) -> Result<(), ProviderError> {
-    let s = resp.status();
-    if s.is_success() {
-        Ok(())
-    } else {
-        Err(ProviderError::Status { code: s.as_u16() })
-    }
-}
-
-/// Fetch the key, validate host binding and scheme, set the header, drop the key.
+/// Set the sensitive bearer header when a key exists.
 fn authorize(
     cfg: &ProviderConfig,
     keys: &dyn KeySource,
     rb: reqwest::RequestBuilder,
 ) -> Result<reqwest::RequestBuilder, ProviderError> {
-    let Some(key) = keys.key_for(cfg)? else {
+    let Some(key) = http::authorize(cfg, keys)? else {
         return Ok(rb);
     };
-    let host = cfg.base_url.host_str().unwrap_or_default().to_owned();
-    if let Some(bound) = &cfg.key_host
-        && !bound.eq_ignore_ascii_case(&host)
-    {
-        return Err(ProviderError::HostMismatch {
-            bound: bound.clone(),
-            actual: host,
-        });
-    }
-    let loopback = matches!(host.as_str(), "localhost" | "127.0.0.1" | "[::1]");
-    if cfg.base_url.scheme() != "https" && !loopback {
-        return Err(ProviderError::InsecureUrl { host });
-    }
-    let mut value =
-        reqwest::header::HeaderValue::from_str(&format!("Bearer {}", key.expose_secret()))
-            .map_err(|_| ProviderError::Decode("key not header-safe"))?;
-    value.set_sensitive(true);
+    let value = http::sensitive(&format!("Bearer {}", key.expose_secret()))?;
     Ok(rb.header(reqwest::header::AUTHORIZATION, value))
 }
 

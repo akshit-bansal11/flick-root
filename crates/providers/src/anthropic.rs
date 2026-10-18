@@ -5,7 +5,7 @@
 //! adaptive thinking; `thinking.type = "enabled"` with `budget_tokens` is
 //! rejected with a 400 on these models, so it is never sent.
 
-use crate::openai_compat::read_capped;
+use crate::http::{self, check_status, net_err, read_capped};
 use crate::sse::{SseEvent, SseParser};
 use crate::{
     Delta, Effort, KeySource, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role,
@@ -92,59 +92,17 @@ fn url(cfg: &ProviderConfig, path: &str) -> String {
     format!("{}/{}", cfg.base_url.as_str().trim_end_matches('/'), path)
 }
 
-fn net_err(e: reqwest::Error) -> ProviderError {
-    if e.is_timeout() {
-        ProviderError::Timeout { phase: "response" }
-    } else {
-        // Only the kind, never the URL or body.
-        ProviderError::Network(
-            if e.is_connect() {
-                "connect failed"
-            } else {
-                "request failed"
-            }
-            .into(),
-        )
-    }
-}
-
-fn check_status(resp: &reqwest::Response) -> Result<(), ProviderError> {
-    let s = resp.status();
-    if s.is_success() {
-        Ok(())
-    } else {
-        Err(ProviderError::Status { code: s.as_u16() })
-    }
-}
-
-/// Set the version header and, when a key exists, the sensitive `x-api-key` header
-/// after checking host binding and scheme.
+/// Set the version header and, when a key exists, the sensitive `x-api-key` header.
 fn authorize(
     cfg: &ProviderConfig,
     keys: &dyn KeySource,
     rb: reqwest::RequestBuilder,
 ) -> Result<reqwest::RequestBuilder, ProviderError> {
     let rb = rb.header("anthropic-version", ANTHROPIC_VERSION);
-    let Some(key) = keys.key_for(cfg)? else {
+    let Some(key) = http::authorize(cfg, keys)? else {
         return Ok(rb);
     };
-    let host = host_of(cfg);
-    if let Some(bound) = &cfg.key_host
-        && !bound.eq_ignore_ascii_case(&host)
-    {
-        return Err(ProviderError::HostMismatch {
-            bound: bound.clone(),
-            actual: host,
-        });
-    }
-    let loopback = matches!(host.as_str(), "localhost" | "127.0.0.1" | "[::1]");
-    if cfg.base_url.scheme() != "https" && !loopback {
-        return Err(ProviderError::InsecureUrl { host });
-    }
-    let mut value = reqwest::header::HeaderValue::from_str(key.expose_secret())
-        .map_err(|_| ProviderError::Decode("key not header-safe"))?;
-    value.set_sensitive(true);
-    Ok(rb.header("x-api-key", value))
+    Ok(rb.header("x-api-key", http::sensitive(key.expose_secret())?))
 }
 
 fn build_body(cfg: &ProviderConfig, req: &Request) -> Result<Value, ProviderError> {

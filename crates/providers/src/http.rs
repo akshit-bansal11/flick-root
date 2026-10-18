@@ -1,7 +1,8 @@
 //! Host-bound HTTP clients (ADR-011): no redirects with credentials, https only.
 
 use crate::secret::{SecretName, SecretVault};
-use crate::{ProviderConfig, ProviderError};
+use crate::{KeySource, ProviderConfig, ProviderError};
+use secrecy::SecretString;
 use std::time::Duration;
 use url::{Host, Url};
 
@@ -63,4 +64,78 @@ pub fn on_base_url_change(
     };
     vault.delete(&SecretName::provider(&old_cfg.id, old_host)?)?;
     Ok(true)
+}
+
+/// Read a response body as a stream, failing with `Decode` once it exceeds `max` bytes.
+pub(crate) async fn read_capped(
+    mut resp: reqwest::Response,
+    max: usize,
+) -> Result<Vec<u8>, ProviderError> {
+    let mut buf = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(net_err)? {
+        if buf.len() + chunk.len() > max {
+            return Err(ProviderError::Decode("response too large"));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
+}
+
+/// Map a transport error to its kind only, never the URL or body.
+pub(crate) fn net_err(e: reqwest::Error) -> ProviderError {
+    if e.is_timeout() {
+        ProviderError::Timeout { phase: "response" }
+    } else {
+        ProviderError::Network(
+            if e.is_connect() {
+                "connect failed"
+            } else {
+                "request failed"
+            }
+            .into(),
+        )
+    }
+}
+
+/// Fail with `Status` (code only, no body) on a non-2xx response.
+pub(crate) fn check_status(resp: &reqwest::Response) -> Result<(), ProviderError> {
+    let s = resp.status();
+    if s.is_success() {
+        Ok(())
+    } else {
+        Err(ProviderError::Status { code: s.as_u16() })
+    }
+}
+
+/// Fetch the key (if any) and validate host binding and scheme. The caller sets
+/// its own sensitive header from the returned key.
+pub(crate) fn authorize(
+    cfg: &ProviderConfig,
+    keys: &dyn KeySource,
+) -> Result<Option<SecretString>, ProviderError> {
+    let Some(key) = keys.key_for(cfg)? else {
+        return Ok(None);
+    };
+    let host = cfg.base_url.host_str().unwrap_or_default().to_owned();
+    if let Some(bound) = &cfg.key_host
+        && !bound.eq_ignore_ascii_case(&host)
+    {
+        return Err(ProviderError::HostMismatch {
+            bound: bound.clone(),
+            actual: host,
+        });
+    }
+    let loopback = matches!(host.as_str(), "localhost" | "127.0.0.1" | "[::1]");
+    if cfg.base_url.scheme() != "https" && !loopback {
+        return Err(ProviderError::InsecureUrl { host });
+    }
+    Ok(Some(key))
+}
+
+/// A sensitive header value built from `raw`.
+pub(crate) fn sensitive(raw: &str) -> Result<reqwest::header::HeaderValue, ProviderError> {
+    let mut v = reqwest::header::HeaderValue::from_str(raw)
+        .map_err(|_| ProviderError::Decode("key not header-safe"))?;
+    v.set_sensitive(true);
+    Ok(v)
 }
