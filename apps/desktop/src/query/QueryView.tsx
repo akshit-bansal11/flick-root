@@ -1,6 +1,7 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Effort } from "../types";
 import { EmptyState } from "./EmptyState";
+import { Markdown } from "./Markdown";
 import "./query.css";
 
 interface Props {
@@ -15,8 +16,7 @@ interface Props {
   noProvider: boolean;
   onToggleEffort: () => void;
   onOpenSettings: () => void;
-  /** Slot: T2.11 replaces plain text with the safe Markdown renderer. */
-  renderAnswer?: (text: string) => ReactNode;
+  onOpenLink: (url: string) => void;
 }
 
 export function QueryView(p: Props) {
@@ -42,7 +42,11 @@ export function QueryView(p: Props) {
         )}
       </div>
       {p.thinking && !p.text && <div className="query-thinking">thinking…</div>}
-      {p.text && <div data-answer>{p.renderAnswer ? p.renderAnswer(p.text) : p.text}</div>}
+      {p.text && (
+        <div data-answer>
+          <Markdown text={p.text} onOpenLink={p.onOpenLink} />
+        </div>
+      )}
       {p.error && (
         <div className="query-error" role="alert">
           {p.error}

@@ -13,6 +13,7 @@ const base = {
   noProvider: false,
   onToggleEffort: () => {},
   onOpenSettings: () => {},
+  onOpenLink: () => {},
 };
 const render = (props: Partial<Parameters<typeof QueryView>[0]>) => {
   const c = document.body.appendChild(document.createElement("div"));

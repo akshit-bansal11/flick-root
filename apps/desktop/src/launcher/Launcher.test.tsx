@@ -18,6 +18,7 @@ vi.mock("../ipc", () => ({
   resizeLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(),
+  openLink: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
 }));

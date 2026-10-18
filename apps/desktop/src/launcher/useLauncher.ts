@@ -130,7 +130,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   const toggleEffort = useCallback(() => press("t", true), [press]);
   const openSettings = useCallback((section: string) => ipc.openSettings(section).catch(warn), []);
 
-  return { state, setText, activate, press, toggleEffort, openSettings };
+  const openLink = useCallback((url: string) => ipc.openLink(url).catch(warn), []);
+
+  return { state, setText, activate, press, toggleEffort, openSettings, openLink };
 }
 
 function warn(err: unknown) {

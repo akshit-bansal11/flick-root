@@ -9,7 +9,8 @@ import { useLauncher } from "./useLauncher";
 export function Launcher() {
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const { state, setText, activate, press, toggleEffort, openSettings } = useLauncher(inputRef);
+  const { state, setText, activate, press, toggleEffort, openSettings, openLink } =
+    useLauncher(inputRef);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -53,6 +54,7 @@ export function Launcher() {
           reasoning={q.reasoning}
           onToggleEffort={toggleEffort}
           onOpenSettings={() => openSettings("providers")}
+          onOpenLink={openLink}
         />
       ) : (
         <>
