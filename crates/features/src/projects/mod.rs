@@ -1,9 +1,11 @@
 //! F05 Project launcher (KICKOFF 1.3, ADR-009; FR-F05-01). Scan is off the keystroke path.
-//! Keywords `code <name>` / `term <name>` and VS Code recents belong to T4.7; items carry
-//! the folder in `payload.path` so those can reuse them.
+//! Keywords `code <name>` / `term <name>` open the folder in the editor / Windows Terminal;
+//! a bare name opens it in Explorer. VS Code recents are merged with the scan.
 
+mod editor;
 mod markers;
 mod scan;
+mod vscode;
 
 use crate::ctx::{FeatureCtx, TaskScope};
 use crate::error::FeatureError;
@@ -11,6 +13,7 @@ use crate::feature::Feature;
 use crate::schema::{Field, FieldKind, SettingsSchema};
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
+use editor::Editor;
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
 use launcher_core::{Action, ActionKind, Input, Item, ItemId, ItemKind, Mode, Outcome};
 use parking_lot::Mutex;
@@ -40,6 +43,7 @@ struct Live {
 pub struct Projects {
     live: Mutex<Option<Live>>,
     matcher: Mutex<FuzzyMatcher>,
+    editor: Mutex<Editor>,
 }
 
 /// Default roots, then the user's `roots` option; only those that exist.
@@ -60,6 +64,36 @@ fn depth_from(opts: &toml::Table) -> usize {
         .and_then(toml::Value::as_integer)
         .and_then(|d| usize::try_from(d).ok())
         .unwrap_or(DEFAULT_DEPTH)
+}
+
+/// Scan results plus VS Code recents (existing folders only), deduped by normalized path.
+fn merge(mut found: Vec<Project>, recents: Vec<PathBuf>) -> Vec<Project> {
+    let key = |p: &Path| {
+        p.to_string_lossy()
+            .trim_end_matches(['\\', '/'])
+            .to_lowercase()
+    };
+    let mut seen: std::collections::HashSet<String> = found.iter().map(|p| key(&p.path)).collect();
+    for path in recents {
+        let Some(name) = path.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+            continue;
+        };
+        if path.is_dir() && seen.insert(key(&path)) {
+            found.push(Project { name, path });
+        }
+    }
+    found
+}
+
+/// `code foo` / `term foo` to (action, rest). Needs the space, so `code` alone is a name search.
+fn keyword(q: &str) -> Option<(&'static str, &str)> {
+    let (head, rest) = q.split_once(char::is_whitespace)?;
+    let action = match head.to_ascii_lowercase().as_str() {
+        "code" => "code",
+        "term" => "term",
+        _ => return None,
+    };
+    Some((action, rest.trim()))
 }
 
 fn build(projects: Vec<Project>) -> Index {
@@ -113,6 +147,16 @@ impl Feature for Projects {
                     restart: true,
                 },
                 Field {
+                    key: "editor".into(),
+                    label: "Editor".into(),
+                    help: "Used by \"code <name>\": code, cursor, zed, or a command.".into(),
+                    kind: FieldKind::Text {
+                        placeholder: "code".into(),
+                    },
+                    default: serde_json::json!("code"),
+                    restart: true,
+                },
+                Field {
                     key: "depth".into(),
                     label: "Scan depth".into(),
                     help: "How many folder levels below each root to look.".into(),
@@ -130,13 +174,23 @@ impl Feature for Projects {
     fn start(&self, ctx: FeatureCtx) -> Result<(), FeatureError> {
         let opts = ctx.options("projects");
         let (roots, depth) = (roots_from(&opts), depth_from(&opts));
+        *self.editor.lock() = Editor::parse(
+            opts.get("editor")
+                .and_then(toml::Value::as_str)
+                .unwrap_or_default(),
+        );
         let slot: Slot = Arc::new(ArcSwap::from_pointee(None));
         let (out, token) = (slot.clone(), ctx.tasks.token());
         ctx.tasks.spawn(async move {
             let t = token.clone();
-            let found =
-                tokio::task::spawn_blocking(move || scan(&roots, depth, &|| t.is_cancelled()))
-                    .await;
+            let found = tokio::task::spawn_blocking(move || {
+                let found = scan(&roots, depth, &|| t.is_cancelled());
+                let recents = vscode::default_db()
+                    .map(|db| vscode::recent_folders(&db))
+                    .unwrap_or_default();
+                merge(found, recents)
+            })
+            .await;
             match found {
                 Ok(p) if !token.is_cancelled() => out.store(Arc::new(Some(build(p)))),
                 Ok(_) => {}
@@ -156,7 +210,11 @@ impl Feature for Projects {
         }
     }
     fn query(&self, input: &Input) -> Vec<Item> {
-        let q = input.text.trim();
+        let (action, q) =
+            keyword(input.text.trim()).map_or(("open", input.text.trim()), |(a, r)| (a, r));
+        if q.is_empty() {
+            return Vec::new();
+        }
         let Some(slot) = self.live.lock().as_ref().map(|l| l.index.clone()) else {
             return Vec::new();
         };
@@ -175,13 +233,17 @@ impl Feature for Projects {
                     id: ItemId(format!("projects:{path}")),
                     kind: ItemKind::Project,
                     title: p.name.clone(),
-                    subtitle: path.clone(),
+                    subtitle: match action {
+                        "code" => format!("Open in editor: {path}"),
+                        "term" => format!("Open in terminal: {path}"),
+                        _ => path.clone(),
+                    },
                     icon: None,
                     // ponytail: squash nucleo's unbounded score into 0..1, tune if ranking needs it.
                     score: s.score as f32 / (s.score as f32 + 200.0),
                     source: "projects".into(),
                     actions: vec![ActionKind::Primary],
-                    payload: serde_json::json!({ "path": path }),
+                    payload: serde_json::json!({ "path": path, "action": action }),
                 }
             })
             .collect()
@@ -196,10 +258,22 @@ impl Feature for Projects {
             .and_then(|p| p.as_str())
             .ok_or_else(|| FeatureError::Other("item has no path".into()))?
             .to_owned();
-        tokio::task::spawn_blocking(move || index_apps::launch::open_path(Path::new(&path)))
-            .await
-            .map_err(|e| FeatureError::Other(format!("open task failed: {e}")))?
-            .map_err(|e| FeatureError::Other(format!("could not open folder: {e}")))?;
+        let act = item.payload.get("action").and_then(|a| a.as_str());
+        let spec = match act {
+            Some("code") => Some(self.editor.lock().open_spec(Path::new(&path))),
+            Some("term") => Some(editor::terminal_spec(Path::new(&path)).ok_or_else(|| {
+                FeatureError::Other("terminal cannot open a folder name containing ';'".into())
+            })?),
+            _ => None,
+        };
+        tokio::task::spawn_blocking(move || match spec {
+            Some(s) => editor::spawn(&s).map_err(|e| format!("could not start {}: {e}", s.program)),
+            None => index_apps::launch::open_path(Path::new(&path))
+                .map_err(|e| format!("could not open folder: {e}")),
+        })
+        .await
+        .map_err(|e| FeatureError::Other(format!("open task failed: {e}")))?
+        .map_err(FeatureError::Other)?;
         Ok(Outcome::HideLauncher)
     }
 }
@@ -300,6 +374,26 @@ mod tests {
         assert!(scan(&[d.path().join("nope")], 3, &|| false).is_empty());
     }
 
+    #[test]
+    fn keywords_and_merge() {
+        assert_eq!(keyword("code  foo "), Some(("code", "foo")));
+        assert_eq!(keyword("TERM x"), Some(("term", "x")));
+        assert_eq!(keyword("code"), None);
+        assert_eq!(keyword("codex foo"), None);
+        let d = tempfile::tempdir().unwrap();
+        let a = d.path().join("A");
+        let b = d.path().join("b");
+        fs::create_dir_all(&a).unwrap();
+        fs::create_dir_all(&b).unwrap();
+        let found = vec![Project {
+            name: "A".into(),
+            path: a.clone(),
+        }];
+        let upper = PathBuf::from(a.to_string_lossy().to_uppercase());
+        let m = merge(found, vec![upper, b, d.path().join("gone")]);
+        assert_eq!(names(&m), ["A", "b"]);
+    }
+
     #[tokio::test]
     async fn start_scans_queries_and_stop_clears() {
         let d = fixture();
@@ -323,6 +417,9 @@ mod tests {
                 .ends_with("rust-proj")
         );
         assert!(f.query(&input("")).is_empty());
+        let k = f.query(&input("code rust"));
+        assert_eq!(k[0].payload["action"], "code");
+        assert!(f.query(&input("term ")).is_empty());
         f.stop();
         assert!(f.query(&input("rust")).is_empty());
         assert!(f.count().is_none());
