@@ -1,7 +1,10 @@
 import { type ReactElement, useEffect, useState } from "react";
+import { About } from "./About";
 import * as api from "./api";
+import { Features } from "./Features";
 import { General } from "./General";
 import { Nav, PAGES, type PageId } from "./Nav";
+import { Providers } from "./Providers";
 import { errorText, type SettingsView } from "./types";
 import "./settings.css";
 
@@ -53,11 +56,11 @@ export function SettingsApp() {
         {loadError ?? "Loading…"}
       </p>
     ),
-    features: <Placeholder id="features" />,
-    providers: <Placeholder id="providers" />,
+    features: <Features />,
+    providers: <Providers />,
     engine: <Placeholder id="engine" />,
     integrations: <Placeholder id="integrations" />,
-    about: <Placeholder id="about" />,
+    about: <About />,
   };
 
   return (
