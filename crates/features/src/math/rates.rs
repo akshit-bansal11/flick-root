@@ -1,7 +1,6 @@
 //! ECB daily reference rates (F02, FR-F02-03/04): parse, convert, parse currency queries.
 //! Everything here is pure; the fetch task lives in `mod.rs`.
 
-use chrono::NaiveDate;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use regex::Regex;
@@ -87,10 +86,9 @@ impl Rates {
         Some(amount * self.per_eur.get(to)? / self.per_eur.get(from)?)
     }
 
-    /// Whole days between the reference date and `today`, 0 when unparseable or in the future.
-    pub fn age_days(&self, today: NaiveDate) -> i64 {
-        NaiveDate::parse_from_str(&self.date, "%Y-%m-%d")
-            .map_or(0, |d| (today - d).num_days().max(0))
+    /// Whole days since the rates were last fetched, 0 when `now_ms` is earlier.
+    pub fn age_days(&self, now_ms: i64) -> i64 {
+        (now_ms.saturating_sub(self.fetched_at) / 86_400_000).max(0)
     }
 
     /// Resolves a symbol, word or ISO code to a code we have a rate for.
@@ -154,9 +152,10 @@ pub fn format_amount(v: f64, code: &str) -> String {
     }
 }
 
-/// "rates from 3 days ago" once older than two days, otherwise the plain date.
-pub fn subtitle(typed: &str, rates: &Rates, today: NaiveDate) -> String {
-    let age = rates.age_days(today);
+/// "rates from 3 days ago" once the last fetch is over two days old (offline or failing),
+/// otherwise the ECB reference date. Age counts from the fetch, not the weekend-skewed ECB date.
+pub fn subtitle(typed: &str, rates: &Rates, now_ms: i64) -> String {
+    let age = rates.age_days(now_ms);
     if age > 2 {
         format!("{typed} · rates from {age} days ago")
     } else {
@@ -230,8 +229,12 @@ mod tests {
     #[test]
     fn subtitle_age() {
         let r = fixture();
-        let d = |s| NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap();
-        assert!(subtitle("x", &r, d("2026-10-17")).contains("2026-10-16"));
-        assert!(subtitle("x", &r, d("2026-10-19")).contains("rates from 3 days ago"));
+        let day = 86_400_000;
+        let r = Rates {
+            fetched_at: 10 * day,
+            ..r
+        };
+        assert!(subtitle("x", &r, 10 * day + day).contains("2026-10-16"));
+        assert!(subtitle("x", &r, 13 * day).contains("rates from 3 days ago"));
     }
 }

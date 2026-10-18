@@ -15,6 +15,7 @@ fn input(t: &str) -> Input {
 }
 
 fn bench(c: &mut Criterion) {
+    features::math::warm();
     for t in ["2.5 kg to lb", "5pm ist in pst", "$20 in inr", "notepad"] {
         let i = input(t);
         c.bench_function(&format!("math query {t}"), |b| {
