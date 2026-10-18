@@ -79,6 +79,22 @@ impl AppIndex {
         self.entries.store(Arc::new(v));
     }
 
+    /// Fill the list from `dir`'s cache without enumerating. Returns false if there was no usable cache.
+    pub fn load_cache(&self, dir: &std::path::Path) -> Result<bool, AppsError> {
+        match cache::load_entries(dir)? {
+            Some(v) => {
+                self.replace(v);
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// Write the current list to `dir`'s cache.
+    pub fn save_cache(&self, dir: &std::path::Path) -> Result<(), AppsError> {
+        cache::save_entries(dir, &self.entries())
+    }
+
     /// Enumerate, filter, dedupe and sort. Blocking and COM-based: call from `spawn_blocking`.
     pub fn refresh_blocking(&self) -> Result<RefreshStats, AppsError> {
         let _com = com::ComGuard::new().map_err(AppsError::Enumerate)?;

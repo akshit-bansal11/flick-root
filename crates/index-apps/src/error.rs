@@ -15,7 +15,16 @@ pub enum AppsError {
         #[source]
         source: windows::core::Error,
     },
-    /// The app cache could not be read.
+    /// The user dismissed the elevation prompt.
+    #[error("launch cancelled by the user")]
+    Cancelled,
+    /// Spawning a helper process (explorer) failed.
+    #[error("could not start explorer")]
+    Spawn(#[source] std::io::Error),
+    /// Icon extraction or encoding failed.
+    #[error("icon extraction failed: {0}")]
+    Icon(String),
+    /// The app cache could not be read or written.
     #[error("app cache unreadable")]
     Cache(#[source] std::io::Error),
 }
