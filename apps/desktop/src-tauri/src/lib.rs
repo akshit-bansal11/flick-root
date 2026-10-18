@@ -1,5 +1,5 @@
 //! Tauri shell for the launcher.
-mod autostart;
+pub mod autostart;
 mod hotkey;
 mod tray;
 mod window;
@@ -14,16 +14,25 @@ pub fn run() {
         )
         .init();
     let result = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            tray::show_launcher(app, "second-instance");
+        }))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(hotkey::plugin())
         .setup(|app| {
             window::setup(app)?;
+            tray::setup(app)?;
             // A conflict is already logged and emitted; keep running.
             let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             window::report_shown,
-            window::hide_launcher
+            window::hide_launcher,
+            tray::open_settings
         ])
         .run(tauri::generate_context!());
     if let Err(err) = result {
