@@ -3,9 +3,14 @@
 pub mod ctx;
 pub mod error;
 pub mod feature;
+pub mod frecency;
+pub mod math;
+pub mod projects;
 pub mod registry;
 pub mod schema;
 pub mod search;
+pub mod syscmd;
+pub mod web;
 
 pub use ctx::{EventSink, FeatureCtx, TaskScope};
 pub use error::FeatureError;
@@ -16,7 +21,30 @@ pub use search::{command_search, find_search};
 
 use std::sync::Arc;
 
-/// All built-in features. Empty until the feature crates land.
+/// All built-in features.
 pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
-    Vec::new()
+    vec![
+        Arc::new(frecency::Frecency),
+        Arc::new(math::Math),
+        Arc::new(syscmd::SysCmd),
+        Arc::new(web::Web),
+        Arc::new(projects::Projects),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builtins_are_five_unique_enabled_v001() {
+        let f = builtin_features();
+        let ids: std::collections::HashSet<_> = f.iter().map(|x| x.id()).collect();
+        assert_eq!(f.len(), 5);
+        assert_eq!(ids.len(), 5);
+        assert!(
+            f.iter()
+                .all(|x| x.default_enabled() && x.version_tag() == "v0.0.1")
+        );
+    }
 }

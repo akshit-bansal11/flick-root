@@ -21,8 +21,36 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 reqwest = { workspace = true }
 parking_lot = { workspace = true }
+win = { workspace = true }
+fend-core = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+quick-xml = { workspace = true }
+percent-encoding = { workspace = true }
+rusqlite = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 tempfile = { workspace = true }
 criterion = { workspace = true }
+
+[[bench]]
+name = "frecency"
+harness = false
+
+[[bench]]
+name = "math"
+harness = false
+
+[[bench]]
+name = "syscmd"
+harness = false
+
+[[bench]]
+name = "web"
+harness = false
+
+[[bench]]
+name = "projects"
+harness = false
