@@ -239,6 +239,29 @@ mod tests {
     }
 
     #[test]
+    fn file_sink_receives_redacted_event() {
+        global().register(SECRET.as_bytes());
+        let dir = std::env::temp_dir().join(format!("lg-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("app.log");
+        let sink = SinkHandle(Arc::new(Mutex::new(Sink {
+            stderr: false,
+            file: Some(RotatingFile::open(path.clone()).unwrap()),
+        })));
+        let sub = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .with_writer(RedactingMake(sink))
+            .finish();
+        tracing::subscriber::with_default(sub, || {
+            tracing::info!("ready {SECRET}");
+        });
+        let text = fs::read_to_string(&path).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+        assert!(text.contains("ready"), "got {text:?}");
+        assert!(!text.contains(SECRET));
+    }
+
+    #[test]
     fn panic_text_is_redacted() {
         global().register(SECRET.as_bytes());
         let out = format_panic(&format!("boom {SECRET}"), None);
