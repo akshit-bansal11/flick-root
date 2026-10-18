@@ -243,7 +243,7 @@ pub fn start(app: &AppHandle) {
     }
 }
 
-async fn refresh_apps(s: &Arc<AppState>) {
+pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
     let st = s.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
         let stats = st.apps.refresh_blocking()?;
@@ -266,7 +266,8 @@ async fn refresh_apps(s: &Arc<AppState>) {
     }
 }
 
-async fn start_find(s: &Arc<AppState>) {
+/// Loads the snapshot, scans the roots and starts the watcher (Find on, or a reindex).
+pub(crate) async fn start_find(s: &Arc<AppState>) {
     let st = s.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
         match snapshot::load(&st.snapshot_path()) {
@@ -289,6 +290,14 @@ async fn start_find(s: &Arc<AppState>) {
         Ok(Err(err)) => tracing::warn!(%err, "find index failed"),
         Err(err) => tracing::warn!(%err, "find task failed"),
     }
+}
+
+/// Find off: drops the watcher and frees the file index memory.
+pub(crate) fn stop_find(s: &AppState) {
+    s.watch.lock().take();
+    s.overlay.store(Arc::new(Overlay::new()));
+    s.files
+        .replace(index_files::store::StoreBuilder::new().finish(Vec::new()));
 }
 
 /// Stops features, flushes the store and saves the file snapshot.

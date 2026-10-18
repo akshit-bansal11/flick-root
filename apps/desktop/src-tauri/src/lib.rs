@@ -60,7 +60,19 @@ pub fn run() {
             commands::secrets::set_secret,
             commands::secrets::delete_secret,
             commands::secrets::test_secret,
-            commands::secrets::list_secrets
+            commands::secrets::list_secrets,
+            commands::features::list_features,
+            commands::features::set_feature_enabled,
+            commands::features::set_feature_options,
+            commands::features::set_mode_enabled,
+            commands::features::run_system_command,
+            commands::settings::get_settings,
+            commands::settings::set_general,
+            commands::settings::set_roots,
+            commands::settings::clear_history,
+            commands::settings::reindex,
+            commands::settings::get_about,
+            commands::settings::resize_launcher
         ])
         .build(tauri::generate_context!());
     match result {

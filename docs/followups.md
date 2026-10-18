@@ -26,3 +26,6 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T3.9: keys stored in an earlier session are not registered with the log redactor until set again (VaultKeys has no register-on-use hook); add one.
 - T4.1: Settings must call `Frecency::clear_history()` for the "Clear history" button; learned prefixes from earlier sessions apply from the second ranking of that prefix (lazy lookup).
 - T3.9: set_secret registers the value with the redactor before validation (rejected values are registered too; harmless). If provider_cfg() returns None on a base_url change, key deletion is skipped silently — make it an explicit error.
+- T4.5 syscmd: confirm token comes from std RandomState + counter (fine as an accidental-press guard, not a secret); confirm://expired timer path untested (needs a real FeatureCtx).
+- T3.7: clear_history clears the store and emits `history://cleared`, but the frecency feature's in-memory maps don't listen yet (the registry can't downcast); add a listener or a registry hook so cleared history disappears without a restart.
+- T3.7: the Explain hotkey is saved to config but not registered (global-shortcut handler toggles the launcher for every shortcut) — F09 must add per-shortcut dispatch.
