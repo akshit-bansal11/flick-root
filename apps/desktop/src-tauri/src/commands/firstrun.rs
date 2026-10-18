@@ -61,9 +61,9 @@ pub async fn complete_first_run(
         tracing::warn!(%err, "emit failed");
     }
     if let Some(win) = app.get_webview_window(tray::SETTINGS_LABEL)
-        && let Err(err) = win.hide()
+        && let Err(err) = win.destroy()
     {
-        tracing::warn!(%err, "hiding settings failed");
+        tracing::warn!(%err, "closing settings failed");
     }
     tray::show_launcher(&app, "first-run");
     Ok(())
