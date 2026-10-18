@@ -122,6 +122,10 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     // Current height in logical px, converted with the window's own scale.
     let logical_h = f64::from(win.outer_size()?.height) / win.scale_factor()?;
     let (p, sz) = placement(pos, size, scale, BASE_WIDTH, logical_h);
+    // Move first so a cross-monitor DPI change (WM_DPICHANGED) rescales the
+    // old size, then set the size at the target scale and re-pin the position,
+    // since resizing after the move can shift the origin.
+    win.set_position(p)?;
     win.set_size(sz)?;
     win.set_position(p)?;
     if let Ok(mut s) = state.inner.lock() {
