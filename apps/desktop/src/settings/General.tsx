@@ -1,29 +1,11 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { comboFromEvent, validateCombo } from "../firstrun/hotkeyRules";
 import * as api from "./api";
 import { errorText, type GeneralPatch, type SettingsView, type Theme } from "./types";
 
 interface Props {
   settings: SettingsView;
   onChange: (s: SettingsView) => void;
-}
-
-const MODIFIER_KEYS = new Set(["Control", "Alt", "Shift", "Meta"]);
-
-/** Builds a Tauri accelerator such as "Alt+Space"; null until a non-modifier key is pressed. */
-function combo(e: KeyboardEvent): string | null {
-  if (MODIFIER_KEYS.has(e.key)) return null;
-  const key = e.code.startsWith("Key")
-    ? e.code.slice(3)
-    : e.code.startsWith("Digit")
-      ? e.code.slice(5)
-      : e.code;
-  const mods = [
-    e.ctrlKey && "Ctrl",
-    e.altKey && "Alt",
-    e.shiftKey && "Shift",
-    e.metaKey && "Super",
-  ];
-  return [...mods.filter(Boolean), key].join("+");
 }
 
 function Row({
@@ -83,9 +65,11 @@ export function General({ settings, onChange }: Props) {
   const onCapture = (e: KeyboardEvent) => {
     e.preventDefault();
     if (e.key === "Escape") return setCapturing(false);
-    const c = combo(e);
+    const c = comboFromEvent(e);
     if (!c) return;
     setCapturing(false);
+    const bad = validateCombo(c, settings.hotkeyExplain);
+    if (bad) return setError("hotkey", bad);
     void patch("hotkey", { hotkeyLauncher: c });
   };
 

@@ -11,7 +11,6 @@ use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, PhysicalSize, State};
-use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 const MIN_HEIGHT: u32 = 64;
 
@@ -88,15 +87,11 @@ pub async fn set_general(
             "theme must be system, dark or light",
         ));
     }
+    if let Some(h) = &hotkey_explain {
+        hotkey::validate(h)?;
+    }
     if let Some(new) = &hotkey_launcher {
-        let old = state.config.load().general.hotkey.clone();
-        if *new != old {
-            hotkey::register(&app, "launcher", new)
-                .map_err(|e| CommandError::new("hotkey_conflict", format!("{e:#}")))?;
-            if let Err(err) = app.global_shortcut().unregister(old.as_str()) {
-                tracing::warn!(%err, "unregistering old hotkey failed");
-            }
-        }
+        hotkey::rebind_launcher(&app, new)?;
     }
     if let Some(on) = launch_at_startup {
         autostart::set_autostart(&app, on)

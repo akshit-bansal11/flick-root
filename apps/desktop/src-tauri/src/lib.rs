@@ -49,11 +49,9 @@ pub fn run() {
                 .general
                 .hotkey
                 .clone();
-            if hotkey::register(app.handle(), "launcher", &saved).is_err()
-                && saved != hotkey::DEFAULT
-            {
+            if hotkey::rebind_launcher(app.handle(), &saved).is_err() && saved != hotkey::DEFAULT {
                 tracing::warn!(saved, "saved hotkey failed, using default");
-                let _ = hotkey::register(app.handle(), "launcher", hotkey::DEFAULT);
+                let _ = hotkey::rebind_launcher(app.handle(), hotkey::DEFAULT);
             }
             let first_run_done = app
                 .state::<std::sync::Arc<state::AppState>>()
