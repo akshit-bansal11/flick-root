@@ -25,3 +25,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T3.9: secret metadata lives in local_data_dir()/secret_meta.json (name, host, added_at, last_used only) because Store has no secret_meta accessors; move it to the SQLite table.
 - T3.9: keys stored in an earlier session are not registered with the log redactor until set again (VaultKeys has no register-on-use hook); add one.
 - T4.1: Settings must call `Frecency::clear_history()` for the "Clear history" button; learned prefixes from earlier sessions apply from the second ranking of that prefix (lazy lookup).
+- T3.9: set_secret registers the value with the redactor before validation (rejected values are registered too; harmless). If provider_cfg() returns None on a base_url change, key deletion is skipped silently — make it an explicit error.
