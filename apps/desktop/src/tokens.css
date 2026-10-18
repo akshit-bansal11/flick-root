@@ -69,6 +69,7 @@
   --l-nav-w: 200px;
 
   --l-blur: none;
+  --l-tile-hue-default: 220;
   --l-tile-hue-s: 48%;
   --l-tile-hue-l: 38%;
   --l-tile-text: #fff;
@@ -149,4 +150,9 @@
   :root {
     --motion-scale: 0;
   }
+}
+
+/* Declared on the element so var(--h) resolves per tile, not at :root. */
+.tile-letter {
+  --l-tile-bg: hsl(var(--h, var(--l-tile-hue-default)) var(--l-tile-hue-s) var(--l-tile-hue-l));
 }

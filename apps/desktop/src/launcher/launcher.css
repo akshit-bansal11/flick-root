@@ -1,0 +1,132 @@
+html,
+body,
+#root {
+  margin: 0;
+  background: transparent;
+  font: var(--l-fs) / var(--l-lh) var(--l-ui);
+  color: var(--l-text);
+}
+
+.launcher {
+  background: var(--l-panel);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  overflow: hidden;
+}
+
+.launcher.show {
+  animation: launcher-in calc(100ms * var(--motion-scale)) var(--l-motion-ease);
+}
+
+@keyframes launcher-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.inputbar {
+  display: flex;
+  align-items: center;
+  gap: var(--l-sp-5);
+  height: var(--l-input);
+  padding: 0 var(--l-sp-8);
+  min-width: 0;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  font: 400 var(--l-fs-input) var(--l-ui);
+  color: var(--l-text);
+  caret-color: var(--l-accent);
+  text-overflow: ellipsis;
+}
+
+.input::placeholder {
+  color: var(--l-muted);
+}
+
+.hint {
+  flex: none;
+  font: 500 var(--l-fs-meta) var(--l-mono);
+  color: var(--l-muted);
+  white-space: nowrap;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-1);
+}
+
+.results:not(:empty) {
+  padding: var(--l-sp-3);
+  border-top: var(--l-border);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--l-sp-5);
+  height: var(--l-row);
+  padding: 0 var(--l-sp-5);
+  border: 1px solid transparent;
+  border-radius: var(--l-r2);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.row:hover {
+  background: var(--l-hover);
+}
+
+.row.sel {
+  background: var(--l-sel);
+}
+
+.row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--l-sp-5);
+}
+
+.row-title,
+.row-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-sub {
+  font-size: var(--l-fs-sub);
+  color: var(--l-muted);
+  min-width: 0;
+}
+
+.row-meta {
+  flex: none;
+  font: 500 var(--l-fs-meta) var(--l-mono);
+  color: var(--l-accent-text);
+}
+
+.tile {
+  flex: none;
+  width: var(--l-tile);
+  height: var(--l-tile);
+  border-radius: var(--l-r-tile);
+}
+
+.tile-letter {
+  display: grid;
+  place-items: center;
+  font: 600 10.5px var(--l-ui);
+  color: var(--l-tile-text);
+  background: var(--l-tile-bg);
+}

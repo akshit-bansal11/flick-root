@@ -15,5 +15,6 @@ export default defineConfig({
       },
     },
   },
+  resolve: { dedupe: ["react", "react-dom"] },
   test: { environment: "jsdom", passWithNoTests: true },
 });
