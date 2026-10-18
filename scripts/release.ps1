@@ -120,7 +120,7 @@ $changed.Add('Cargo.lock'); $changed.Add('CHANGELOG.md')
 if ($DryRun) {
     Write-Host '> cargo update -w --offline'
     Write-Host "> git-cliff --tag $tag -o CHANGELOG.md"
-    Write-Host '> gate: cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo test; pnpm lint; pnpm --filter desktop typecheck; pnpm --filter desktop test'
+    Write-Host '> gate: pnpm --filter desktop build; cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo test; pnpm lint; pnpm typecheck; pnpm test; pnpm --filter web build'
     Write-Host "> git add $($changed -join ' ')"
     Write-Host "> git commit -m 'up/ release: $tag'"
     Write-Host "> git tag -a $tag -m $tag"
@@ -136,12 +136,15 @@ try {
         Invoke-Native cargo @('update', '-w')
     }
     Invoke-Native git-cliff @('--tag', $tag, '-o', 'CHANGELOG.md')
+    # The shell's generate_context! needs apps/desktop/dist, as in CI.
+    Invoke-Native pnpm @('--filter', 'desktop', 'build')
     Invoke-Native cargo @('fmt', '--check')
     Invoke-Native cargo @('clippy', '--all-targets', '--', '-D', 'warnings')
     Invoke-Native cargo @('test')
     Invoke-Native pnpm @('lint')
-    Invoke-Native pnpm @('--filter', 'desktop', 'typecheck')
-    Invoke-Native pnpm @('--filter', 'desktop', 'test')
+    Invoke-Native pnpm @('typecheck')
+    Invoke-Native pnpm @('test')
+    Invoke-Native pnpm @('--filter', 'web', 'build')
 } catch {
     Write-Host "FAILED: $_"
     Write-Host 'Changed files (undo with: git checkout -- .):'
