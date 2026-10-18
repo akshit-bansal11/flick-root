@@ -35,7 +35,6 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T4.7 projects: the `&`/spaces test checks only the built argv; add a runtime test that spawns a temp .cmd with `&`, `"` and `%` in the folder name and asserts std either escapes them or returns an error (relies on Rust ≥ 1.77.2 .cmd arg escaping).
 - W3 review NIT: tauri.conf.json CSP adds `style-src 'self' 'unsafe-inline'` beyond ADR-011 rule 3; React style props go through CSSOM (not blocked by CSP) — check if it is needed, else record the deviation in the ADR.
 - W3 review NIT: capabilities/default.json:27 lets the launcher window call probe_providers (keyed probes); drop unless the Query empty state needs it.
-- W3 review NIT: providers/src/openai_compat.rs:69 (and the Anthropic header) `format!("Bearer …")` copies the key into a non-zeroized String; wrap in Zeroizing<String>.
 - W3 review NIT: state.rs:190 ctx.http uses the default redirect policy and no connect timeout; use providers::http::plain_client().
 - W3 review NIT: frecency/mod.rs:121 stores kind via Debug lowercase while launch.rs used serde; pick one.
 - F3.1: Enter on a math/currency result copies and returns Outcome::Copied, but reducer.ts outcome() has no 'copied' case, so the launcher shows no feedback; add a brief 'Copied' state (W5).
@@ -47,3 +46,5 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - F3.6: no hub test drives NoKey / HostMismatch / InsecureUrl through stream(); add one with an erroring KeySource expecting Error "provider_error" and no Fallback. Hub::run also sends Started for providers[0] before stream() runs, so Started can precede an authorize failure.
 - T5.2: General.tsx has an inline `.s-switch` button duplicating settings/Toggle.tsx; switch General to Toggle.
 - T5.3: provider enable control is a native checkbox (Biome rejected role="switch" without aria-checked); restyle to the Win11 pill via Toggle.tsx for consistency.
+- T5.10: install_panic_hook itself is not tested from outside (logging is private and the hook is process-wide); unit test covers panic_text redaction only.
+- T5.12: SettingsRoot's settings://navigate listener has no test of its own (resolveView is unit-tested).
