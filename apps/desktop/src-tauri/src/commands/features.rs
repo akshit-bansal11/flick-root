@@ -60,9 +60,11 @@ fn changed(app: &AppHandle, v: &FeatureView) {
     }
 }
 
-fn persist(state: &AppState, cfg: launcher_core::Config) -> Result<(), CommandError> {
+/// Writes only `[features.<id>]` so concurrent provider/general edits are not clobbered.
+fn persist(state: &AppState, id: &str, cfg: launcher_core::Config) -> Result<(), CommandError> {
+    let table = cfg.features.get(id).cloned().unwrap_or_default();
     state.update_config(|c| {
-        *c = cfg;
+        c.features.insert(id.to_string(), table);
         Ok(())
     })
 }
@@ -89,7 +91,7 @@ pub async fn set_feature_enabled(
         .set_enabled(&id, enabled, &state.ctx)
         .await
         .map_err(map_err)?;
-    persist(&state, cfg)?;
+    persist(&state, &id, cfg)?;
     let v = view(&state, &id).await?;
     changed(&app, &v);
     if enabled && v.status == FeatureState::Failed {
@@ -115,7 +117,7 @@ pub async fn set_feature_options(
         .set_options(&id, table, &state.ctx)
         .await
         .map_err(map_err)?;
-    persist(&state, cfg)?;
+    persist(&state, &id, cfg)?;
     let v = view(&state, &id).await?;
     changed(&app, &v);
     Ok(v)

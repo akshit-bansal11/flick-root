@@ -105,6 +105,17 @@ async fn stop_entry(e: &mut Entry) {
     e.state = FeatureState::Stopped;
 }
 
+/// Atomically edits only `[features.<id>]` in the live config so features see it at once.
+/// The shell persists that one table; it never replaces the whole config from this snapshot.
+fn patch_feature(ctx: &FeatureCtx, id: &str, f: impl Fn(&mut toml::Table)) -> Config {
+    ctx.config.rcu(|cur| {
+        let mut c = (**cur).clone();
+        f(c.features.entry(id.to_string()).or_default());
+        c
+    });
+    (**ctx.config.load()).clone()
+}
+
 fn find<'a>(v: &'a mut [Entry], id: &str) -> Result<&'a mut Entry, FeatureError> {
     v.iter_mut()
         .find(|e| e.feature.id() == id)
@@ -162,12 +173,9 @@ impl Registry {
     ) -> Result<Config, FeatureError> {
         let mut v = self.entries.write().await;
         let e = find(&mut v, id)?;
-        let mut cfg = (**ctx.config.load()).clone();
-        cfg.features
-            .entry(id.to_string())
-            .or_default()
-            .insert("enabled".into(), toml::Value::Boolean(on));
-        ctx.config.store(Arc::new(cfg.clone()));
+        let cfg = patch_feature(ctx, id, |t| {
+            t.insert("enabled".into(), toml::Value::Boolean(on));
+        });
         match (on, e.state) {
             (true, FeatureState::Registered | FeatureState::Stopped | FeatureState::Failed) => {
                 start_entry(e, ctx).await;
@@ -190,8 +198,13 @@ impl Registry {
         let mut v = self.entries.write().await;
         let e = find(&mut v, id)?;
         validate(&e.feature.settings_schema(), &table)?;
-        let mut cfg = (**ctx.config.load()).clone();
-        let old = cfg.features.get(id).cloned().unwrap_or_default();
+        let old = ctx
+            .config
+            .load()
+            .features
+            .get(id)
+            .cloned()
+            .unwrap_or_default();
         if let Some(en) = old.get("enabled") {
             table.insert("enabled".into(), en.clone());
         }
@@ -201,8 +214,7 @@ impl Registry {
             .filter(|k| old.get(*k) != table.get(*k))
             .cloned()
             .collect();
-        cfg.features.insert(id.to_string(), table);
-        ctx.config.store(Arc::new(cfg.clone()));
+        let cfg = patch_feature(ctx, id, |t| *t = table.clone());
         if e.state == FeatureState::Running && e.feature.needs_restart_for(&changed) {
             stop_entry(e).await;
             start_entry(e, ctx).await;
@@ -241,10 +253,7 @@ impl Registry {
 
     /// Looks up a feature by id, for `execute`.
     pub async fn get(&self, id: &str) -> Option<Arc<dyn Feature>> {
-        let v = self.entries.read().await;
-        v.iter()
-            .find(|e| e.feature.id() == id)
-            .map(|e| e.feature.clone())
+        self.running.load().iter().find(|f| f.id() == id).cloned()
     }
 
     /// One view per feature, in registration order.

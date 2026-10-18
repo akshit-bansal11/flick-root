@@ -212,7 +212,7 @@ fn schema_def() -> SettingsSchema {
                 ],
             },
             default: serde_json::Value::Array(rows),
-            restart: false,
+            restart: true,
         }],
     }
 }

@@ -47,11 +47,21 @@ pub fn command_search(
             .filter_map(|h| apps.get(h.idx).map(|a| app_item(a, h.score as f32)))
             .collect()
     };
-    items.extend(registry.query_all(input));
-    let max = items.iter().map(|i| i.score).fold(0.0_f32, f32::max);
+    // Nucleo scores are unbounded; feature items score 0..1. Squash apps into 0..=APP_CEIL so an
+    // exact feature keyword match (1.0) outranks a fuzzy app hit, while apps still order among themselves.
+    // ponytail: relative-to-top squash, a fixed calibration if apps ever need absolute confidence.
+    const APP_CEIL: f32 = 0.9;
+    let app_max = items.iter().map(|i| i.score).fold(0.0_f32, f32::max);
     for it in &mut items {
-        let base = if max > 0.0 { it.score / max } else { 0.0 };
-        it.score = base + registry.rank_boost_all(input, it);
+        it.score = if app_max > 0.0 {
+            APP_CEIL * it.score / app_max
+        } else {
+            0.0
+        };
+    }
+    items.extend(registry.query_all(input));
+    for it in &mut items {
+        it.score += registry.rank_boost_all(input, it);
     }
     if k > 0 && items.len() > k {
         items.select_nth_unstable_by(k - 1, by_score);
@@ -130,5 +140,47 @@ mod tests {
         assert_eq!(got[0].id.0, "app:p.Code");
         let all = command_search(&apps, &idx, &mut m, &r, &input(""), 2);
         assert_eq!(all.len(), 2);
+    }
+
+    async fn live_registry() -> Registry {
+        use crate::ctx::{EventSink, FeatureCtx, TaskScope};
+        use arc_swap::ArcSwap;
+        use launcher_core::Config;
+        use launcher_core::store::Store;
+        use providers::hub::ProviderHub;
+        use std::sync::Arc;
+        struct Sink;
+        impl EventSink for Sink {
+            fn emit(&self, _: &str, _: serde_json::Value) {}
+        }
+        let c = FeatureCtx {
+            config: Arc::new(ArcSwap::from_pointee(Config::default())),
+            store: Arc::new(Store::open_in_memory().unwrap()),
+            providers: Arc::new(ArcSwap::from_pointee(ProviderHub::new(vec![]))),
+            http: reqwest::Client::new(),
+            events: Arc::new(Sink),
+            tasks: TaskScope::new(),
+        };
+        let r = Registry::new();
+        r.register(Arc::new(crate::syscmd::SysCmd::default())).await;
+        r.register(Arc::new(crate::web::Web)).await;
+        r.apply_config(&c.config.load(), &c).await;
+        r
+    }
+
+    fn top(text: &str, r: &Registry) -> Item {
+        let apps = vec![app("Clock"), app("Notepad"), app("Calculator")];
+        let names: Vec<_> = apps.iter().map(|a| a.name.as_str()).collect();
+        let idx = MatchIndex::new(&names);
+        let mut m = FuzzyMatcher::new();
+        command_search(&apps, &idx, &mut m, r, &input(text), 5).remove(0)
+    }
+
+    #[tokio::test]
+    async fn feature_exact_matches_beat_fuzzy_apps() {
+        let r = live_registry().await;
+        assert_eq!(top("lock", &r).source, "syscmd");
+        assert_eq!(top("g cats", &r).source, "web");
+        assert_eq!(top("notepad", &r).title, "Notepad");
     }
 }
