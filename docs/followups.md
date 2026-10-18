@@ -29,3 +29,5 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T4.5 syscmd: confirm token comes from std RandomState + counter (fine as an accidental-press guard, not a secret); confirm://expired timer path untested (needs a real FeatureCtx).
 - T3.7: clear_history clears the store and emits `history://cleared`, but the frecency feature's in-memory maps don't listen yet (the registry can't downcast); add a listener or a registry hook so cleared history disappears without a restart.
 - T3.7: the Explain hotkey is saved to config but not registered (global-shortcut handler toggles the launcher for every shortcut) — F09 must add per-shortcut dispatch.
+- Test temp-dir names in apps/desktop/src-tauri/src/icons.rs:60 and meta_store.rs:100 contain the brand literal; derive from brand::APP_NAME.
+- T4.3 math: '2.5 kg to lb' takes ~295 µs (budget 0.5 ms; fend parse + unit lookup dominate). A hand-rolled fast path for simple unit conversions would cut it if the end-to-end Command bench (T5.6) needs headroom.
