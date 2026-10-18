@@ -67,7 +67,7 @@ export interface AskRequest {
 }
 
 export type AskEvent =
-  | { type: "started"; provider: string; model: string }
+  | { type: "started"; provider: string; model: string; reasoning?: boolean }
   | { type: "fallback"; from: string; to: string; reason: string }
   | { type: "thinking" }
   | { type: "delta"; text: string }

@@ -15,6 +15,11 @@ export interface QueryState {
   provider: string | null;
   effort: Effort;
   error: string | null;
+  errorCode: string | null;
+  thinking: boolean;
+  model: string | null;
+  /** False once a started event says the provider has no reasoning control. */
+  reasoning: boolean;
 }
 
 export interface State {
@@ -71,7 +76,17 @@ export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
   askToken: 0,
   items: [],
   selected: 0,
-  query: { status: "idle", text: "", provider: null, effort: "fast", error: null },
+  query: {
+    status: "idle",
+    text: "",
+    provider: null,
+    effort: "fast",
+    error: null,
+    errorCode: null,
+    thinking: false,
+    model: null,
+    reasoning: true,
+  },
   pendingConfirm: null,
   overlay: { firstRun: false },
   visible: false,
@@ -93,7 +108,16 @@ function switchMode(s: State, mode: Mode, input: string): Result {
   const cleared: State = {
     ...s,
     items: [],
-    query: { ...s.query, status: "idle", text: "", provider: null, error: null },
+    query: {
+      ...s.query,
+      status: "idle",
+      text: "",
+      provider: null,
+      error: null,
+      errorCode: null,
+      thinking: false,
+      model: null,
+    },
   };
   const r = search(cleared, mode, input);
   return { state: r.state, effects: [...cancel, ...r.effects] };
@@ -133,7 +157,16 @@ function enter(s: State, k: KeyInput): Result {
       {
         ...s,
         askToken: token,
-        query: { ...s.query, status: "streaming", text: "", provider: null, error: null },
+        query: {
+          ...s.query,
+          status: "streaming",
+          text: "",
+          provider: null,
+          error: null,
+          errorCode: null,
+          thinking: false,
+          model: null,
+        },
       },
       ...cancel,
       { type: "ask", token, text, effort: s.query.effort },
@@ -201,13 +234,19 @@ function ask(s: State, token: number, e: AskEvent): Result {
   if (q.status !== "streaming" || token !== s.askToken) return out(s);
   switch (e.type) {
     case "started":
-      return out({ ...s, query: { ...q, provider: e.provider } });
+      return out({
+        ...s,
+        query: { ...q, provider: e.provider, model: e.model, reasoning: e.reasoning ?? true },
+      });
     case "fallback":
       return out({ ...s, query: { ...q, provider: e.to } });
     case "thinking":
-      return out(s);
+      return out({ ...s, query: { ...q, thinking: true } });
     case "delta":
-      return out({ ...s, query: { ...q, text: q.text + e.text } }, { type: "resize" });
+      return out(
+        { ...s, query: { ...q, thinking: false, text: q.text + e.text } },
+        { type: "resize" },
+      );
     case "done":
       return out(
         { ...s, query: { ...q, status: "done", provider: e.provider } },
@@ -215,7 +254,10 @@ function ask(s: State, token: number, e: AskEvent): Result {
       );
     case "error":
       return out(
-        { ...s, query: { ...q, status: "error", error: e.message } },
+        {
+          ...s,
+          query: { ...q, status: "error", error: e.message, errorCode: e.code, thinking: false },
+        },
         e.code === "no_provider" || e.code === "query_disabled"
           ? { type: "openSettings", section: "providers" }
           : { type: "resize" },

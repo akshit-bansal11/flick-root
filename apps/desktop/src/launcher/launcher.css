@@ -130,3 +130,30 @@ body,
   color: var(--l-tile-text);
   background: var(--l-tile-bg);
 }
+
+.actions {
+  display: flex;
+  gap: var(--l-sp-4);
+  align-items: center;
+  height: var(--l-row);
+  padding: 0 var(--l-sp-8);
+  border-top: var(--l-border);
+}
+
+.action {
+  display: flex;
+  gap: var(--l-sp-3);
+  align-items: center;
+  font: 500 var(--l-fs-action) var(--l-ui);
+  color: var(--l-text);
+  background: none;
+  border: var(--l-border);
+  border-radius: var(--l-r2);
+  padding: var(--l-sp-2) var(--l-sp-5);
+  cursor: pointer;
+}
+
+.action-key {
+  font: 500 var(--l-fs-meta) var(--l-mono);
+  color: var(--l-muted);
+}

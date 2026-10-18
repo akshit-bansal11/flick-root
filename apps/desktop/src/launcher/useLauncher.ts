@@ -122,7 +122,15 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     [dispatch],
   );
 
-  return { state, setText, activate };
+  const press = useCallback(
+    (key: string, ctrl: boolean) =>
+      dispatch({ type: "key", key: { key, ctrl, shift: false, alt: false } }),
+    [dispatch],
+  );
+  const toggleEffort = useCallback(() => press("t", true), [press]);
+  const openSettings = useCallback((section: string) => ipc.openSettings(section).catch(warn), []);
+
+  return { state, setText, activate, press, toggleEffort, openSettings };
 }
 
 function warn(err: unknown) {

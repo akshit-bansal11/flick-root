@@ -301,3 +301,26 @@ describe("reducer", () => {
     expect(r.state.seq).toBe(1);
   });
 });
+
+describe("query state flags", () => {
+  const ask = (s: State, event: import("../types").AskEvent) =>
+    reduce(s, { type: "ask", token: s.askToken, event }).state.query;
+
+  it("thinking is set by event and cleared by the first delta", () => {
+    const t = ask(streaming(), { type: "thinking" });
+    expect(t.thinking).toBe(true);
+    const s = streaming({ query: t });
+    expect(ask(s, { type: "delta", text: "a" }).thinking).toBe(false);
+  });
+
+  it("started stores model and reasoning, defaulting reasoning to true", () => {
+    const a = ask(streaming(), { type: "started", provider: "p", model: "m", reasoning: false });
+    expect(a).toMatchObject({ model: "m", reasoning: false });
+    expect(ask(streaming(), { type: "started", provider: "p", model: "m" }).reasoning).toBe(true);
+  });
+
+  it("error stores errorCode", () => {
+    const e = ask(streaming(), { type: "error", code: "no_provider", message: "x" });
+    expect(e.errorCode).toBe("no_provider");
+  });
+});
