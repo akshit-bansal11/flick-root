@@ -10,7 +10,7 @@ const BUDGET: Duration = Duration::from_millis(if cfg!(debug_assertions) { 50 } 
 /// Per-thread warm-up limit; runs once, off the keystroke deadline.
 const WARMUP: Duration = Duration::from_secs(2);
 
-/// Currency words and symbols; those expressions wait for the rates feature (T4.4).
+/// Currency words and symbols; fend cannot convert them, so `rates.rs` answers them instead.
 const CURRENCY_WORDS: &[&str] = &[
     "usd", "eur", "inr", "gbp", "jpy", "cad", "aud", "chf", "cny", "dollar", "dollars", "euro",
     "euros", "rupee", "rupees",
