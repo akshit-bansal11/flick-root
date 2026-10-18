@@ -1,10 +1,10 @@
 .fr-shell {
   max-width: 520px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 32px var(--l-sp-10);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--l-sp-8);
   color: var(--l-text);
   font-family: var(--l-ui);
   font-size: var(--l-fs);
@@ -17,7 +17,7 @@
 .fr-field,
 .fr-btn {
   min-height: var(--l-row);
-  padding: 0 16px;
+  padding: 0 var(--l-sp-8);
   border: var(--l-border);
   border-radius: var(--l-r);
   background: var(--l-surface);
@@ -27,7 +27,7 @@
 }
 .fr-field {
   display: block;
-  margin-top: 6px;
+  margin-top: var(--l-sp-3);
   min-width: 220px;
   font-family: var(--l-mono);
 }
@@ -49,7 +49,7 @@
   outline-offset: 2px;
 }
 .fr-status {
-  margin: 8px 0 0;
+  margin: var(--l-sp-4) 0 0;
   min-height: 1.35em;
   font-size: var(--l-fs-sub);
 }
@@ -61,18 +61,18 @@
 }
 .fr-servers {
   list-style: none;
-  margin: 0 0 12px;
+  margin: 0 0 var(--l-sp-6);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--l-sp-4);
 }
 .fr-server {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: var(--l-sp-6);
+  padding: var(--l-sp-4) var(--l-sp-6);
   border: var(--l-border);
   border-radius: var(--l-r);
   background: var(--l-surface);
@@ -80,7 +80,7 @@
 .fr-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--l-sp-4);
 }
 @media (prefers-reduced-motion: reduce) {
   .fr-field,

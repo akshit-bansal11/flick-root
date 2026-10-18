@@ -65,7 +65,7 @@
 .pv-shell button:focus-visible,
 .pv-shell input:focus-visible,
 .pv-links button:focus-visible {
-  outline: 2px solid var(--l-accent);
+  outline: 2px solid var(--l-focus);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

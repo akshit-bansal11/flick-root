@@ -11,7 +11,13 @@ interface Props {
 }
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
-const rows = (v: unknown): Row[] => (Array.isArray(v) ? (v as Row[]) : []);
+const isRow = (r: unknown): r is Row =>
+  typeof r === "object" &&
+  r !== null &&
+  !Array.isArray(r) &&
+  Object.values(r).every((x) => typeof x === "string");
+const isRowArray = (v: unknown): v is Row[] => Array.isArray(v) && v.every(isRow);
+const rows = (v: unknown): Row[] => (isRowArray(v) ? v : []);
 
 // Rows have no id of their own: give each row object a stable React key that survives edits.
 const ids = new WeakMap<Row, number>();
