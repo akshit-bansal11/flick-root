@@ -11,10 +11,10 @@
   flex-direction: column;
   gap: var(--l-sp-6);
   padding: var(--l-sp-9);
-  background: var(--l-surface);
+  background: var(--l-panel);
   color: var(--l-text);
   border: var(--l-border);
-  border-radius: var(--l-r);
+  border-radius: var(--l-r-panel);
   box-shadow: var(--l-shadow);
   font-family: var(--l-ui);
   font-size: var(--l-fs);
@@ -52,10 +52,11 @@
 }
 .key-dialog button {
   padding: var(--l-sp-3) var(--l-sp-8);
-  background: var(--l-surface);
+  background: transparent;
   color: var(--l-text);
   border: var(--l-border);
-  border-radius: var(--l-r2);
+  border-radius: var(--l-r);
+  cursor: pointer;
   font: inherit;
 }
 .key-dialog button:last-child {

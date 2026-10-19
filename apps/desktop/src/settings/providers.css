@@ -1,13 +1,45 @@
 .pv-group {
   margin: var(--l-sp-10) 0 var(--l-sp-4);
-  color: var(--l-muted-strong);
+  color: var(--l-muted);
+  font-family: var(--l-mono);
   font-size: var(--l-fs-group);
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.pv-shell ul:not(.pv-links) {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-2);
+}
 .pv-row {
-  padding: var(--l-sp-5) 0;
-  border-bottom: var(--l-border);
+  padding: var(--l-sp-6) var(--l-sp-7);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  background: var(--l-surface);
   list-style: none;
+}
+.pv-head input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--l-accent);
+}
+.pv-head .pv-stat {
+  color: var(--l-muted);
+  font-family: var(--l-mono);
+  font-size: var(--l-fs-action);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pv-head .pv-stat[data-ok="true"] {
+  color: var(--l-ok-text);
+}
+.pv-title {
+  font-weight: 600;
+}
+.pv-shell > .s-btn-primary {
+  margin-bottom: var(--l-sp-4);
 }
 .pv-head,
 .pv-key,
@@ -16,7 +48,7 @@
   align-items: center;
   gap: var(--l-sp-6);
 }
-.pv-head > span:first-of-type {
+.pv-head > .pv-title {
   flex: 1;
 }
 .pv-opts {
@@ -50,7 +82,7 @@
   padding: var(--l-sp-2) var(--l-sp-6);
   border: var(--l-border);
   border-radius: var(--l-r);
-  background: var(--l-surface);
+  background: transparent;
   color: var(--l-text);
   font: inherit;
   cursor: pointer;

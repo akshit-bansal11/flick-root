@@ -82,6 +82,7 @@ export function Features() {
   return (
     <section>
       <h1 className="s-title">Features</h1>
+      <p className="s-desc">Turn modules on or off. Off means fully stopped.</p>
       {errors.page && (
         <div className="s-error" role="alert">
           {errors.page}

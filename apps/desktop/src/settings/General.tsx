@@ -111,6 +111,7 @@ export function General({ settings, onChange }: Props) {
   return (
     <section>
       <h1 className="s-title">General</h1>
+      <p className="s-desc">Hotkey, theme and where Find looks.</p>
 
       <Row label="Hotkey" help="Opens the launcher from anywhere." error={errors.hotkey}>
         <kbd className="s-kbd">{settings.hotkeyLauncher}</kbd>

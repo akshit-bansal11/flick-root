@@ -1,4 +1,6 @@
 .fr-shell {
+  min-height: 100vh;
+  box-sizing: border-box;
   max-width: 520px;
   margin: 0 auto;
   padding: 32px var(--l-sp-10);

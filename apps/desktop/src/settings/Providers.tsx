@@ -3,6 +3,7 @@ import { AddKeyDialog } from "./AddKeyDialog";
 import * as api from "./api";
 import { MaskedKey } from "./MaskedKey";
 import { errorText, type ProbeResult, type ProviderGroup, type ProviderView } from "./types";
+import "./features.css";
 import "./providers.css";
 
 const GROUPS: [ProviderGroup, string][] = [
@@ -68,8 +69,13 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
           checked={p.enabled}
           onChange={(e) => run(() => api.setProvider(p.id, { enabled: e.target.checked }))}
         />
-        <span>{p.title}</span>
-        <span className="s-help">{statusText(p, probe)}</span>
+        <span className="f-tile" aria-hidden="true">
+          {p.title.charAt(0)}
+        </span>
+        <span className="pv-title">{p.title}</span>
+        <span className="pv-stat" data-ok={p.key_required ? !!p.key : !!probe?.reachable}>
+          {statusText(p, probe)}
+        </span>
         {p.key_required && !p.key && (
           <button type="button" onClick={() => setDialog("add")}>
             Add key
@@ -187,7 +193,10 @@ export function Providers() {
   return (
     <section className="pv-shell" aria-label="AI providers">
       <h1 className="s-title">AI providers</h1>
-      <button type="button" onClick={probe}>
+      <p className="s-desc">
+        Choose where answers come from. Keys stay in Windows Credential Manager.
+      </p>
+      <button type="button" className="s-btn-primary" onClick={probe}>
         Probe local servers
       </button>
       {err && (

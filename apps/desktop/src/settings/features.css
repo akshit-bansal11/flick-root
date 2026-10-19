@@ -1,8 +1,11 @@
 .f-group {
-  margin: var(--l-sp-8) 0 var(--l-sp-2);
-  color: var(--l-muted-strong);
-  font-size: var(--l-fs-sub);
+  margin: var(--l-sp-6) 0 var(--l-sp-3);
+  color: var(--l-muted);
+  font-family: var(--l-mono);
+  font-size: var(--l-fs-group);
   font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .f-grow {
   flex: 1;
@@ -10,19 +13,22 @@
 .f-tile {
   display: grid;
   place-items: center;
-  width: var(--l-row);
-  height: var(--l-row);
+  flex: none;
+  width: var(--l-tile-settings);
+  height: var(--l-tile-settings);
   border-radius: var(--l-r);
   background: var(--l-sel);
   color: var(--l-accent-text);
   font-weight: 600;
 }
 .f-pill {
-  padding: 0 var(--l-sp-3);
+  padding: 1px 7px;
   border: var(--l-border);
   border-radius: var(--l-r-pill);
-  color: var(--l-muted-strong);
-  font-size: var(--l-fs-meta);
+  color: var(--l-muted);
+  font-family: var(--l-mono);
+  font-size: var(--l-fs-group);
+  font-weight: 500;
 }
 .f-form {
   display: flex;

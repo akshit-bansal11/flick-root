@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useRef } from "react";
+import { APP_DISPLAY_NAME } from "../brand";
 
 export const PAGES = [
   { id: "general", label: "General" },
@@ -31,6 +32,7 @@ export function Nav({ active, onSelect, featuresCount }: Props) {
   // Buttons activate on Enter/Space natively; arrows move focus, roving tabindex keeps one tab stop.
   return (
     <nav className="s-nav" aria-label="Settings">
+      <div className="s-brand">{APP_DISPLAY_NAME}</div>
       {PAGES.map((p, i) => (
         <button
           key={p.id}
