@@ -54,6 +54,8 @@ pub enum HubEvent {
 pub struct ProviderHub {
     providers: Vec<Arc<dyn Provider>>,
     first_token: Duration,
+    /// Config and keys, kept to rebuild one provider with another model.
+    source: Option<(Providers, Arc<dyn KeySource>)>,
 }
 
 /// Longest wait for the request to be answered with a first delta.
@@ -72,6 +74,7 @@ impl ProviderHub {
         Self {
             providers,
             first_token: FIRST_TOKEN_TIMEOUT,
+            source: None,
         }
     }
 
@@ -94,7 +97,20 @@ impl ProviderHub {
             })
             .map(Arc::from)
             .collect();
-        Self::new(providers)
+        let mut hub = Self::new(providers);
+        hub.source = Some((cfg.clone(), keys.clone()));
+        hub
+    }
+
+    /// An enabled provider `id` rebuilt with `model`; `None` when it is off or unbuildable.
+    pub fn with_model(&self, id: &str, model: &str) -> Option<Arc<dyn Provider>> {
+        let (cfg, keys) = self.source.as_ref()?;
+        let mut entry = cfg.entries.get(id).filter(|e| e.enabled)?.clone();
+        entry.model = model.to_owned();
+        let pr = preset(id).or_else(|| preset("custom"))?;
+        build_provider(id, &entry, pr, keys.clone())
+            .ok()
+            .map(Arc::from)
     }
 
     /// The first enabled provider (the Query provider), if any.
@@ -109,8 +125,19 @@ impl ProviderHub {
 
     /// Ask with fallback. Cancelling stops everything and emits nothing further.
     pub fn ask(&self, req: Request, cancel: CancellationToken) -> BoxStream<'static, HubEvent> {
+        self.ask_with(req, cancel, None)
+    }
+
+    /// Like [`ask`](Self::ask), but `first` is tried before the rest; a hub provider with
+    /// the same id is dropped from the remainder.
+    pub fn ask_with(
+        &self,
+        req: Request,
+        cancel: CancellationToken,
+        first: Option<Arc<dyn Provider>>,
+    ) -> BoxStream<'static, HubEvent> {
         let (tx, rx) = unbounded();
-        let providers = self.providers.clone();
+        let providers = order_with(&self.providers, first);
         let first_token = self.first_token;
         tokio::spawn(async move {
             tokio::select! {
@@ -120,6 +147,18 @@ impl ProviderHub {
         });
         rx.boxed()
     }
+}
+
+fn order_with(
+    all: &[Arc<dyn Provider>],
+    first: Option<Arc<dyn Provider>>,
+) -> Vec<Arc<dyn Provider>> {
+    let Some(f) = first else {
+        return all.to_vec();
+    };
+    let id = f.config().id.clone();
+    let rest = all.iter().filter(|p| p.config().id != id).cloned();
+    std::iter::once(f).chain(rest).collect()
 }
 
 async fn run(

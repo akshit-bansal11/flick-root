@@ -318,6 +318,110 @@ pub async fn set_provider_order(
     blocking(move || s.update_config(|cfg| apply_order(cfg, ids))).await
 }
 
+/// One selectable provider and model pair.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ThinkingMode {
+    /// `<provider_id>/<model>`.
+    pub id: String,
+    /// Provider id.
+    pub provider_id: String,
+    /// Provider display title.
+    pub provider_label: String,
+    /// Model name.
+    pub model: String,
+    /// Runs on this machine.
+    pub local: bool,
+}
+
+/// Modes plus the current pick.
+#[derive(Debug, Serialize)]
+pub struct ThinkingModes {
+    /// Every mode, in fallback order.
+    pub modes: Vec<ThinkingMode>,
+    /// Chosen mode id; the first mode when none or stale.
+    pub selected: Option<String>,
+}
+
+/// Splits a mode id at the first `/`.
+pub(crate) fn parse_mode_id(id: &str) -> Option<(&str, &str)> {
+    id.split_once('/')
+        .filter(|(p, m)| !p.is_empty() && !m.is_empty())
+}
+
+/// One mode per model of each enabled provider, in fallback order.
+pub(crate) fn thinking_modes(cfg: &Config) -> Vec<ThinkingMode> {
+    let mut out = Vec::new();
+    for pid in &cfg.providers.order {
+        let Some(e) = cfg.providers.entries.get(pid).filter(|e| e.enabled) else {
+            continue;
+        };
+        let pr = preset_of(pid);
+        let mut seen: Vec<&str> = Vec::new();
+        for m in std::iter::once(&e.model).chain(&e.models) {
+            let m = m.trim();
+            if m.is_empty() || seen.contains(&m) {
+                continue;
+            }
+            seen.push(m);
+            out.push(ThinkingMode {
+                id: format!("{pid}/{m}"),
+                provider_id: pid.clone(),
+                provider_label: pr.title.to_owned(),
+                model: m.to_owned(),
+                local: pr.group == Group::Local,
+            });
+        }
+    }
+    out
+}
+
+/// The stored id if still valid, else the first mode's id.
+fn selected_mode(cfg: &Config, modes: &[ThinkingMode]) -> Option<String> {
+    let stored = cfg.modes.query.thinking_mode.as_deref();
+    modes
+        .iter()
+        .find(|m| Some(m.id.as_str()) == stored)
+        .or_else(|| modes.first())
+        .map(|m| m.id.clone())
+}
+
+/// The valid (provider id, model) behind a mode id, if any.
+pub(crate) fn resolve_mode(cfg: &Config, id: &str) -> Option<(String, String)> {
+    let (p, m) = parse_mode_id(id)?;
+    thinking_modes(cfg)
+        .into_iter()
+        .find(|t| t.provider_id == p && t.model == m)
+        .map(|t| (t.provider_id, t.model))
+}
+
+/// Lists thinking modes and the selected one; carries no key data.
+#[tauri::command]
+pub fn list_thinking_modes(state: State<'_, Arc<AppState>>) -> ThinkingModes {
+    let cfg = state.config.load();
+    let modes = thinking_modes(&cfg);
+    let selected = selected_mode(&cfg, &modes);
+    ThinkingModes { modes, selected }
+}
+
+/// Persists the chosen thinking mode; unknown ids are rejected.
+#[tauri::command]
+pub async fn set_thinking_mode(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<(), CommandError> {
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|cfg| {
+            resolve_mode(cfg, &id)
+                .ok_or_else(|| CommandError::new("unknown_mode", "no such thinking mode"))?;
+            cfg.modes.query.thinking_mode = Some(id);
+            Ok(())
+        })
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,5 +506,38 @@ mod tests {
         let all = views(&vault(), &Config::default());
         assert_eq!(all.len(), PRESETS.len());
         assert!(all.iter().all(|v| v.status == "off"));
+    }
+
+    #[test]
+    fn thinking_modes_filter_order_dedupe() {
+        let mut cfg = Config::default();
+        assert!(thinking_modes(&cfg).is_empty());
+        apply_order(
+            &mut cfg,
+            vec!["openai".into(), "ollama".into(), "anthropic".into()],
+        )
+        .unwrap();
+        for (id, model, extra) in [
+            ("openai", "gpt-a", vec!["gpt-b", "gpt-a", " "]),
+            ("ollama", "", vec!["llama"]),
+        ] {
+            let e = cfg.providers.entries.get_mut(id).unwrap();
+            e.enabled = true;
+            e.model = model.into();
+            e.models = extra.into_iter().map(String::from).collect();
+        }
+        let ids: Vec<_> = thinking_modes(&cfg).into_iter().map(|m| m.id).collect();
+        assert_eq!(ids, ["openai/gpt-a", "openai/gpt-b", "ollama/llama"]);
+        assert!(thinking_modes(&cfg)[2].local);
+        assert_eq!(parse_mode_id("a/b/c"), Some(("a", "b/c")));
+        assert_eq!(parse_mode_id("nope"), None);
+        assert!(resolve_mode(&cfg, "openai/gpt-b").is_some());
+        assert!(resolve_mode(&cfg, "anthropic/x").is_none());
+        let modes = thinking_modes(&cfg);
+        assert_eq!(selected_mode(&cfg, &modes).as_deref(), Some("openai/gpt-a"));
+        cfg.modes.query.thinking_mode = Some("ollama/llama".into());
+        assert_eq!(selected_mode(&cfg, &modes).as_deref(), Some("ollama/llama"));
+        cfg.modes.query.thinking_mode = Some("gone/x".into());
+        assert_eq!(selected_mode(&cfg, &modes).as_deref(), Some("openai/gpt-a"));
     }
 }

@@ -109,6 +109,9 @@ pub struct QueryMode {
     pub effort: String,
     /// Output token cap.
     pub max_tokens: u32,
+    /// Last chosen thinking mode id (`<provider>/<model>`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_mode: Option<String>,
 }
 
 /// One model provider entry.
@@ -123,6 +126,9 @@ pub struct ProviderEntry {
     pub base_url: String,
     /// Model name.
     pub model: String,
+    /// Extra models besides `model`, offered as thinking modes.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<String>,
     /// Host the key was entered for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_host: Option<String>,
@@ -284,6 +290,7 @@ impl Default for QueryMode {
             enabled: true,
             effort: "fast".into(),
             max_tokens: 1024,
+            thinking_mode: None,
         }
     }
 }
@@ -300,6 +307,7 @@ fn provider(wire: &str, base_url: &str, key_host: Option<&str>, model: &str) -> 
         wire: wire.into(),
         base_url: base_url.into(),
         model: model.into(),
+        models: Vec::new(),
         key_host: key_host.map(String::from),
         effort: None,
     }
@@ -573,6 +581,23 @@ pub fn local_data_dir() -> Result<PathBuf, CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn thinking_fields_round_trip_and_old_configs_load() {
+        let old: Config = toml::from_str(&toml::to_string(&Config::default()).unwrap()).unwrap();
+        assert!(old.providers.entries["ollama"].models.is_empty());
+        assert_eq!(old.modes.query.thinking_mode, None);
+        let mut c = Config::default();
+        c.modes.query.thinking_mode = Some("ollama/x".into());
+        c.providers.entries.get_mut("ollama").unwrap().models = vec!["y".into()];
+        let back: Config = toml::from_str(&toml::to_string(&c).unwrap()).unwrap();
+        assert_eq!(back, c);
+        assert!(
+            !toml::to_string(&Config::default())
+                .unwrap()
+                .contains("models")
+        );
+    }
 
     #[test]
     fn old_config_without_custom_engine_still_loads() {

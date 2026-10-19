@@ -94,6 +94,8 @@ pub fn run() {
             commands::providers::probe_providers,
             commands::providers::set_provider,
             commands::providers::set_provider_order,
+            commands::providers::list_thinking_modes,
+            commands::providers::set_thinking_mode,
             commands::engines::list_engines,
             commands::engines::probe_decision_engines,
             commands::engines::set_engine,

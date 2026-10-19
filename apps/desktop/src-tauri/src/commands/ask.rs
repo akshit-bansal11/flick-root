@@ -123,6 +123,7 @@ pub async fn ask_stream(
     text: String,
     attachment: Option<String>,
     effort: String,
+    thinking_mode: Option<String>,
     on_event: Channel<AskEvent>,
 ) -> Result<String, CommandError> {
     check_enabled(state.config.load().modes.query.enabled)?;
@@ -136,9 +137,16 @@ pub async fn ask_stream(
     }
     let cancel = CancellationToken::new();
     ASKS.lock().insert(id.clone(), cancel.clone());
-    let mut events = hub.ask(
+    let first = {
+        let cfg = state.config.load();
+        thinking_mode
+            .and_then(|m| super::providers::resolve_mode(&cfg, &m))
+            .and_then(|(p, m)| hub.with_model(&p, &m))
+    };
+    let mut events = hub.ask_with(
         request(&text, attachment.as_deref(), &effort),
         cancel.clone(),
+        first,
     );
     let task_id = id.clone();
     tauri::async_runtime::spawn(async move {

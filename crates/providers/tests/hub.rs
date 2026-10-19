@@ -181,3 +181,37 @@ async fn stalled_server_times_out_and_falls_back() {
     );
     assert!(matches!(ev.last(), Some(HubEvent::Done { provider }) if provider == "b"));
 }
+
+#[tokio::test]
+async fn override_goes_first_with_its_model_and_replaces_same_id() {
+    let done = || vec![Ok(Delta::Done(Usage::default()))];
+    let a = fake("a", done(), false);
+    let b = fake("b", vec![Err(ProviderError::Status { code: 503 })], false);
+    let mut over = cfg("b", "http://localhost:1/v1");
+    over.model = "big".into();
+    let b2: Arc<dyn Provider> = Arc::new(Fake {
+        cfg: over,
+        items: vec![Err(ProviderError::Status { code: 503 })],
+        hang: false,
+    });
+    let hub = ProviderHub::new(vec![a, b]);
+    let ev: Vec<_> = hub
+        .ask_with(req(), CancellationToken::new(), Some(b2))
+        .collect()
+        .await;
+    assert_eq!(
+        ev[0],
+        HubEvent::Started {
+            provider: "b".into(),
+            model: "big".into()
+        }
+    );
+    assert!(matches!(&ev[1], HubEvent::Fallback { from, to, .. } if from == "b" && to == "a"));
+    assert!(matches!(ev.last(), Some(HubEvent::Done { provider }) if provider == "a"));
+    assert_eq!(
+        ev.iter()
+            .filter(|e| matches!(e, HubEvent::Fallback { .. }))
+            .count(),
+        1
+    );
+}
