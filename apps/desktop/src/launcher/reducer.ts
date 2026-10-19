@@ -58,7 +58,6 @@ export type Effect =
   | { type: "cancelAsk"; token: number }
   | { type: "nextProvider" }
   | { type: "hide" }
-  | { type: "resize" }
   | { type: "openSettings"; section: string };
 
 export interface Result {
@@ -98,7 +97,7 @@ const out = (state: State, ...effects: Effect[]): Result => ({ state, effects })
 /** Set mode and input; Command and Find bump seq and search, Query never searches. */
 function search(s: State, mode: Mode, input: string): Result {
   const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null };
-  if (mode === "query") return out({ ...next, items: [] }, { type: "resize" });
+  if (mode === "query") return out({ ...next, items: [] });
   const seq = s.seq + 1;
   return out({ ...next, seq }, { type: "search", seq, mode, text: input });
 }
@@ -171,7 +170,6 @@ function enter(s: State, k: KeyInput): Result {
       },
       ...cancel,
       { type: "ask", token, text, effort: s.query.effort },
-      { type: "resize" },
     );
   }
   return openSelected(s, k);
@@ -249,25 +247,18 @@ function ask(s: State, token: number, e: AskEvent): Result {
     case "thinking":
       return out({ ...s, query: { ...q, thinking: true } });
     case "delta":
-      return out(
-        { ...s, query: { ...q, thinking: false, text: q.text + e.text } },
-        { type: "resize" },
-      );
+      return out({ ...s, query: { ...q, thinking: false, text: q.text + e.text } });
     case "done":
-      return out(
-        { ...s, query: { ...q, status: "done", provider: e.provider } },
-        { type: "resize" },
-      );
-    case "error":
-      return out(
-        {
-          ...s,
-          query: { ...q, status: "error", error: e.message, errorCode: e.code, thinking: false },
-        },
-        e.code === "no_provider" || e.code === "query_disabled"
-          ? { type: "openSettings", section: "providers" }
-          : { type: "resize" },
-      );
+      return out({ ...s, query: { ...q, status: "done", provider: e.provider } });
+    case "error": {
+      const errored: State = {
+        ...s,
+        query: { ...q, status: "error", error: e.message, errorCode: e.code, thinking: false },
+      };
+      return e.code === "no_provider" || e.code === "query_disabled"
+        ? out(errored, { type: "openSettings", section: "providers" })
+        : out(errored);
+    }
   }
 }
 
@@ -276,7 +267,7 @@ function outcome(s: State, commandId: string, o: Outcome): Result {
     case "needsConfirm":
       return out({ ...s, pendingConfirm: { commandId, token: o.token } });
     case "showItems":
-      return out({ ...s, items: o.items, selected: 0, pendingConfirm: null }, { type: "resize" });
+      return out({ ...s, items: o.items, selected: 0, pendingConfirm: null });
     case "hideLauncher":
       return out({ ...s, pendingConfirm: null }, { type: "hide" });
     default:
@@ -299,7 +290,7 @@ export function reduce(s: State, ev: Event): Result {
       return textChange(s, ev.text);
     case "results":
       if (ev.seq !== s.seq) return out(s);
-      return out({ ...s, items: ev.items, selected: 0 }, { type: "resize" });
+      return out({ ...s, items: ev.items, selected: 0 });
     case "ask":
       return ask(s, ev.token, ev.event);
     case "outcome":

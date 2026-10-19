@@ -67,8 +67,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
             ipc.cancelAsk(ask.current.id).catch(warn);
           else cancelled.current.add(e.token);
           break;
-        // Resize is driven by the ResizeObserver in Launcher; provider switching is T2.8.
-        case "resize":
+        // Provider switching is T2.8.
         case "nextProvider":
           break;
       }
@@ -128,7 +127,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   const openLink = useCallback((url: string) => ipc.openLink(url).catch(warn), []);
 
-  return { state, setText, activate, press, toggleEffort, openSettings, openLink };
+  const hide = useCallback(() => ipc.hideLauncher().catch(warn), []);
+
+  return { state, setText, activate, press, toggleEffort, openSettings, openLink, hide };
 }
 
 function warn(err: unknown) {

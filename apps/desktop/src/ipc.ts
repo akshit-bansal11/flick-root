@@ -37,8 +37,6 @@ export const openLink = (url: string) => invoke<void>("open_link", { url });
 
 export const hideLauncher = () => invoke<void>("hide_launcher");
 
-export const resizeLauncher = (heightPx: number) => invoke<void>("resize_launcher", { heightPx });
-
 export const reportShown = (shownId: number) => invoke<void>("report_shown", { shownId });
 
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });

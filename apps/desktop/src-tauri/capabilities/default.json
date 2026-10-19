@@ -17,7 +17,6 @@
     "allow-run-system-command",
     "allow-ask-stream",
     "allow-cancel-ask",
-    "allow-resize-launcher",
     "allow-get-first-run",
     "allow-complete-first-run",
     "allow-probe-providers"

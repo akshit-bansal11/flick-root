@@ -108,8 +108,7 @@ pub fn run() {
             commands::settings::set_roots,
             commands::settings::clear_history,
             commands::settings::reindex,
-            commands::settings::get_about,
-            commands::settings::resize_launcher
+            commands::settings::get_about
         ])
         .build(tauri::generate_context!());
     match result {

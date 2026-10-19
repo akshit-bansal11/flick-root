@@ -15,7 +15,6 @@ vi.mock("../ipc", () => ({
   askStream: vi.fn(),
   cancelAsk: vi.fn(),
   hideLauncher: vi.fn(() => Promise.resolve()),
-  resizeLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(),
   openLink: vi.fn(() => Promise.resolve()),

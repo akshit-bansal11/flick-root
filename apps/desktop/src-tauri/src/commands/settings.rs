@@ -256,14 +256,6 @@ pub async fn get_about(app: AppHandle) -> Result<About, CommandError> {
     })
 }
 
-/// No-op: the launcher window now spans its monitor and never resizes. Kept until the UI stops
-/// calling it (F6.3), then removed with its manifest entry.
-#[tauri::command]
-pub async fn resize_launcher(height_px: u32) -> Result<(), CommandError> {
-    let _ = height_px;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

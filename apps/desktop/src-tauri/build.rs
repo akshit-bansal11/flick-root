@@ -11,7 +11,6 @@ fn main() {
         "run_system_command",
         "ask_stream",
         "cancel_ask",
-        "resize_launcher",
         "get_settings",
         "set_general",
         "set_roots",
