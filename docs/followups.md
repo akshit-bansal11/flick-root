@@ -58,3 +58,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - Pre-release review NIT: web lib/markdown.ts:9 scheme check misses tab/newline inside the scheme; strip [\t\n\r] first (trusted repo content, low risk).
 - Pre-release review NIT: web lib/markdown.ts:12 relative links to files not on the site (LICENSE, docs/adr/, followups.md) become broken site paths; point them at REPO_URL/blob/main/<path>.
 - Pre-release review NIT: apps/web/package.json @types/node ^20 while CI uses Node 24; bump to ^24.
+- T6.6 web: the landing page's live launcher demo (typing, Tab, prefixes, arrows, autoplay, reduced motion) was never exercised in a browser; pages are HTTP-verified only.
