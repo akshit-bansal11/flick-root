@@ -22,7 +22,7 @@ export function Launcher() {
     toggleEffort,
     openSettings,
     openLink,
-    hide,
+    panelRef,
   } = useLauncher(inputRef);
 
   const overlay = useOverlay();
@@ -34,70 +34,59 @@ export function Launcher() {
   const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
 
   return (
-    <>
-      <button
-        type="button"
-        className="backdrop"
-        tabIndex={-1}
-        aria-hidden="true"
-        onMouseDown={hide}
+    <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
+      <InputBar
+        mode={state.mode}
+        value={state.input}
+        listId={none ? HINTS_ID : LISTBOX_ID}
+        activeId={activeId}
+        onChange={setText}
+        inputRef={inputRef}
       />
-      <div className={state.visible ? "launcher show" : "launcher"}>
-        <InputBar
-          mode={state.mode}
-          value={state.input}
-          listId={none ? HINTS_ID : LISTBOX_ID}
-          activeId={activeId}
-          onChange={setText}
-          inputRef={inputRef}
-        />
-        <div className="launcher-body">
-          {overlay && <Overlay />}
-          {state.mode === "query" && state.attachment && (
-            <Attachment attachment={state.attachment} onRemove={removeAttachment} />
-          )}
-          {state.mode === "query" && state.notice && (
-            <p className="attach-notice">{state.notice}</p>
-          )}
-          {state.mode === "query" ? (
-            <QueryView
-              question={q.status === "idle" ? "" : state.input || DEFAULT_QUESTION}
-              provider={q.provider}
-              effort={q.effort}
-              text={q.text}
-              error={noProvider ? null : q.error}
-              noProvider={noProvider}
-              modes={state.thinkingModes.modes}
-              selectedMode={state.thinkingModes.selected}
-              thinking={q.thinking}
-              streaming={q.status === "streaming"}
-              reasoning={q.reasoning}
-              onToggleEffort={toggleEffort}
-              onOpenSettings={() => openSettings("providers")}
-              onOpenLink={openLink}
-            />
-          ) : none ? (
-            <PrefixHints
-              modes={hints}
-              selected={state.selected}
-              typed={state.input !== ""}
-              onEnter={enterMode}
-            />
-          ) : (
-            <Results
-              items={state.items}
-              selected={state.selected}
-              query={state.input}
-              onActivate={activate}
-            />
-          )}
-        </div>
-        {state.mode === "find" && state.items.length > 0 && <Actions onPress={press} />}
-        <Footer
-          mode={state.mode}
-          canKill={state.armed && state.items[state.selected]?.kind === "process"}
-        />
+      <div className="launcher-body">
+        {overlay && <Overlay />}
+        {state.mode === "query" && state.attachment && (
+          <Attachment attachment={state.attachment} onRemove={removeAttachment} />
+        )}
+        {state.mode === "query" && state.notice && <p className="attach-notice">{state.notice}</p>}
+        {state.mode === "query" ? (
+          <QueryView
+            question={q.status === "idle" ? "" : state.input || DEFAULT_QUESTION}
+            provider={q.provider}
+            effort={q.effort}
+            text={q.text}
+            error={noProvider ? null : q.error}
+            noProvider={noProvider}
+            modes={state.thinkingModes.modes}
+            selectedMode={state.thinkingModes.selected}
+            thinking={q.thinking}
+            streaming={q.status === "streaming"}
+            reasoning={q.reasoning}
+            onToggleEffort={toggleEffort}
+            onOpenSettings={() => openSettings("providers")}
+            onOpenLink={openLink}
+          />
+        ) : none ? (
+          <PrefixHints
+            modes={hints}
+            selected={state.selected}
+            typed={state.input !== ""}
+            onEnter={enterMode}
+          />
+        ) : (
+          <Results
+            items={state.items}
+            selected={state.selected}
+            query={state.input}
+            onActivate={activate}
+          />
+        )}
       </div>
-    </>
+      {state.mode === "find" && state.items.length > 0 && <Actions onPress={press} />}
+      <Footer
+        mode={state.mode}
+        canKill={state.armed && state.items[state.selected]?.kind === "process"}
+      />
+    </div>
   );
 }

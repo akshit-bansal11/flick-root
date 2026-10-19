@@ -2,37 +2,48 @@ html,
 body,
 #root {
   margin: 0;
+  overflow: hidden;
   background: transparent;
   font: var(--l-fs) / var(--l-lh) var(--l-ui);
   color: var(--l-text);
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  cursor: default;
-  background: transparent;
-}
-
 .launcher {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(50vh - var(--l-panel-max) / 2);
-  margin: 0 auto;
-  width: clamp(560px, 40vw, 960px);
+  position: relative;
+  width: 100%;
   max-height: var(--l-panel-max);
   display: flex;
   flex-direction: column;
-  background: var(--l-panel);
-  border: var(--l-border);
+  background: var(--l-glass-tint);
   border-radius: var(--l-r-panel);
   overflow: hidden;
-  box-shadow: var(--l-highlight), var(--l-shadow-panel);
+  box-shadow: var(--l-glass-inner);
+}
+
+/* Specular sheen across the top of the glass. */
+.launcher::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 40%;
+  background: var(--l-glass-sheen);
+  pointer-events: none;
+}
+
+/* 1px hairline whose brightness fades top to bottom (masked ring). */
+.launcher::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--l-glass-border);
+  mask:
+    linear-gradient(var(--l-mask) 0 0) content-box,
+    linear-gradient(var(--l-mask) 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .launcher-body {
@@ -91,7 +102,7 @@ body,
   flex: none;
   padding: 1px var(--l-sp-4);
   border-radius: var(--l-r2);
-  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
   color: var(--l-accent);
   font: 500 var(--l-fs-meta) var(--l-mono);
   white-space: nowrap;
@@ -120,11 +131,11 @@ body,
 }
 
 .hint-row:hover {
-  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
 .hint-row.sel {
-  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
 }
 
 .hint-label {
@@ -152,7 +163,7 @@ body,
   border: var(--l-border);
   border-bottom-width: 2px;
   border-radius: var(--l-r2);
-  background: var(--l-bg);
+  background: color-mix(in srgb, var(--l-text) 8%, transparent);
 }
 
 .results {
@@ -178,11 +189,11 @@ body,
 }
 
 .row:hover {
-  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
 .row.sel {
-  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
 }
 
 .row-text {
@@ -313,7 +324,7 @@ body,
 }
 
 .action:hover {
-  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), var(--l-panel));
+  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
 .action:focus-visible,

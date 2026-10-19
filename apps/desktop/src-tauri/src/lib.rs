@@ -82,6 +82,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             window::report_shown,
             window::hide_launcher,
+            window::resize_launcher,
             tray::open_settings,
             commands::search::search,
             commands::ask::ask_stream,

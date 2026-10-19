@@ -3,6 +3,7 @@
 pub mod clipboard;
 pub mod com;
 pub mod drives;
+pub mod dwm;
 pub mod error;
 pub mod explorer;
 pub mod foreground;

@@ -8,6 +8,7 @@ const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace"]
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
   const [state, setState] = useState<State>(() => initialState());
+  const panelRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   const ask = useRef<{ token: number; id: string | null }>({ token: 0, id: null });
   const cancelled = useRef(new Set<number>());
@@ -92,6 +93,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   useEffect(() => {
     const unlisten = [
       ipc.onShown((p) => {
+        document.documentElement.dataset.glass = p.glass === false ? "off" : "on";
         dispatch({ type: "shown" });
         inputRef.current?.focus();
         requestAnimationFrame(() => {
@@ -120,6 +122,21 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
       for (const u of unlisten) u.then((fn) => fn()).catch(warn);
     };
   }, [dispatch, inputRef]);
+
+  // Window height follows the panel; only a changed whole-pixel height crosses IPC.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let last = 0;
+    const ro = new ResizeObserver(() => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h === last || h === 0) return;
+      last = h;
+      ipc.resizeLauncher(h).catch(warn);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -165,10 +182,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   const openLink = useCallback((url: string) => ipc.openLink(url).catch(warn), []);
 
-  const hide = useCallback(() => ipc.hideLauncher().catch(warn), []);
-
   return {
     state,
+    panelRef,
     removeAttachment,
     enterMode,
     setText,
@@ -177,7 +193,6 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     toggleEffort,
     openSettings,
     openLink,
-    hide,
   };
 }
 

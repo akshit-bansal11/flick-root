@@ -4,12 +4,38 @@ use std::time::Instant;
 
 use crate::error::CommandError;
 use serde_json::json;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
+use tauri::window::{Effect, EffectsBuilder};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow,
+    WindowEvent,
+};
 
 /// Label of the single launcher window.
 pub const LABEL: &str = "launcher";
 
-type Rect = (i32, i32, u32, u32, u64);
+/// Panel width in logical px. Keep equal to `--l-panel-w` in tokens.css.
+const PANEL_W: f64 = 640.0;
+/// Tallest panel in logical px. Keep equal to `--l-panel-max` in tokens.css.
+const PANEL_MAX_H: f64 = 586.0;
+/// Shortest window in logical px (the input row alone).
+const PANEL_MIN_H: f64 = 56.0;
+
+/// Window origin and width in physical px for a work area `(x, y, w, h)` at `scale`:
+/// centred horizontally, top at the vertical centre of a max-height panel.
+fn layout(work: (i32, i32, u32, u32), scale: f64) -> (i32, i32, u32) {
+    let w = (PANEL_W * scale).round();
+    let x = f64::from(work.0) + (f64::from(work.2) - w) / 2.0;
+    let y = f64::from(work.1) + ((f64::from(work.3) - PANEL_MAX_H * scale) / 2.0).max(0.0);
+    (x.round() as i32, y.round() as i32, w as u32)
+}
+
+fn clamp_height(h: f64) -> f64 {
+    if h.is_finite() {
+        h.clamp(PANEL_MIN_H, PANEL_MAX_H)
+    } else {
+        PANEL_MIN_H
+    }
+}
 
 /// Timing and monitor state shared between toggles and `report_shown`.
 #[derive(Default)]
@@ -21,7 +47,10 @@ pub struct ShowState {
 struct Inner {
     shown_id: u64,
     t0: Option<Instant>,
-    monitor: Option<Rect>,
+    /// Last logical window height set by the UI.
+    height: Option<f64>,
+    /// Whether the acrylic effect is currently applied.
+    glass: bool,
 }
 
 /// Hooks up blur/close handling for the prewarmed launcher window.
@@ -30,6 +59,16 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     let win = app
         .get_webview_window(LABEL)
         .ok_or_else(|| anyhow::anyhow!("launcher window missing from tauri.conf.json"))?;
+    #[cfg(windows)]
+    match win.hwnd() {
+        Ok(h) => {
+            if let Err(err) = win::dwm::round_corners(h.0 as isize) {
+                tracing::warn!(%err, "rounded corners failed");
+            }
+        }
+        Err(err) => tracing::warn!(%err, "no window handle"),
+    }
+    sync_glass(app.handle(), &win);
     let handle = app.handle().clone();
     let w = win.clone();
     win.on_window_event(move |event| match event {
@@ -93,6 +132,7 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {
         tracing::warn!(%err, "show failed");
     }
+    let glass = sync_glass(app, win);
     let state: State<ShowState> = app.state();
     let Ok(mut s) = state.inner.lock() else {
         return;
@@ -104,11 +144,32 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     emit(
         app,
         "launcher://shown",
-        json!({ "shownId": shown_id, "reason": reason }),
+        json!({ "shownId": shown_id, "reason": reason, "glass": glass }),
     );
 }
 
-/// Covers the whole monitor under the cursor (its full physical bounds).
+/// Applies or removes the acrylic effect to match the Windows transparency setting;
+/// returns whether glass is on.
+fn sync_glass(app: &AppHandle, win: &WebviewWindow) -> bool {
+    #[cfg(windows)]
+    let want = win::dwm::transparency_enabled();
+    #[cfg(not(windows))]
+    let want = false;
+    let state: State<ShowState> = app.state();
+    let Ok(mut s) = state.inner.lock() else {
+        return false;
+    };
+    if s.glass != want {
+        let cfg = want.then(|| EffectsBuilder::new().effect(Effect::Acrylic).build());
+        match win.set_effects(cfg) {
+            Ok(()) => s.glass = want,
+            Err(err) => tracing::warn!(%err, "window effect failed"),
+        }
+    }
+    s.glass
+}
+
+/// Sizes the window to the panel and centres it on the monitor under the cursor.
 fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let cursor = app.cursor_position()?;
     let monitors = app.available_monitors()?;
@@ -122,27 +183,47 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let Some(m) = found.or(monitors.first()) else {
         return Ok(());
     };
-    let (pos, size, scale) = (*m.position(), *m.size(), m.scale_factor());
-    let key: Rect = (pos.x, pos.y, size.width, size.height, scale.to_bits());
+    let (wa, scale) = (m.work_area(), m.scale_factor());
+    let (x, y, w) = layout(
+        (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
+        scale,
+    );
     let state: State<ShowState> = app.state();
-    {
-        let s = state
-            .inner
-            .lock()
-            .map_err(|_| anyhow::anyhow!("state poisoned"))?;
-        if s.monitor == Some(key) {
-            return Ok(());
-        }
-    }
+    let height = state
+        .inner
+        .lock()
+        .map_err(|_| anyhow::anyhow!("state poisoned"))?
+        .height
+        .unwrap_or(PANEL_MIN_H);
+    let pos = PhysicalPosition::new(x, y);
+    let size = PhysicalSize::new(w, (height * scale).round() as u32);
     // Move first so a cross-monitor DPI change (WM_DPICHANGED) rescales the
     // old size, then set the size in physical px and re-pin the position,
     // since resizing after the move can shift the origin.
     win.set_position(pos)?;
     win.set_size(size)?;
     win.set_position(pos)?;
-    if let Ok(mut s) = state.inner.lock() {
-        s.monitor = Some(key);
-    }
+    Ok(())
+}
+
+/// Grows or shrinks the window to the panel's content height (logical px); the top stays put.
+#[tauri::command]
+pub async fn resize_launcher(
+    app: AppHandle,
+    state: State<'_, ShowState>,
+    height: f64,
+) -> Result<(), CommandError> {
+    let win = app
+        .get_webview_window(LABEL)
+        .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
+    let h = clamp_height(height);
+    state
+        .inner
+        .lock()
+        .map_err(|_| CommandError::new("internal", "state poisoned"))?
+        .height = Some(h);
+    win.set_size(LogicalSize::new(PANEL_W, h))
+        .map_err(|e| CommandError::new("window", e.to_string()))?;
     Ok(())
 }
 
@@ -170,4 +251,37 @@ pub async fn hide_launcher(app: AppHandle) -> Result<(), CommandError> {
         .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
     hide(&app, &win);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layout_centres_at_scale_1() {
+        // 1920x1040 work area with a 40px taskbar at the bottom.
+        assert_eq!(layout((0, 0, 1920, 1040), 1.0), (640, 227, 640));
+    }
+
+    #[test]
+    fn layout_scales_and_offsets() {
+        // Second monitor to the right, 150%.
+        let (x, y, w) = layout((1920, 0, 2880, 1500), 1.5);
+        assert_eq!(w, 960);
+        assert_eq!(x, 1920 + (2880 - 960) / 2);
+        assert_eq!(y, ((1500.0 - 586.0 * 1.5) / 2.0_f64).round() as i32);
+    }
+
+    #[test]
+    fn layout_never_above_work_area() {
+        assert_eq!(layout((0, 10, 800, 300), 1.0).1, 10);
+    }
+
+    #[test]
+    fn height_is_clamped() {
+        assert_eq!(clamp_height(10.0), PANEL_MIN_H);
+        assert_eq!(clamp_height(9999.0), PANEL_MAX_H);
+        assert_eq!(clamp_height(f64::NAN), PANEL_MIN_H);
+        assert_eq!(clamp_height(200.0), 200.0);
+    }
 }

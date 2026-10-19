@@ -57,12 +57,14 @@ export const openLink = (url: string) => invoke<void>("open_link", { url });
 
 export const hideLauncher = () => invoke<void>("hide_launcher");
 
+export const resizeLauncher = (height: number) => invoke<void>("resize_launcher", { height });
+
 export const reportShown = (shownId: number) => invoke<void>("report_shown", { shownId });
 
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });
 
-export const onShown = (cb: (p: ShownPayload) => void): Promise<UnlistenFn> =>
-  listen<ShownPayload>("launcher://shown", (e) => cb(e.payload));
+export const onShown = (cb: (p: ShownPayload & { glass?: boolean }) => void): Promise<UnlistenFn> =>
+  listen<ShownPayload & { glass?: boolean }>("launcher://shown", (e) => cb(e.payload));
 
 export const onExplainCaptured = (cb: (c: ExplainCaptured) => void): Promise<UnlistenFn> =>
   listen<ExplainCaptured>("explain://captured", (e) => cb(e.payload));

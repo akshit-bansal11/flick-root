@@ -58,7 +58,8 @@
   --l-sp-10: 24px;
 
   --l-r: 6px;
-  --l-r-panel: 14px;
+  /* Matches the DWM round-corner radius (DWMWCP_ROUND). */
+  --l-r-panel: 8px;
   --l-r2: 3px;
   --l-r-tile: 4px;
   --l-r-pill: 999px;
@@ -83,6 +84,17 @@
   --l-hover-mix: 7%;
   --l-tile-settings: 32px;
   --l-nav-w: 200px;
+
+  /* Panel width; Rust keeps PANEL_W in window.rs equal to this. */
+  --l-panel-w: 640px;
+
+  /* Liquid glass: themes override these. Tint is the panel colour at --l-glass-alpha over the acrylic. */
+  --l-glass-alpha: 62%;
+  --l-glass-tint: color-mix(in srgb, var(--l-panel) var(--l-glass-alpha), transparent);
+  --l-glass-border: linear-gradient(to bottom, rgb(255 255 255 / 0.38), rgb(255 255 255 / 0.06));
+  --l-glass-sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.1), transparent);
+  --l-glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.08), inset 0 0 18px rgb(255 255 255 / 0.04);
+  --l-mask: #000;
 
   --l-blur: none;
   --l-tile-hue-default: 220;
@@ -144,6 +156,9 @@
     --l-shadow: 0 22px 48px -18px rgba(30, 30, 50, 0.22);
     --l-shadow-panel: 0 24px 64px rgb(30 30 50 / 0.25), 0 2px 8px rgb(30 30 50 / 0.15);
     --l-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
+    --l-glass-border: linear-gradient(to bottom, rgb(255 255 255 / 0.9), rgb(15 35 51 / 0.14));
+    --l-glass-sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.55), transparent);
+    --l-glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.7), inset 0 0 18px rgb(255 255 255 / 0.25);
   }
 }
 
@@ -168,6 +183,22 @@
   --l-shadow: 0 22px 48px -18px rgba(30, 30, 50, 0.22);
   --l-shadow-panel: 0 24px 64px rgb(30 30 50 / 0.25), 0 2px 8px rgb(30 30 50 / 0.15);
   --l-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
+  --l-glass-border: linear-gradient(to bottom, rgb(255 255 255 / 0.9), rgb(15 35 51 / 0.14));
+  --l-glass-sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.55), transparent);
+  --l-glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.7), inset 0 0 18px rgb(255 255 255 / 0.25);
+}
+
+/* Opaque panel: Windows transparency off (data-glass set from Rust) or reduced transparency. */
+:root[data-glass="off"] {
+  --l-glass-tint: var(--l-panel);
+  --l-glass-sheen: none;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --l-glass-tint: var(--l-panel);
+    --l-glass-sheen: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
