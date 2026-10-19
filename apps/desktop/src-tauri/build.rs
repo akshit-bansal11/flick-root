@@ -45,6 +45,7 @@ fn main() {
         "complete_first_run",
         "set_tutorial_done",
         "get_about",
+        "set_hotkeys_paused",
     ];
     let attrs = tauri_build::Attributes::new()
         .app_manifest(tauri_build::AppManifest::new().commands(commands));

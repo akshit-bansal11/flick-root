@@ -1,57 +1,76 @@
 import { describe, expect, it } from "vitest";
 import {
-  autoAdvance,
+  acceleratorCaps,
+  acceleratorChord,
+  ghostInput,
+  goalMet,
+  isAccelerator,
   isLastStep,
   nextStep,
   prevStep,
-  splitExample,
-  TUTORIAL_STEPS,
-  type TutorialView,
+  TOUR_STEPS,
+  type TourEvent,
+  type TourView,
 } from "./steps";
 
-const view = (v: Partial<TutorialView> = {}): TutorialView => ({
+const view = (v: Partial<Omit<TourView, "seen">> & { seen?: TourEvent[] } = {}): TourView => ({
   mode: "none",
   input: "",
-  itemsCount: 0,
-  thinkingModes: 0,
+  attachment: false,
   ...v,
+  seen: new Set(v.seen ?? []),
 });
-const at = (id: string) => TUTORIAL_STEPS.findIndex((s) => s.id === id);
+const at = (id: string) => TOUR_STEPS.findIndex((s) => s.id === id);
 
-describe("tutorial steps", () => {
-  it("run welcome to finish with unique ids", () => {
-    expect(TUTORIAL_STEPS[0]?.id).toBe("welcome");
-    expect(TUTORIAL_STEPS.at(-1)?.id).toBe("finish");
-    expect(new Set(TUTORIAL_STEPS.map((s) => s.id)).size).toBe(TUTORIAL_STEPS.length);
+describe("tour steps", () => {
+  it("run open to done with unique ids", () => {
+    expect(TOUR_STEPS[0]?.id).toBe("open");
+    expect(TOUR_STEPS.at(-1)?.id).toBe("done");
+    expect(TOUR_STEPS).toHaveLength(9);
+    expect(new Set(TOUR_STEPS.map((s) => s.id)).size).toBe(TOUR_STEPS.length);
   });
   it("next ends after the last step; back stops at the first", () => {
     expect(nextStep(0)).toBe(1);
-    expect(nextStep(TUTORIAL_STEPS.length - 1)).toBeNull();
-    expect(isLastStep(TUTORIAL_STEPS.length - 1)).toBe(true);
+    expect(nextStep(TOUR_STEPS.length - 1)).toBeNull();
+    expect(isLastStep(TOUR_STEPS.length - 1)).toBe(true);
     expect(prevStep(0)).toBe(0);
     expect(prevStep(3)).toBe(2);
   });
-  it("welcome advances as soon as any mode is entered", () => {
-    expect(autoAdvance(0, view())).toBe(0);
-    expect(autoAdvance(0, view({ mode: "query" }))).toBe(1);
-  });
-  it("auto-advances only when the current step is done", () => {
-    const apps = at("apps");
-    expect(autoAdvance(apps, view({ mode: "run" }))).toBe(apps);
-    expect(autoAdvance(apps, view({ mode: "run", input: "chr" }))).toBe(apps + 1);
-    const cmd = at("commands");
-    expect(autoAdvance(cmd, view({ mode: "commands", input: "2+2", itemsCount: 1 }))).toBe(cmd + 1);
-    expect(autoAdvance(cmd, view({ mode: "run", input: "x", itemsCount: 1 }))).toBe(cmd);
-    expect(autoAdvance(at("ask"), view({ mode: "query", input: "hi" }))).toBe(at("ask"));
+  it("each goal needs its own events", () => {
+    expect(goalMet(at("open"), view())).toBe(false);
+    expect(goalMet(at("open"), view({ seen: ["hotkey"] }))).toBe(true);
+    expect(goalMet(at("apps"), view({ seen: ["launchApp"] }))).toBe(true);
+    expect(goalMet(at("commands"), view({ mode: "commands", seen: ["copied"] }))).toBe(true);
+    expect(goalMet(at("commands"), view({ mode: "run", seen: ["copied"] }))).toBe(false);
+    expect(goalMet(at("find"), view({ seen: ["openFile"] }))).toBe(true);
+    expect(goalMet(at("ask"), view({ seen: ["modelSwitched"] }))).toBe(false);
+    expect(goalMet(at("ask"), view({ seen: ["modelSwitched", "askSent"] }))).toBe(true);
+    expect(goalMet(at("explain"), view({ seen: ["captured"] }))).toBe(false);
+    expect(goalMet(at("explain"), view({ seen: ["captured"], attachment: true }))).toBe(true);
+    expect(goalMet(at("around"), view({ mode: "find" }))).toBe(false);
+    expect(goalMet(at("around"), view({ mode: "find", seen: ["left"] }))).toBe(true);
+    expect(goalMet(at("themes"), view({ seen: ["theme"] }))).toBe(true);
+    expect(goalMet(at("done"), view({ seen: ["theme", "left"] }))).toBe(false);
   });
   it("step text reads its shortcuts from the table", () => {
-    const body = (id: string) => TUTORIAL_STEPS[at(id)]?.body ?? "";
-    expect(body("find")).toContain("Ctrl Shift C copies the path");
-    expect(body("commands")).toContain("Delete ends it");
-    expect(body("commands")).not.toContain("Backspace");
-    expect(body("settings")).toContain("F1");
+    const body = (id: string) => TOUR_STEPS[at(id)]?.body ?? "";
+    expect(body("commands")).toContain("Ctrl Shift C");
+    expect(body("around")).toContain("F1");
+    expect(body("around")).toContain("⌫");
+    expect(TOUR_STEPS[at("ask")]?.keys).toContain("Tab");
   });
-  it("splits an example into prefix and text", () => {
-    expect(splitExample("! notepad")).toEqual({ prefix: "!", text: "notepad" });
+  it("ghostInput sends the prefix first, then the text after it", () => {
+    expect(ghostInput("!")).toBe("!");
+    expect(ghostInput("! ")).toBe("");
+    expect(ghostInput("! spo")).toBe("spo");
+  });
+  it("maps accelerators onto chords", () => {
+    expect(acceleratorChord("Alt+Space")).toBe("Alt+Space");
+    expect(acceleratorChord("Shift+Control+k")).toBe("Ctrl+Shift+K");
+    expect(acceleratorChord("")).toBeNull();
+    expect(acceleratorCaps("Alt+Space")).toEqual(["Alt", "Space"]);
+    const e = { key: " ", ctrlKey: false, shiftKey: false, altKey: true, metaKey: false };
+    expect(isAccelerator("Alt+Space", e)).toBe(true);
+    expect(isAccelerator("Ctrl+Space", e)).toBe(false);
   });
 });

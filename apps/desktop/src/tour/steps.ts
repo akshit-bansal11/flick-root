@@ -1,88 +1,130 @@
-import { caps, capsText } from "../shortcuts";
+import { caps, capsOf, capsText, chordOf, fromEvent } from "../shortcuts";
+import type { ThemeId } from "../theme";
 import type { LaunchMode } from "../types";
 
-/** Shortcut keys as one phrase for step text: "Ctrl Shift ↵". */
-const key = capsText;
+/** Things the user did in the demo that a step can wait for. */
+export type TourEvent =
+  | "hotkey"
+  | "launchApp"
+  | "openFile"
+  | "copied"
+  | "askSent"
+  | "modelSwitched"
+  | "captured"
+  | "left"
+  | "theme";
 
-/** What a step's `done` can look at: the launcher as the user sees it. */
-export interface TutorialView {
+/** What a step's goal can look at: the demo as the user sees it. */
+export interface TourView {
   mode: LaunchMode;
   input: string;
-  itemsCount: number;
-  thinkingModes: number;
+  attachment: boolean;
+  /** Events seen since this step began. */
+  seen: ReadonlySet<TourEvent>;
 }
 
-export interface TutorialStep {
+/** What the "Show me" button does. */
+export type ShowKind = "type" | "hotkey" | "select" | "theme";
+
+export interface TourStep {
   id: string;
   title: string;
   body: string;
   /** Key caps shown on the card. */
-  keys?: string[];
-  /** What the example button types, prefix included. */
+  keys: string[];
+  /** Real hotkey caps to show instead of `keys`, read from settings. */
+  hotkey?: "launcher" | "explain";
+  /** Text "Show me" types, prefix included. */
   example?: string;
-  /** True once the user has tried the step; the tutorial then moves on by itself. */
-  done?: (view: TutorialView) => boolean;
+  show?: ShowKind;
+  /** True once the user did what the step asks; the tour then moves on by itself. */
+  goal?: (view: TourView) => boolean;
 }
 
-export const TUTORIAL_STEPS: readonly TutorialStep[] = [
+const key = capsText;
+const saw = (v: TourView, ...e: TourEvent[]) => e.every((x) => v.seen.has(x));
+
+export const TOUR_STEPS: readonly TourStep[] = [
   {
-    id: "welcome",
-    title: "Welcome",
-    body: "One bar, four modes. Each starts with a prefix character. This tour takes a minute and you can skip it any time.",
-    keys: [">", "!", "/", "?"],
-    done: (v) => v.mode !== "none",
+    id: "open",
+    title: "Open the bar",
+    body: "Press your hotkey from anywhere in Windows and the bar appears. Try it now.",
+    keys: [],
+    hotkey: "launcher",
+    show: "hotkey",
+    goal: (v) => saw(v, "hotkey"),
   },
   {
     id: "apps",
     title: "! Apps and programs",
-    body: `Type ! then a name to open any app or program on your drives. ${key("open")} opens it, ${key("location")} shows its location, ${key("admin")} runs it as admin.`,
-    keys: ["!", ...caps("open"), key("location")],
-    example: "! notepad",
-    done: (v) => v.mode === "run" && v.input.trim() !== "",
+    body: `Type ! and a name, arrow to a row, then press ${key("open")} to open it.`,
+    keys: ["!", ...caps("open")],
+    example: "! spotify",
+    show: "type",
+    goal: (v) => saw(v, "launchApp"),
   },
   {
     id: "commands",
     title: "> Commands",
-    body: `Math (2+2), units (5 km to mi), currency (250 usd in inr), time zones (5pm ist in pst), web search (g cats), projects, system commands (lock), ports (port 3000, proc chrome: arrow to the row, then ${key("kill")} ends it), media (play, pause, play lofi on spotify) and capture (log 250 lunch).`,
-    keys: [">", "↑ ↓", ...caps("kill")],
+    body: `Math, units, currency, time zones and system commands. Type 5 km to mi, then press ${key("copyResult")} to copy the answer.`,
+    keys: [">", ...caps("copyResult")],
     example: "> 5 km to mi",
-    done: (v) => v.mode === "commands" && v.itemsCount > 0,
+    show: "type",
+    goal: (v) => v.mode === "commands" && saw(v, "copied"),
   },
   {
     id: "find",
     title: "/ Find",
-    body: `Search files and folders. ${key("open")} opens, ${key("location")} shows the location, ${key("copyPath")} copies the path. Plain language works too: pdf from yesterday.`,
-    keys: ["/", ...caps("open"), key("location"), key("copyPath")],
-    example: "/ pdf from yesterday",
-    done: (v) => v.mode === "find" && v.input.trim() !== "" && v.itemsCount > 0,
+    body: `Search files and folders. ${key("open")} opens one, ${key("location")} shows it in Explorer.`,
+    keys: ["/", ...caps("open"), ...caps("location")],
+    example: "/ report",
+    show: "type",
+    goal: (v) => saw(v, "openFile"),
   },
   {
     id: "ask",
     title: "? Ask",
-    body: `Ask your own AI provider. ${key("model")} and ${key("modelPrev")} switch thinking mode (provider and model), ${key("effort")} toggles fast and think, ${key("copyAnswer")} copies the answer. No provider yet? Connect one in Settings > Providers.`,
-    keys: ["?", ...caps("model"), key("effort")],
+    body: `Ask your own AI. ${key("model")} switches the model, ${key("ask")} asks. Nothing is sent from this tour.`,
+    keys: ["?", ...caps("model"), ...caps("ask")],
     example: "? what is a CIDR block",
+    show: "type",
+    goal: (v) => saw(v, "modelSwitched", "askSent"),
   },
   {
     id: "explain",
     title: "Explain this",
-    body: "Select text in any app and press the shortcut. You see the captured text first, and text that looks like a secret is blocked.",
-    keys: ["Alt", "Shift", "Space"],
+    body: "Select the sample text below, then press the Explain hotkey. You see the captured text before anything is sent.",
+    keys: [],
+    hotkey: "explain",
+    show: "select",
+    goal: (v) => v.attachment && saw(v, "captured"),
   },
   {
-    id: "settings",
-    title: "Themes and Settings",
-    body: `Pick a theme in Settings > Appearance. Open Settings from the tray icon or with ${key("openSettings")}. Press ${key("sheet")} in the launcher to see every keyboard shortcut.`,
-    keys: [...caps("sheet"), key("openSettings")],
+    id: "around",
+    title: "Getting around",
+    body: `${key("leave")} on an empty bar leaves a mode. Then ${key("go:find")} jumps to Find. ${key("sheet")} lists every shortcut and ${key("back")} steps back: close, clear, hide.`,
+    keys: [...caps("leave"), ...caps("go:find"), ...caps("sheet")],
+    example: "!",
+    show: "type",
+    goal: (v) => saw(v, "left") && v.mode === "find",
   },
   {
-    id: "finish",
+    id: "themes",
+    title: "Themes",
+    body: "Pick a theme and the bar restyles on the spot. Settings > Appearance has the same choices and more.",
+    keys: [],
+    show: "theme",
+    goal: (v) => saw(v, "theme"),
+  },
+  {
+    id: "done",
     title: "You are set",
-    body: "Press the hotkey any time to start. Replay the tour from Settings > General.",
+    body: "Press the hotkey any time and pick a prefix. Find this tour again in Settings > General.",
+    keys: [">", "!", "/", "?"],
   },
 ];
 
-const LAST = TUTORIAL_STEPS.length - 1;
+const LAST = TOUR_STEPS.length - 1;
 
 /** Step after `step`, or null when it was the last (finish). */
 export const nextStep = (step: number): number | null => (step >= LAST ? null : step + 1);
@@ -92,13 +134,69 @@ export const prevStep = (step: number): number => Math.max(0, step - 1);
 
 export const isLastStep = (step: number): boolean => step >= LAST;
 
-/** Step to show after the view changed: moves on once the current step is done. */
-export function autoAdvance(step: number, view: TutorialView): number {
-  const done = TUTORIAL_STEPS[step]?.done;
-  return done?.(view) && step < LAST ? step + 1 : step;
+/** True when the step's goal is met (steps without a goal never complete by themselves). */
+export const goalMet = (step: number, view: TourView): boolean =>
+  TOUR_STEPS[step]?.goal?.(view) ?? false;
+
+/** Wait after a goal is met, so the check animation plays before the next step. */
+export const ADVANCE_MS = 600;
+
+/** Ghost typing speed: one character every this many ms. */
+export const GHOST_MS = 45;
+
+/**
+ * What the demo's `text` event carries when the ghost has typed `typed` of an example:
+ * the prefix alone first (it picks the mode), then only the text after the prefix.
+ */
+export const ghostInput = (typed: string): string =>
+  typed.length <= 1 ? typed : typed.slice(1).trimStart();
+
+const ACCEL_NAMES: Record<string, string> = {
+  control: "Ctrl",
+  ctrl: "Ctrl",
+  commandorcontrol: "Ctrl",
+  cmdorctrl: "Ctrl",
+  alt: "Alt",
+  option: "Alt",
+  shift: "Shift",
+  super: "Win",
+  win: "Win",
+  meta: "Win",
+  cmd: "Win",
+};
+const MOD_ORDER = ["Ctrl", "Alt", "Shift", "Win"];
+
+/** Chord (shortcuts.ts form) for a Tauri accelerator such as "Shift+Alt+Space"; null when empty. */
+export function acceleratorChord(accel: string): string | null {
+  const parts = accel
+    .split("+")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const k = parts.pop();
+  if (!k) return null;
+  const mods = parts.map((p) => ACCEL_NAMES[p.toLowerCase()] ?? p);
+  const ordered = MOD_ORDER.filter((m) => mods.includes(m));
+  return [...ordered, k.length === 1 ? k.toUpperCase() : k].join("+");
 }
 
-/** Splits an example into its mode prefix and the text typed after it. */
-export function splitExample(example: string): { prefix: string; text: string } {
-  return { prefix: example.slice(0, 1), text: example.slice(1).trimStart() };
+/** Key caps for an accelerator: ["Alt", "Space"]. */
+export const acceleratorCaps = (accel: string): string[] => {
+  const c = acceleratorChord(accel);
+  return c ? capsOf(c) : [];
+};
+
+/** True when a DOM key press is the accelerator. */
+export function isAccelerator(accel: string, e: Parameters<typeof fromEvent>[0]): boolean {
+  const want = acceleratorChord(accel);
+  return want !== null && chordOf(fromEvent(e)) === want;
 }
+
+/** Theme choices offered by the Themes step. */
+export const TOUR_THEMES: readonly ThemeId[] = [
+  "glass",
+  "frost",
+  "midnight",
+  "aurora",
+  "ember",
+  "solid",
+];

@@ -11,7 +11,7 @@ export interface KeyInput {
   meta?: boolean;
 }
 
-export type Scope = LaunchMode | "launcher" | "settings";
+export type Scope = LaunchMode | "launcher" | "settings" | "tour";
 
 /** Runtime facts a shortcut can depend on; the sheet explains them, the footer hides the hint without them. */
 export type Condition = "adminAction" | "armedProcess" | "copyValue" | "attachment" | "answer";
@@ -109,6 +109,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "pagePrev", keys: "Ctrl+Shift+Tab", label: "Previous page", scope: "settings" },
   { id: "closeSettings", keys: "Esc", label: "Close Settings", scope: "settings" },
   { id: "closeSettingsW", keys: "Ctrl+W", label: "Close Settings", scope: "settings" },
+  { id: "tourNext", keys: "Alt+Right", label: "Next tour step", scope: "tour" },
+  { id: "tourBack", keys: "Alt+Left", label: "Previous tour step", scope: "tour" },
 ];
 
 /** Chords text fields and Windows own. No table entry may use one. */
@@ -246,9 +248,19 @@ export const SCOPE_LABEL: Record<Scope, string> = {
   find: "Find",
   query: "Ask",
   settings: "Settings window",
+  tour: "Tour",
 };
 
-const SCOPE_ORDER: Scope[] = ["launcher", "none", "commands", "run", "find", "query", "settings"];
+const SCOPE_ORDER: Scope[] = [
+  "launcher",
+  "none",
+  "commands",
+  "run",
+  "find",
+  "query",
+  "settings",
+  "tour",
+];
 
 /** The table grouped by scope, for the sheet. */
 export const groups = (): { scope: Scope; label: string; items: Shortcut[] }[] =>

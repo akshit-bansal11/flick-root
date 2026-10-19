@@ -40,6 +40,7 @@ export const setGeneral = (patch: GeneralPatch) =>
     scanPrograms: patch.scanPrograms,
   });
 export const setTutorialDone = (done: boolean) => invoke<void>("set_tutorial_done", { done });
+export const setHotkeysPaused = (paused: boolean) => invoke<void>("set_hotkeys_paused", { paused });
 export const getAppearance = () => invoke<AppearanceView>("get_appearance");
 export const setAppearance = (patch: Partial<AppearanceView>) =>
   invoke<AppearanceView>("set_appearance", patch);

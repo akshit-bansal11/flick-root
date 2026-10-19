@@ -74,3 +74,10 @@ describe("chordOf and matches", () => {
     expect(idFor("find", key("Backspace", { ctrl: true }))).toBeUndefined();
   });
 });
+
+describe("tour scope", () => {
+  it("binds Alt+Right and Alt+Left, neither reserved, listed last in the sheet", () => {
+    expect(inScope("tour").map((s) => s.keys)).toEqual(["Alt+Right", "Alt+Left"]);
+    expect(groups().at(-1)?.scope).toBe("tour");
+  });
+});

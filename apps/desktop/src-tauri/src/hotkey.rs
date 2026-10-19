@@ -138,6 +138,38 @@ pub fn register(app: &AppHandle, which: &str, accelerator: &str) -> Result<(), a
         })
 }
 
+/// True while the tour holds the global hotkeys released so its demo can see the keys.
+static PAUSED: Mutex<bool> = Mutex::new(false);
+
+/// Releases (`true`) or restores (`false`) the launcher and Explain global shortcuts.
+/// The bindings in `ACTIVE`/`EXPLAIN` stay put, so resume restores exactly what was held.
+/// Idempotent: pausing twice or resuming while running does nothing.
+pub fn set_paused(app: &AppHandle, paused: bool) {
+    let mut flag = PAUSED.lock().unwrap_or_else(|p| p.into_inner());
+    if *flag == paused {
+        return;
+    }
+    *flag = paused;
+    for (which, acc) in [("launcher", active()), ("explain", explain_active())] {
+        let Some(acc) = acc else { continue };
+        if paused {
+            match app.global_shortcut().unregister(acc.as_str()) {
+                Ok(()) => tracing::info!(which, acc, "hotkey paused"),
+                Err(err) => tracing::warn!(%err, which, acc, "pausing hotkey failed"),
+            }
+        } else if register(app, which, &acc).is_ok() {
+            tracing::info!(which, acc, "hotkey resumed");
+        }
+    }
+}
+
+/// Tour command: pause or resume the global hotkeys.
+#[tauri::command]
+pub fn set_hotkeys_paused(app: AppHandle, paused: bool) -> Result<(), CommandError> {
+    set_paused(&app, paused);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::validate;

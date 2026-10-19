@@ -124,7 +124,8 @@ pub fn run() {
             commands::settings::set_roots,
             commands::settings::clear_history,
             commands::settings::reindex,
-            commands::settings::get_about
+            commands::settings::get_about,
+            hotkey::set_hotkeys_paused
         ])
         .build(tauri::generate_context!());
     match result {
