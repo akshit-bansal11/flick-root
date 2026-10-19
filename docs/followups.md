@@ -59,3 +59,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - Pre-release review NIT: apps/web/package.json @types/node ^20 while CI uses Node 24; bump to ^24.
 - T6.6 web: the landing page's live launcher demo (typing, Tab, prefixes, arrows, autoplay, reduced motion) was never exercised in a browser; pages are HTTP-verified only.
 - Laya/Kev: verify they accept the /v1/systemone body and model name '<id>-latest' (docs.typesafe.ai documents Jev only; Laya README not found).
+- nlfind: a named root that isn't indexed returns an empty list (fall back to unrestricted search?); engine chain stops at the first engine that answers; auto-open score threshold 80 is uncalibrated.

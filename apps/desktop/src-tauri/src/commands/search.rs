@@ -57,11 +57,15 @@ pub async fn search(
             let files = state.files.clone();
             let overlay = state.overlay.load_full();
             let inp = input.clone();
-            tauri::async_runtime::spawn_blocking(move || {
+            let found = tauri::async_runtime::spawn_blocking(move || {
                 features::find_search(&files, &overlay, &inp, K)
             })
             .await
-            .map_err(|e| CommandError::new("internal", e.to_string()))?
+            .map_err(|e| CommandError::new("internal", e.to_string()))?;
+            // Feature items (the natural-language finder row) sit above the file hits.
+            let mut items = state.registry.query_all(&input);
+            items.extend(found);
+            items
         }
     };
     let micros = started.elapsed().as_micros() as u64;

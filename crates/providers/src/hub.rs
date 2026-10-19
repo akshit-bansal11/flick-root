@@ -97,6 +97,11 @@ impl ProviderHub {
         Self::new(providers)
     }
 
+    /// The first enabled provider (the Query provider), if any.
+    pub fn first(&self) -> Option<Arc<dyn Provider>> {
+        self.providers.first().cloned()
+    }
+
     /// True when no provider is enabled.
     pub fn is_empty(&self) -> bool {
         self.providers.is_empty()

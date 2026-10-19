@@ -10,6 +10,9 @@ launcher-core = { workspace = true }
 index-apps = { workspace = true }
 index-files = { workspace = true }
 providers = { workspace = true }
+decision = { workspace = true }
+secrecy = { workspace = true }
+url = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "time", "macros"] }
 tokio-util = { workspace = true }
 async-trait = { workspace = true }

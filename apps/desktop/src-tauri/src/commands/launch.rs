@@ -151,6 +151,10 @@ pub async fn launch(
                 .map_err(|e| CommandError::new("feature_failed", e.to_string()))?
         }
     };
+    if let Outcome::ShowItems { items } = &outcome {
+        // The list replaces the results; later Enter/reveal/copy look items up here.
+        *state.last_results.lock() = items.iter().map(|i| (i.id.0.clone(), i.clone())).collect();
+    }
     tracing::debug!(ms = t0.elapsed().as_millis() as u64, "launch call");
     if outcome == Outcome::HideLauncher {
         record(&state, &it);

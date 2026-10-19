@@ -71,7 +71,7 @@ pub fn command_search(
     items
 }
 
-fn file_item(h: FileHit) -> Item {
+pub(crate) fn file_item(h: FileHit) -> Item {
     let path = h.path.to_string_lossy().into_owned();
     Item {
         id: ItemId(format!("file:{path}")),

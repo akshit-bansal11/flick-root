@@ -1123,6 +1123,7 @@ dependencies = [
  "providers",
  "rayon",
  "reqwest",
+ "secrecy",
  "serde",
  "serde_json",
  "tauri",
@@ -1442,6 +1443,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "criterion",
+ "decision",
  "fend-core",
  "index-apps",
  "index-files",
@@ -1453,6 +1455,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rusqlite",
+ "secrecy",
  "serde",
  "serde_json",
  "tempfile",
@@ -1461,6 +1464,7 @@ dependencies = [
  "tokio-util",
  "toml 1.1.8+spec-1.1.0",
  "tracing",
+ "url",
  "win",
 ]
 

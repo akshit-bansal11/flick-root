@@ -6,6 +6,7 @@ mod hotkey;
 mod icons;
 mod logging;
 mod meta_store;
+mod nlhost;
 mod state;
 mod tray;
 mod window;

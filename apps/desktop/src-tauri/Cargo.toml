@@ -27,6 +27,7 @@ index-files = { workspace = true }
 features = { workspace = true }
 providers = { workspace = true }
 decision = { workspace = true }
+secrecy = { workspace = true }
 win = { workspace = true }
 tokio = { workspace = true }
 base64 = { workspace = true }

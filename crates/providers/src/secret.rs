@@ -332,6 +332,13 @@ impl SecretVault {
         Ok(f(&v))
     }
 
+    /// Key of decision engine `id` bound to `host` (`engine.<id>@<host>`), for the engine client only.
+    /// Blocking: call via `spawn_blocking`. Never log or return the value to the UI.
+    pub fn engine_key(&self, id: &str, host: &str) -> Option<SecretString> {
+        let name = SecretName::parse(&format!("engine.{id}@{host}")).ok()?;
+        self.take(&name).ok().flatten()
+    }
+
     /// Crate-internal read for key sources; records the use in memory and persists it
     /// later, coalesced, on a background thread. Blocking: call via `spawn_blocking`.
     pub(crate) fn take(&self, name: &SecretName) -> Result<Option<SecretString>, VaultError> {

@@ -277,6 +277,10 @@ pub fn start(app: &AppHandle) {
         for f in builtin_features() {
             s.registry.register(f).await;
         }
+        let host = Arc::new(crate::nlhost::ShellHost(Arc::downgrade(&s)));
+        s.registry
+            .register(Arc::new(features::NlFind::new(host)))
+            .await;
         let cfg = s.config.load_full();
         s.registry.apply_config(&cfg, &s.ctx).await;
     });
