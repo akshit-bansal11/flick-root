@@ -1,5 +1,6 @@
 import type { Ref } from "react";
 import type { LaunchMode } from "../types";
+import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
 
 const NONE_PLACEHOLDER = "Type > ! / or ? to start";
@@ -16,6 +17,7 @@ interface Props {
 
 export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: Props) {
   const def = mode === "none" ? null : MODES[mode];
+  const chip = useExit(def);
   return (
     <div className="inputbar">
       <svg
@@ -30,9 +32,14 @@ export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: 
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
       </svg>
-      {def && (
-        <span className="chip" data-testid="mode-chip">
-          {def.label}
+      {chip.shown && (
+        <span
+          className={chip.leaving ? "chip out" : "chip"}
+          data-testid={chip.leaving ? undefined : "mode-chip"}
+          aria-hidden={chip.leaving || undefined}
+          onAnimationEnd={chip.leaving ? chip.onEnd : undefined}
+        >
+          {chip.shown.label}
         </span>
       )}
       <input

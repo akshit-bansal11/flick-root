@@ -1,5 +1,6 @@
-import { Fragment } from "react";
+import { Fragment, useLayoutEffect, useRef } from "react";
 import type { Item, LaunchMode } from "../types";
+import { measureRow } from "../useMotion";
 import { groupLabel } from "./kinds";
 import { ResultRow } from "./ResultRow";
 import { MODES } from "./reducer";
@@ -20,9 +21,32 @@ interface Props {
 export function Results({ items, selected, query, onActivate }: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
+  const list = useRef<HTMLDivElement>(null);
+  const hl = useRef<HTMLDivElement>(null);
+  // One highlight layer glides to the selected row; without a measurement the row paints its own background.
+  useLayoutEffect(() => {
+    const el = list.current;
+    const layer = hl.current;
+    if (!el || !layer) return;
+    const box = measureRow(el.querySelector<HTMLElement>(`#${optionId(selected)}`));
+    if (!box) {
+      delete el.dataset.hl;
+      return;
+    }
+    layer.style.height = `${box.height}px`;
+    layer.style.transform = `translateY(${box.top}px)`;
+    if (!el.dataset.hl) {
+      el.dataset.hl = "1";
+      // Placed instantly the first time; later moves glide.
+      requestAnimationFrame(() => {
+        layer.dataset.glide = "1";
+      });
+    }
+  });
   return (
     <>
-      <div id={LISTBOX_ID} role="listbox" aria-label="Results" className="results">
+      <div ref={list} id={LISTBOX_ID} role="listbox" aria-label="Results" className="results">
+        <div ref={hl} className="row-hl" aria-hidden="true" />
         {items.slice(start, start + MAX_ROWS).map((item, k) => {
           const index = start + k;
           const label = groupLabel(item);
@@ -39,6 +63,7 @@ export function Results({ items, selected, query, onActivate }: Props) {
                 index={index}
                 id={optionId(index)}
                 selected={index === selected}
+                order={k}
                 query={query}
                 onActivate={onActivate}
               />

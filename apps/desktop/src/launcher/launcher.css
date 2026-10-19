@@ -66,7 +66,7 @@ body,
 }
 
 .launcher.show {
-  animation: launcher-in calc(100ms * var(--motion-scale)) var(--l-motion-ease);
+  animation: launcher-in var(--l-dur) var(--l-ease-out);
 }
 
 @keyframes launcher-in {
@@ -112,6 +112,7 @@ body,
 }
 
 .chip {
+  animation: chip-in var(--l-dur) var(--l-ease-spring);
   flex: none;
   padding: 1px var(--l-sp-4);
   border-radius: var(--l-r2);
@@ -119,6 +120,24 @@ body,
   color: var(--l-accent);
   font: 500 var(--l-fs-meta) var(--l-mono);
   white-space: nowrap;
+}
+
+.chip.out {
+  animation: chip-out var(--l-dur-fast) var(--l-ease-out) forwards;
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes chip-out {
+  to {
+    opacity: 0;
+    transform: scale(0.92);
+  }
 }
 
 .hints {
@@ -141,6 +160,17 @@ body,
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.hint-row {
+  transition:
+    background var(--l-dur-fast) var(--l-ease-out),
+    transform var(--l-dur-fast) var(--l-ease-out);
+}
+
+.hint-row:active,
+.action:active {
+  transform: scale(0.98);
 }
 
 .hint-row:hover {
@@ -180,12 +210,13 @@ body,
 }
 
 .results {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--l-sp-1);
 }
 
-.results:not(:empty) {
+.results:has(.row) {
   padding: var(--l-sp-3);
 }
 
@@ -201,12 +232,64 @@ body,
   min-width: 0;
 }
 
+.row {
+  z-index: 1;
+  transition: background var(--l-dur-fast) var(--l-ease-out);
+  animation: row-in var(--l-dur) var(--l-ease-out) backwards;
+}
+
+.row[data-i="1"] {
+  animation-delay: calc(var(--l-stagger) * 1);
+}
+.row[data-i="2"] {
+  animation-delay: calc(var(--l-stagger) * 2);
+}
+.row[data-i="3"] {
+  animation-delay: calc(var(--l-stagger) * 3);
+}
+.row[data-i="4"] {
+  animation-delay: calc(var(--l-stagger) * 4);
+}
+.row[data-i="5"] {
+  animation-delay: calc(var(--l-stagger) * 5);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
 .row:hover {
   background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
 .row.sel {
   background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
+}
+
+/* Selection highlight: one layer, moved with transform. When it is placed, rows drop their own selected background. */
+.row-hl {
+  position: absolute;
+  inset: 0 var(--l-sp-3) auto;
+  height: 0;
+  border-radius: var(--l-r);
+  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.row-hl[data-glide] {
+  transition: transform var(--l-dur) var(--l-ease-out);
+}
+
+.results:not([data-hl]) .row-hl {
+  display: none;
+}
+
+.results[data-hl] .row.sel {
+  background: none;
 }
 
 .row-text {
@@ -336,13 +419,21 @@ body,
   cursor: pointer;
 }
 
+.action {
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  transition:
+    background var(--l-dur-fast) var(--l-ease-out),
+    transform var(--l-dur-fast) var(--l-ease-out),
+    outline-color var(--l-dur-fast) var(--l-ease-out);
+}
+
 .action:hover {
   background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
 .action:focus-visible {
-  outline: 2px solid var(--l-focus);
-  outline-offset: 1px;
+  outline-color: var(--l-focus);
 }
 
 .input:focus-visible {
@@ -351,12 +442,39 @@ body,
 
 .copied {
   color: var(--l-accent);
+  animation: copied-in var(--l-dur) var(--l-ease-out);
+}
+
+.copied.out {
+  animation: copied-out var(--l-dur) var(--l-ease-in-out) forwards;
+}
+
+@keyframes copied-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes copied-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .sheet {
+  animation: sheet-in var(--l-dur-slow) var(--l-ease-out);
   max-height: calc(var(--l-row) * 8);
   overflow-y: auto;
   padding: var(--l-sp-3) var(--l-sp-7);
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .sheet-title {

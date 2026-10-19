@@ -1,6 +1,7 @@
 import { APP_DISPLAY_NAME } from "../brand";
 import { type Condition, capsText, inScope, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
+import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
 
 interface Props {
@@ -25,6 +26,7 @@ export function footHints(mode: LaunchMode, ctx: Props["ctx"] = {}): string[] {
 }
 
 export function Footer({ mode, ctx, copied = false }: Props) {
+  const toast = useExit(copied ? "Copied" : null);
   return (
     <div className="foot">
       <span className="brand">
@@ -32,9 +34,14 @@ export function Footer({ mode, ctx, copied = false }: Props) {
         {APP_DISPLAY_NAME}
       </span>
       <span className="keys">
-        {copied && (
-          <span className="copied" role="status">
-            Copied
+        {toast.shown && (
+          <span
+            className={toast.leaving ? "copied out" : "copied"}
+            role={toast.leaving ? undefined : "status"}
+            aria-hidden={toast.leaving || undefined}
+            onAnimationEnd={toast.leaving ? toast.onEnd : undefined}
+          >
+            {toast.shown}
           </span>
         )}
         {footHints(mode, ctx).map((k) => (

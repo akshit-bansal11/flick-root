@@ -127,7 +127,9 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
   return (
     <div className="s-shell">
       <Nav active={page} onSelect={onPage} featuresCount={counts} />
-      <main className="s-main">{pages[page]}</main>
+      <main key={page} className="s-main">
+        {pages[page]}
+      </main>
     </div>
   );
 }

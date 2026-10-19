@@ -31,7 +31,11 @@ export function QueryView(p: Props) {
       {p.question && <div className="query-q">{p.question}</div>}
       <div className="query-chips">
         {mode ? (
-          <span className="query-chip" aria-live="polite">
+          <span
+            key={`${mode.providerLabel}/${mode.model}`}
+            className="query-chip"
+            aria-live="polite"
+          >
             {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
           </span>
         ) : (

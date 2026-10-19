@@ -104,6 +104,15 @@
   --l-tile-text: #fff;
   --l-motion-ease: cubic-bezier(0.2, 0, 0, 1);
   --motion-scale: 1;
+
+  /* Motion. Keystroke-driven animation uses fast/normal only, transform and opacity only, and never delays content. */
+  --l-dur-fast: 80ms;
+  --l-dur: 120ms;
+  --l-dur-slow: 200ms;
+  --l-ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --l-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --l-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --l-stagger: 12ms;
 }
 
 /* Theme and scheme rules also match plain elements (not only :root) so Settings can preview a theme on a swatch.
@@ -290,6 +299,10 @@
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-scale: 0;
+    --l-dur-fast: 0ms;
+    --l-dur: 0ms;
+    --l-dur-slow: 0ms;
+    --l-stagger: 0ms;
   }
 }
 
