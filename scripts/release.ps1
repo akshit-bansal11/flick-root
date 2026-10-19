@@ -1,12 +1,15 @@
 <#
 .SYNOPSIS
-Cuts a release: bumps versions, regenerates CHANGELOG.md, runs the gate, commits, tags, pushes.
+Cuts a release: bumps versions, regenerates CHANGELOG.md, commits, tags, pushes. Builds nothing.
 .DESCRIPTION
-Sets the version in Cargo.toml [workspace.package], tauri.conf.json and every package.json that
-has a version, refreshes Cargo.lock, runs git-cliff, runs the quality gate (stops on the first
-failure and prints the changed files; undo with git checkout -- .), then commits
-"up/ release: v<version>", creates an annotated tag and pushes main and the tag.
-Refuses on a dirty tree, a branch other than main, a non-greater version or an existing tag.
+The quality gate and the installer build run on GitHub: this script refuses unless HEAD is pushed
+and its CI run succeeded. It sets the version in Cargo.toml [workspace.package], tauri.conf.json
+and every package.json that has a version, refreshes Cargo.lock (no compile), runs git-cliff, then
+commits "up/ release: v<version>", creates an annotated tag and pushes main and the tag. The tag
+starts .github/workflows/release.yml, which builds the draft installer.
+For a test installer without a release: gh workflow run release.yml, then gh run download <id> -n installer.
+Refuses on a dirty tree, a branch other than main, a non-greater version, an existing tag, or a
+HEAD that is unpushed or not green in CI.
 Never force-pushes. With -DryRun every refusal is reported as WOULD REFUSE and nothing changes.
 Run: pwsh -File scripts/release.ps1 <version> [-DryRun] [-NoPush]
 .PARAMETER Version
@@ -84,6 +87,13 @@ $tag = "v$Version"
 if (Get-Native git @('tag', '--list', $tag)) { $problems.Add("tag $tag exists locally") }
 if (Get-Native git @('ls-remote', '--tags', 'origin', "refs/tags/$tag")) { $problems.Add("tag $tag exists on origin") }
 
+# The quality gate runs on GitHub, not here: HEAD must be pushed and green in CI.
+$head = (Get-Native git @('rev-parse', 'HEAD')) -join ''
+$remote = ((Get-Native git @('ls-remote', 'origin', 'refs/heads/main')) -join '').Split("`t")[0]
+if ($head -ne $remote) { $problems.Add('HEAD is not pushed to origin/main (push first so CI can run)') }
+$ci = (Get-Native gh @('run', 'list', '--workflow', 'ci.yml', '--commit', $head, '--limit', '1', '--json', 'status,conclusion', '-q', '.[0] | .status + "/" + .conclusion')) -join ''
+if ($ci -ne 'completed/success') { $problems.Add("CI for $($head.Substring(0, 7)) is '$(if ($ci) { $ci } else { 'not found' })', not completed/success") }
+
 if ($problems.Count -gt 0) {
     foreach ($p in $problems) { Write-Host "$(if ($DryRun) { 'WOULD REFUSE' } else { 'REFUSED' }): $p" }
     if (-not $DryRun) { exit 1 }
@@ -120,7 +130,6 @@ $changed.Add('Cargo.lock'); $changed.Add('CHANGELOG.md')
 if ($DryRun) {
     Write-Host '> cargo update -w --offline'
     Write-Host "> git-cliff --tag $tag -o CHANGELOG.md"
-    Write-Host '> gate: pnpm --filter desktop build; cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo test; pnpm lint; pnpm typecheck; pnpm test; pnpm --filter web build'
     Write-Host "> git add $($changed -join ' ')"
     Write-Host "> git commit -m 'up/ release: $tag'"
     Write-Host "> git tag -a $tag -m $tag"
@@ -136,15 +145,6 @@ try {
         Invoke-Native cargo @('update', '-w')
     }
     Invoke-Native git-cliff @('--tag', $tag, '-o', 'CHANGELOG.md')
-    # The shell's generate_context! needs apps/desktop/dist, as in CI.
-    Invoke-Native pnpm @('--filter', 'desktop', 'build')
-    Invoke-Native cargo @('fmt', '--check')
-    Invoke-Native cargo @('clippy', '--all-targets', '--', '-D', 'warnings')
-    Invoke-Native cargo @('test')
-    Invoke-Native pnpm @('lint')
-    Invoke-Native pnpm @('typecheck')
-    Invoke-Native pnpm @('test')
-    Invoke-Native pnpm @('--filter', 'web', 'build')
 } catch {
     Write-Host "FAILED: $_"
     Write-Host 'Changed files (undo with: git checkout -- .):'

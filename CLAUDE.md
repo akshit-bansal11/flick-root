@@ -16,7 +16,8 @@ Free, open-source, keyboard-first Windows launcher: Command, Find and Query mode
 - Benches: `cargo bench -p launcher-core`, `cargo bench -p index-files`
 - UI: `pnpm --filter desktop typecheck`, `pnpm --filter desktop test`, `pnpm lint`
 - Web: `pnpm --filter web dev`, `pnpm --filter web build`
-- Release: `pwsh -File scripts/release.ps1 <version>`
+- Release: `pwsh -File scripts/release.ps1 <version>` (needs HEAD pushed and green in CI; builds nothing locally)
+- Test installer, built on GitHub: `gh workflow run release.yml`, then `gh run download <run-id> -n installer`. Never build installers locally.
 
 ## Rust
 

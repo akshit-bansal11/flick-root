@@ -48,7 +48,6 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T5.3: provider enable control is a native checkbox (Biome rejected role="switch" without aria-checked); restyle to the Win11 pill via Toggle.tsx for consistency.
 - T5.10: install_panic_hook itself is not tested from outside (logging is private and the hook is process-wide); unit test covers panic_text redaction only.
 - T5.12: SettingsRoot's settings://navigate listener has no test of its own (resolveView is unit-tested).
-- T6.9 release.yml: `gh release upload <tag>` against a draft release is untested; if the first tag run fails there, use tauri-action's releaseId output.
 - W5 review NIT: math calc.rs:129 heavy-input test bound loosened to 5 s; tighten to ~10x BUDGET.
 - W5 review NIT: icons.rs:385 data_url clones entry.id per row on the keystroke path, and warm() memoises every icon with no cap (was 512); key the memo by Arc<str> or a borrowed id.
 - W5 review NIT: measure.ps1:56 single-instance check matches only the same exe path (an installed copy elsewhere would catch the hotkeys); .DESCRIPTION says SendInput but the script uses keybd_event.
