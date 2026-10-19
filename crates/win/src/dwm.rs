@@ -2,7 +2,7 @@
 
 use crate::error::WinError;
 use std::ffi::c_void;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
     DWM_SYSTEMBACKDROP_TYPE, DWM_WINDOW_CORNER_PREFERENCE, DWMSBT_NONE, DWMSBT_TRANSIENTWINDOW,
     DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
@@ -13,10 +13,11 @@ use windows::Win32::System::Registry::{
     HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RegGetValueW,
 };
 use windows::Win32::UI::Controls::MARGINS;
+use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
-    WS_SYSMENU,
+    GWL_STYLE, GetWindowLongPtrW, STYLESTRUCT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WM_NCDESTROY, WM_STYLECHANGING,
+    WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU,
 };
 use windows::core::{PCWSTR, s, w};
 
@@ -62,6 +63,41 @@ pub fn strip_caption(hwnd: isize) -> Result<(), WinError> {
         )
     }
     .map_err(|e| WinError::os(e, "SetWindowPos"))
+}
+
+/// Fixed id of the caption-guard subclass.
+const CAPTION_GUARD_ID: usize = 0x464C_4B31;
+
+unsafe extern "system" fn caption_guard(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    id: usize,
+    _data: usize,
+) -> LRESULT {
+    if msg == WM_STYLECHANGING && wparam.0 as i32 == GWL_STYLE.0 && lparam.0 != 0 {
+        // SAFETY: for WM_STYLECHANGING, lparam points at a live STYLESTRUCT owned by the sender.
+        let ss = unsafe { &mut *(lparam.0 as *mut STYLESTRUCT) };
+        ss.styleNew = stripped_style(ss.styleNew);
+    } else if msg == WM_NCDESTROY {
+        // SAFETY: removing our own subclass from the window being destroyed.
+        let _ = unsafe { RemoveWindowSubclass(hwnd, Some(caption_guard), id) };
+    }
+    // SAFETY: forwards the unchanged message to the next proc in the subclass chain.
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+}
+
+/// Keeps the caption bits off `hwnd` for good: tao re-applies its styles on show/resize, so a subclass
+/// clears them on every `WM_STYLECHANGING`. Must run on the thread that owns the window (Tauri's
+/// `setup` is on the main thread; elsewhere use `run_on_main_thread`). Also strips the current style.
+pub fn keep_caption_off(hwnd: isize) -> Result<(), WinError> {
+    let h = HWND(hwnd as *mut c_void);
+    // SAFETY: `caption_guard` is a static proc with the SUBCLASSPROC signature; a repeat install with the same id is a no-op update.
+    if !unsafe { SetWindowSubclass(h, Some(caption_guard), CAPTION_GUARD_ID, 0) }.as_bool() {
+        return Err(WinError::Unavailable("SetWindowSubclass failed".into()));
+    }
+    strip_caption(hwnd)
 }
 
 /// Whether the user allows transparency effects (Settings > Personalization > Colors). Missing value means yes.

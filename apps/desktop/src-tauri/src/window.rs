@@ -71,8 +71,8 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     #[cfg(windows)]
     match win.hwnd() {
         Ok(h) => {
-            if let Err(err) = win::dwm::strip_caption(h.0 as isize) {
-                tracing::warn!(%err, "caption strip failed");
+            if let Err(err) = win::dwm::keep_caption_off(h.0 as isize) {
+                tracing::warn!(%err, "caption guard failed");
             }
             if let Err(err) = win::dwm::round_corners(h.0 as isize) {
                 tracing::warn!(%err, "rounded corners failed");
@@ -143,6 +143,10 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     }
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {
         tracing::warn!(%err, "show failed");
+    }
+    #[cfg(windows)]
+    if let Ok(h) = win.hwnd() {
+        let _ = win::dwm::strip_caption(h.0 as isize);
     }
     let glass = sync_glass(app, win);
     let state: State<ShowState> = app.state();
