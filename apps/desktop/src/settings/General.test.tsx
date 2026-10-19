@@ -11,6 +11,7 @@ vi.mock("./api", () => ({
   setIncludeDrives: vi.fn(),
   clearHistory: vi.fn(),
   reindex: vi.fn(),
+  setTutorialDone: vi.fn(() => Promise.resolve()),
 }));
 
 const settings: SettingsView = {
@@ -58,5 +59,15 @@ describe("General index all drives", () => {
     expect(onChange).toHaveBeenNthCalledWith(1, { ...settings, includeDrives: false });
     expect((await screen.findByRole("alert")).textContent).toBe("scan failed");
     expect(onChange).toHaveBeenLastCalledWith(settings);
+  });
+});
+
+describe("General replay tutorial", () => {
+  afterEach(cleanup);
+  it("clears tutorial_done and confirms", async () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    fireEvent.click(screen.getByText("Replay tutorial"));
+    expect(api.setTutorialDone).toHaveBeenCalledWith(false);
+    expect(await screen.findByText("Opens the next time you open the launcher.")).toBeTruthy();
   });
 });

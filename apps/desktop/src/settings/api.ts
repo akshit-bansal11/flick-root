@@ -39,6 +39,7 @@ export const setGeneral = (patch: GeneralPatch) =>
     theme: patch.theme,
     launchAtStartup: patch.launchAtStartup,
   });
+export const setTutorialDone = (done: boolean) => invoke<void>("set_tutorial_done", { done });
 export const getAppearance = () => invoke<AppearanceView>("get_appearance");
 export const setAppearance = (patch: Partial<AppearanceView>) =>
   invoke<AppearanceView>("set_appearance", patch);

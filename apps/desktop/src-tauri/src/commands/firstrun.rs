@@ -69,6 +69,23 @@ pub async fn complete_first_run(
     Ok(())
 }
 
+/// Records whether the tutorial is finished; `false` replays it on the next show.
+#[tauri::command]
+pub async fn set_tutorial_done(
+    state: State<'_, Arc<AppState>>,
+    done: bool,
+) -> Result<(), CommandError> {
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|c| {
+            c.general.tutorial_done = done;
+            Ok(())
+        })
+    })
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

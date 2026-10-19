@@ -4,7 +4,7 @@ import { applyAppearance } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace"]);
+const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace", "F1"]);
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
@@ -84,6 +84,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
             .then((r) => dispatch({ type: "thinkingModes", modes: r.modes, selected: r.selected }))
             .catch(warn);
           break;
+        case "tutorialDone":
+          ipc.setTutorialDone(e.done).catch(warn);
+          break;
         case "setThinkingMode":
           ipc.setThinkingMode(e.id).catch(warn);
           break;
@@ -98,7 +101,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           ...(p.appearance ?? { theme: "glass", glass: 62, scheme: "system" }),
           glassAvailable: p.glass !== false,
         });
-        dispatch({ type: "shown" });
+        dispatch({ type: "shown", tutorial: p.tutorial });
         inputRef.current?.focus();
         requestAnimationFrame(() => {
           ipc.reportShown(p.shownId).catch(warn);
@@ -197,6 +200,15 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     toggleEffort,
     openSettings,
     openLink,
+    tutorial: {
+      next: useCallback(() => dispatch({ type: "tutorialNext" }), [dispatch]),
+      back: useCallback(() => dispatch({ type: "tutorialBack" }), [dispatch]),
+      skip: useCallback(() => dispatch({ type: "tutorialEnd" }), [dispatch]),
+      example: useCallback(
+        (text: string) => dispatch({ type: "tutorialExample", text }),
+        [dispatch],
+      ),
+    },
   };
 }
 

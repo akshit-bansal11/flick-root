@@ -98,6 +98,8 @@ export type AskEvent =
 export interface ShownPayload {
   shownId: number;
   reason: string;
+  /** True when the tutorial should open: first run done, tutorial not finished. */
+  tutorial?: boolean;
 }
 
 /** `explain://captured` payload (BSD 5); `preview` is at most 2,000 characters. */

@@ -68,6 +68,8 @@ pub struct General {
     pub launch_at_startup: bool,
     /// Whether the first-run flow finished.
     pub first_run_done: bool,
+    /// Whether the tutorial was finished or skipped.
+    pub tutorial_done: bool,
 }
 
 /// Theme ids the UI ships.
@@ -302,6 +304,7 @@ impl Default for General {
             legacy_theme: None,
             launch_at_startup: false,
             first_run_done: false,
+            tutorial_done: false,
         }
     }
 }
@@ -637,6 +640,18 @@ pub fn local_data_dir() -> Result<PathBuf, CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tutorial_done_defaults_false_for_old_configs() {
+        let c: Config = toml::from_str(
+            "[general]
+first_run_done = true
+",
+        )
+        .unwrap();
+        assert!(c.general.first_run_done);
+        assert!(!c.general.tutorial_done);
+    }
 
     #[test]
     fn thinking_fields_round_trip_and_old_configs_load() {

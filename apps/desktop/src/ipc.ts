@@ -62,6 +62,8 @@ export const resizeLauncher = (height: number) => invoke<void>("resize_launcher"
 
 export const reportShown = (shownId: number) => invoke<void>("report_shown", { shownId });
 
+export const setTutorialDone = (done: boolean) => invoke<void>("set_tutorial_done", { done });
+
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });
 
 export type ShownEvent = ShownPayload & { glass?: boolean; appearance?: Appearance };

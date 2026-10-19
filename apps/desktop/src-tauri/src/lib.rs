@@ -116,6 +116,7 @@ pub fn run() {
             commands::features::run_system_command,
             commands::firstrun::get_first_run,
             commands::firstrun::complete_first_run,
+            commands::firstrun::set_tutorial_done,
             commands::settings::get_settings,
             commands::settings::set_general,
             commands::settings::get_appearance,

@@ -9,6 +9,7 @@ import type {
   ThinkingMode,
 } from "../types";
 import { isProgram } from "./kinds";
+import { autoAdvance, nextStep, prevStep, splitExample } from "./tutorialSteps";
 
 export interface KeyInput {
   key: string;
@@ -59,7 +60,8 @@ export interface State {
   pendingConfirm: { commandId: string; token: string } | null;
   /** True once an arrow key moved the selection; only then does Backspace kill a process row. */
   armed: boolean;
-  overlay: { firstRun: boolean };
+  /** Guided tour card; open while the user is walking through it. */
+  tutorial: { open: boolean; step: number };
   visible: boolean;
   attachment: Attachment | null;
   /** One muted line under the bar, for example "No text selected". */
@@ -78,7 +80,12 @@ export type Event =
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
-  | { type: "shown" }
+  | { type: "shown"; tutorial?: boolean }
+  | { type: "tutorialStart" }
+  | { type: "tutorialNext" }
+  | { type: "tutorialBack" }
+  | { type: "tutorialEnd" }
+  | { type: "tutorialExample"; text: string }
   | { type: "hidden" };
 
 export type Effect =
@@ -99,6 +106,7 @@ export type Effect =
   | { type: "cancelAsk"; token: number }
   | { type: "loadThinkingModes" }
   | { type: "setThinkingMode"; id: string }
+  | { type: "tutorialDone"; done: boolean }
   | { type: "hide" }
   | { type: "openSettings"; section: string };
 
@@ -183,7 +191,7 @@ export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]
   thinkingModes: { modes: [], selected: null },
   pendingConfirm: null,
   armed: false,
-  overlay: { firstRun: false },
+  tutorial: { open: false, step: 0 },
   visible: false,
   attachment: null,
   notice: null,
@@ -312,7 +320,26 @@ function openSelected(s: State, k: Pick<KeyInput, "ctrl" | "shift">): Result {
   return out(s, { type: "launch", itemId: item.id, admin: false });
 }
 
+function endTutorial(s: State): Result {
+  return out({ ...s, tutorial: { open: false, step: 0 } }, { type: "tutorialDone", done: true });
+}
+
+function tutorialNext(s: State): Result {
+  if (!s.tutorial.open) return out(s);
+  const step = nextStep(s.tutorial.step);
+  return step === null ? endTutorial(s) : out({ ...s, tutorial: { open: true, step } });
+}
+
+/** Types an example: its prefix enters the mode, the rest becomes the input. */
+function tutorialExample(s: State, example: string): Result {
+  const { prefix, text } = splitExample(example);
+  const mode = modeOf(prefix);
+  if (mode && availableModes(s.enabledModes).includes(mode)) return switchMode(s, mode, text);
+  return textChange(s, example);
+}
+
 function onEscape(s: State): Result {
+  if (s.tutorial.open) return endTutorial(s);
   if (s.query.status === "streaming") {
     return out(
       { ...s, query: { ...s.query, status: "idle" } },
@@ -340,6 +367,13 @@ function cycleThinking(s: State, delta: number): Result {
 }
 
 function key(s: State, k: KeyInput): Result {
+  if (k.key === "F1") {
+    return s.tutorial.open ? out(s) : out({ ...s, tutorial: { open: true, step: 0 } });
+  }
+  if (s.tutorial.open && k.ctrl && k.key === "ArrowRight") return tutorialNext(s);
+  if (s.tutorial.open && k.ctrl && k.key === "ArrowLeft") {
+    return out({ ...s, tutorial: { open: true, step: prevStep(s.tutorial.step) } });
+  }
   switch (k.key) {
     case "ArrowDown":
       return move(s, 1);
@@ -418,8 +452,24 @@ function outcome(s: State, commandId: string, o: Outcome): Result {
   }
 }
 
+/** Events after which the visible results or text may satisfy the current tutorial step. */
+const VIEW_EVENTS = new Set<Event["type"]>(["text", "results", "enterMode", "tutorialExample"]);
+
 /** Pure reducer: next state plus effects for the shell to run. */
 export function reduce(s: State, ev: Event): Result {
+  const r = reduceCore(s, ev);
+  const t = r.state.tutorial;
+  if (!t.open || !VIEW_EVENTS.has(ev.type)) return r;
+  const step = autoAdvance(t.step, {
+    mode: r.state.mode,
+    input: r.state.input,
+    itemsCount: r.state.items.length,
+    thinkingModes: r.state.thinkingModes.modes.length,
+  });
+  return step === t.step ? r : { ...r, state: { ...r.state, tutorial: { open: true, step } } };
+}
+
+function reduceCore(s: State, ev: Event): Result {
   switch (ev.type) {
     case "key":
       return key(s, ev.key);
@@ -470,7 +520,20 @@ export function reduce(s: State, ev: Event): Result {
         seq: s.seq,
         askToken: s.askToken,
         visible: true,
+        tutorial: { open: ev.tutorial === true, step: 0 },
       });
+    case "tutorialStart":
+      return out({ ...s, tutorial: { open: true, step: 0 } });
+    case "tutorialNext":
+      return tutorialNext(s);
+    case "tutorialBack":
+      return out(
+        s.tutorial.open ? { ...s, tutorial: { open: true, step: prevStep(s.tutorial.step) } } : s,
+      );
+    case "tutorialEnd":
+      return s.tutorial.open ? endTutorial(s) : out(s);
+    case "tutorialExample":
+      return tutorialExample(s, ev.text);
     case "hidden":
       return out(
         {

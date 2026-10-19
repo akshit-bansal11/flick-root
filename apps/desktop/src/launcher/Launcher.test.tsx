@@ -16,6 +16,7 @@ vi.mock("../ipc", () => ({
   cancelAsk: vi.fn(),
   listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null })),
   setThinkingMode: vi.fn(() => Promise.resolve()),
+  setTutorialDone: vi.fn(() => Promise.resolve()),
   hideLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(),
@@ -51,7 +52,6 @@ async function mount() {
 }
 
 beforeEach(() => {
-  localStorage.setItem("prefixes-overlay-seen", "1");
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubGlobal(
     "ResizeObserver",

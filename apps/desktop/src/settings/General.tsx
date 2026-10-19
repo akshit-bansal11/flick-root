@@ -47,6 +47,7 @@ export function General({ settings, onChange }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [cleared, setCleared] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [replayed, setReplayed] = useState(false);
 
   const setError = (k: string, e: unknown) =>
     setErrors((p) => ({ ...p, [k]: e ? errorText(e) : null }));
@@ -106,6 +107,16 @@ export function General({ settings, onChange }: Props) {
       setError("reindex", e);
     }
     setReindexing(false);
+  };
+
+  const replay = async () => {
+    try {
+      await api.setTutorialDone(false);
+      setError("tutorial", null);
+      setReplayed(true);
+    } catch (e) {
+      setError("tutorial", e);
+    }
   };
 
   return (
@@ -226,6 +237,18 @@ export function General({ settings, onChange }: Props) {
           onClick={() => void reindex()}
         >
           {reindexing ? "Reindexing…" : "Reindex"}
+        </button>
+      </Row>
+
+      <Row
+        label="Tutorial"
+        help={
+          replayed ? "Opens the next time you open the launcher." : "A short tour of every mode."
+        }
+        error={errors.tutorial}
+      >
+        <button type="button" className="s-btn" onClick={() => void replay()}>
+          Replay tutorial
         </button>
       </Row>
     </section>
