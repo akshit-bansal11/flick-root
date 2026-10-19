@@ -1,17 +1,7 @@
 import { APP_DISPLAY_NAME, REPO_URL } from "@/brand";
 import { Download } from "@/components/Download";
+import { Features } from "@/components/Features";
 import { LauncherDemo } from "@/components/LauncherDemo";
-
-const FEATURES = [
-  ["Command", "Fuzzy search of installed apps, including Store apps."],
-  ["Find", "Fuzzy search of files and folders under the roots you index."],
-  ["Query", "Streams an answer from the provider you choose, with fallback."],
-  ["Frecency", "Ranks what you use often and recently higher."],
-  ["Math, units, currency", "Type 2.5 kg to lb or 250 usd in inr; Enter copies it."],
-  ["System commands", "Lock, Sleep, Restart, Shut down, Wi-Fi and more."],
-  ["Web shortcuts", "A keyword plus a query opens a URL: g, yt, gh, maps, wiki."],
-  ["Project launcher", "Open a project in your editor or terminal by name."],
-] as const;
 
 export default function Home() {
   return (
@@ -28,19 +18,7 @@ export default function Home() {
         <Download />
       </section>
 
-      <section aria-labelledby="features">
-        <h2 id="features" className="mb-6 text-2xl font-semibold">
-          Features
-        </h2>
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {FEATURES.map(([t, d]) => (
-            <li key={t} className="rounded-[var(--l-r)] border border-line bg-surface p-4">
-              <h3 className="font-semibold">{t}</h3>
-              <p className="text-muted">{d}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Features />
 
       <section aria-labelledby="privacy">
         <h2 id="privacy" className="mb-4 text-2xl font-semibold">
