@@ -7,9 +7,12 @@ use crate::error::WinError;
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, GetClipboardData, GetClipboardSequenceNumber, OpenClipboard,
-    SetClipboardData,
+    RegisterClipboardFormatW, SetClipboardData,
 };
-use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
+use windows::Win32::System::Memory::{
+    GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
+};
+use windows::core::PCWSTR;
 
 /// Clipboard format id of UTF-16 text (avoids the Win32_System_Ole feature).
 const CF_UNICODETEXT: u32 = 13;
@@ -55,23 +58,53 @@ pub fn read_text() -> Result<Option<String>, WinError> {
         _ => return Ok(None),
     };
     let g = HGLOBAL(h.0);
-    // SAFETY: g is a movable global block from the clipboard; locked, read up to the NUL, unlocked.
+    // SAFETY: g is a movable global block from the clipboard; locked, read only within its
+    // GlobalSize (a missing NUL cannot run past the block), unlocked.
     unsafe {
         let p = GlobalLock(g) as *const u16;
         if p.is_null() {
             return Ok(None);
         }
-        let mut len = 0;
-        while *p.add(len) != 0 {
-            len += 1;
-        }
-        let s = String::from_utf16_lossy(std::slice::from_raw_parts(p, len));
+        let max = GlobalSize(g) / 2;
+        let all = std::slice::from_raw_parts(p, max);
+        let len = all.iter().position(|&c| c == 0).unwrap_or(max);
+        let s = String::from_utf16_lossy(&all[..len]);
         let _ = GlobalUnlock(g);
         Ok(Some(s))
     }
 }
 
-/// Replace the clipboard content with `text`.
+/// Puts `data` on the open clipboard under the registered format `name`.
+///
+/// # Safety
+/// The clipboard must be open on this thread and already emptied by the caller.
+unsafe fn set_registered(name: &str, data: &[u8]) {
+    let wide: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
+    // SAFETY: `wide` is NUL-terminated and outlives the call. The block is sized for `data`,
+    // written while locked, and freed unless SetClipboardData takes ownership.
+    unsafe {
+        let fmt = RegisterClipboardFormatW(PCWSTR(wide.as_ptr()));
+        if fmt == 0 {
+            return;
+        }
+        let Ok(g) = GlobalAlloc(GMEM_MOVEABLE, data.len().max(1)) else {
+            return;
+        };
+        let p = GlobalLock(g) as *mut u8;
+        if p.is_null() {
+            let _ = GlobalFree(Some(g));
+            return;
+        }
+        std::ptr::copy_nonoverlapping(data.as_ptr(), p, data.len());
+        let _ = GlobalUnlock(g);
+        if SetClipboardData(fmt, Some(HANDLE(g.0))).is_err() {
+            let _ = GlobalFree(Some(g));
+        }
+    }
+}
+
+/// Replace the clipboard content with `text`, marked so clipboard history, cloud clipboard and
+/// clipboard monitors skip it (Flick only writes back restores; they must not leave new copies).
 pub fn write_text(text: &str) -> Result<(), WinError> {
     let mut wide: Vec<u16> = text.encode_utf16().collect();
     wide.push(0);
@@ -93,6 +126,9 @@ pub fn write_text(text: &str) -> Result<(), WinError> {
             let _ = GlobalFree(Some(g));
             return Err(WinError::os(e, "SetClipboardData"));
         }
+        set_registered("ExcludeClipboardContentFromMonitorProcessing", &[0]);
+        set_registered("CanIncludeInClipboardHistory", &0u32.to_le_bytes());
+        set_registered("CanUploadToCloudClipboard", &0u32.to_le_bytes());
     }
     Ok(())
 }
