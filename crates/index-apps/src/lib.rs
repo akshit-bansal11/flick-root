@@ -4,6 +4,7 @@ pub mod cache;
 pub mod com;
 pub mod enumerate;
 pub mod error;
+pub mod extra;
 pub mod filter;
 pub mod icons;
 pub mod launch;
@@ -31,6 +32,18 @@ pub struct AppEntry {
     pub target: Option<PathBuf>,
     /// True for packaged (Store) apps without a target.
     pub is_packaged: bool,
+}
+
+impl AppEntry {
+    /// What to hand the shell: the parsing name itself when it is an absolute path (extras),
+    /// else `shell:AppsFolder\<parsing_name>`.
+    pub fn shell_path(&self) -> String {
+        if std::path::Path::new(&self.parsing_name).is_absolute() {
+            self.parsing_name.clone()
+        } else {
+            format!("shell:AppsFolder\\{}", self.parsing_name)
+        }
+    }
 }
 
 /// Result of a refresh.
@@ -101,10 +114,35 @@ impl AppIndex {
         let raw = enumerate::enumerate_raw()?;
         let total = raw.len();
         let mut seen = HashSet::new();
-        let mut v: Vec<AppEntry> = raw
+        let mut kept: Vec<enumerate::RawEntry> = raw
             .into_iter()
             .filter(filter::keep)
             .filter(|r| seen.insert((r.name.to_lowercase(), r.parsing_name.clone())))
+            .collect();
+        // Extras: name filter only (desktop .url must survive); drop repeats by target or name.
+        let mut names: HashSet<String> = kept.iter().map(|r| r.name.to_lowercase()).collect();
+        let mut targets: HashSet<String> = kept
+            .iter()
+            .filter_map(|r| r.target.as_ref())
+            .map(|t| t.to_string_lossy().to_lowercase())
+            .collect();
+        for r in extra::extra_entries() {
+            let t = r
+                .target
+                .as_ref()
+                .map(|t| t.to_string_lossy().to_lowercase());
+            if !filter::keep_name(&r.name)
+                || names.contains(&r.name.to_lowercase())
+                || t.as_ref().is_some_and(|t| targets.contains(t))
+            {
+                continue;
+            }
+            names.insert(r.name.to_lowercase());
+            targets.extend(t);
+            kept.push(r);
+        }
+        let mut v: Vec<AppEntry> = kept
+            .into_iter()
             .map(|r| AppEntry {
                 id: make_id(&r.parsing_name),
                 is_packaged: r.target.is_none(),
@@ -140,7 +178,14 @@ mod tests {
         let s = idx.refresh_blocking().unwrap();
         let e = idx.entries();
         let spotify = e.iter().any(|a| a.name.contains("Spotify"));
-        println!("raw={} kept={} spotify={spotify}", s.raw, s.kept);
+        let extras = e
+            .iter()
+            .filter(|a| std::path::Path::new(&a.parsing_name).is_absolute())
+            .count();
+        println!(
+            "raw={} kept={} extras={extras} spotify={spotify}",
+            s.raw, s.kept
+        );
         assert!(e.len() > 10);
         assert!(e.iter().all(|a| !a.name.contains("Uninstall")));
     }

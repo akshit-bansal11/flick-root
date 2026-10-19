@@ -67,7 +67,7 @@ pub fn launch(entry: &AppEntry, how: LaunchKind) -> Result<(), AppsError> {
         LaunchKind::Admin => "runas",
     };
     shell_execute(
-        &format!("shell:AppsFolder\\{}", entry.parsing_name),
+        &entry.shell_path(),
         verb,
         &entry.name,
         how == LaunchKind::Normal,

@@ -21,6 +21,11 @@ const DOC_EXT: &[&str] = &[
     "xml", "json",
 ];
 
+/// True unless the display name looks like an uninstaller, readme or similar.
+pub fn keep_name(name: &str) -> bool {
+    !JUNK_NAME.as_ref().is_some_and(|r| r.is_match(name))
+}
+
 /// Keep or drop an entry; `is_dir` answers whether a target path is a directory.
 pub fn keep_with(raw: &RawEntry, is_dir: impl Fn(&Path) -> bool) -> bool {
     if JUNK_NAME.as_ref().is_some_and(|r| r.is_match(&raw.name)) {

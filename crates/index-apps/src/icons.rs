@@ -20,7 +20,7 @@ fn icon_err(what: &str, e: impl std::fmt::Display) -> AppsError {
 
 /// Render the app icon at `size` x `size` and return PNG bytes. Needs COM on the calling thread.
 pub fn extract_icon(entry: &AppEntry, size: u32) -> Result<Vec<u8>, AppsError> {
-    let path = HSTRING::from(format!("shell:AppsFolder\\{}", entry.parsing_name));
+    let path = HSTRING::from(entry.shell_path());
     // SAFETY: `path` is a valid NUL-terminated HSTRING for the call; COM is initialised by the caller.
     let factory: IShellItemImageFactory = unsafe { SHCreateItemFromParsingName(&path, None) }
         .map_err(|e| icon_err("create item", e))?;
