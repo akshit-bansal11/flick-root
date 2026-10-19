@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 pub mod drives;
 pub mod error;
+pub mod programs;
 pub mod query;
 pub mod scan;
 pub mod skip;
@@ -12,6 +13,7 @@ pub mod store;
 pub mod watch;
 
 pub use error::FilesError;
+pub use programs::{PROGRAM_EXTS, ProgramFile, scan_programs};
 pub use query::{FileHit, FindQuery, query};
 pub use scan::{Parallelism, Root, default_roots, scan};
 pub use store::{FileIndex, FileStore, StoreBuilder};
