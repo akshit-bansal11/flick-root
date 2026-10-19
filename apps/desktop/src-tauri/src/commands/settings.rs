@@ -31,6 +31,8 @@ pub struct SettingsView {
     pub roots: Vec<String>,
     /// User-added root paths.
     pub extra_roots: Vec<String>,
+    /// Index every fixed non-system drive.
+    pub include_drives: bool,
 }
 
 fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
@@ -45,6 +47,7 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
         query_enabled: c.modes.query.enabled,
         roots: c.modes.find.roots.clone(),
         extra_roots: c.modes.find.extra_roots.clone(),
+        include_drives: c.modes.find.include_drives,
     }
 }
 
@@ -118,23 +121,33 @@ pub async fn set_general(
     Ok(settings_view(&app, &state))
 }
 
-/// Replaces the user-added Find roots and rescans when Find is on.
+/// Replaces the user-added Find roots and/or sets "index all drives", then rescans when Find is on.
 #[tauri::command]
 pub async fn set_roots(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
-    roots: Vec<String>,
+    roots: Option<Vec<String>>,
+    include_drives: Option<bool>,
 ) -> Result<SettingsView, CommandError> {
     let s = Arc::clone(&state);
     blocking(move || {
-        if let Some(bad) = roots.iter().find(|r| !Path::new(r).is_dir()) {
+        if let Some(bad) = roots
+            .iter()
+            .flatten()
+            .find(|r| !Path::new(r.as_str()).is_dir())
+        {
             return Err(CommandError::new(
                 "invalid_path",
                 format!("not a folder: {bad}"),
             ));
         }
         s.update_config(|c| {
-            c.modes.find.extra_roots = roots;
+            if let Some(r) = roots {
+                c.modes.find.extra_roots = r;
+            }
+            if let Some(on) = include_drives {
+                c.modes.find.include_drives = on;
+            }
             Ok(())
         })
     })

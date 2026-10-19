@@ -12,6 +12,7 @@ export interface SettingsView {
   queryEnabled: boolean;
   roots: string[];
   extraRoots: string[];
+  includeDrives: boolean;
 }
 
 export interface GeneralPatch {

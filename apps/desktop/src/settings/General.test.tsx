@@ -8,6 +8,7 @@ import type { SettingsView } from "./types";
 vi.mock("./api", () => ({
   setGeneral: vi.fn(() => Promise.resolve({})),
   setRoots: vi.fn(),
+  setIncludeDrives: vi.fn(),
   clearHistory: vi.fn(),
   reindex: vi.fn(),
 }));
@@ -21,6 +22,7 @@ const settings: SettingsView = {
   queryEnabled: false,
   roots: [],
   extraRoots: [],
+  includeDrives: true,
 };
 
 describe("General hotkey capture", () => {
@@ -42,5 +44,19 @@ describe("General hotkey capture", () => {
       ctrlKey: true,
     });
     expect(api.setGeneral).toHaveBeenCalledWith({ hotkeyLauncher: "Ctrl+K" });
+  });
+});
+
+describe("General index all drives", () => {
+  afterEach(cleanup);
+  it("flips optimistically, then reverts with an error when Rust fails", async () => {
+    vi.mocked(api.setIncludeDrives).mockRejectedValueOnce({ code: "x", message: "scan failed" });
+    const onChange = vi.fn();
+    render(<General settings={settings} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("switch", { name: "Index all drives" }));
+    expect(api.setIncludeDrives).toHaveBeenCalledWith(false);
+    expect(onChange).toHaveBeenNthCalledWith(1, { ...settings, includeDrives: false });
+    expect((await screen.findByRole("alert")).textContent).toBe("scan failed");
+    expect(onChange).toHaveBeenLastCalledWith(settings);
   });
 });

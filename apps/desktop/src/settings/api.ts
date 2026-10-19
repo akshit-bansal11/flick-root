@@ -31,6 +31,8 @@ export const setGeneral = (patch: GeneralPatch) =>
     launchAtStartup: patch.launchAtStartup,
   });
 export const setRoots = (roots: string[]) => invoke<SettingsView>("set_roots", { roots });
+export const setIncludeDrives = (includeDrives: boolean) =>
+  invoke<SettingsView>("set_roots", { includeDrives });
 export const clearHistory = (scope: ClearScope) => invoke<void>("clear_history", { scope });
 export const reindex = (kind: ReindexKind) => invoke<void>("reindex", { kind });
 export const getAbout = () => invoke<About>("get_about");

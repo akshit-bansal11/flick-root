@@ -25,6 +25,7 @@ const settings: SettingsView = {
   theme: "system",
   launchAtStartup: false,
   findEnabled: true,
+  includeDrives: true,
   queryEnabled: false,
   roots: [],
   extraRoots: [],

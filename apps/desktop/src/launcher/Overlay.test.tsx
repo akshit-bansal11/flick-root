@@ -7,7 +7,6 @@ import { Launcher } from "./Launcher";
 vi.mock("../ipc", () => ({
   search: vi.fn(() => Promise.resolve({ seq: 0, items: [], group: null })),
   hideLauncher: vi.fn(() => Promise.resolve()),
-  resizeLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
@@ -26,13 +25,6 @@ const input = () => screen.getByRole("combobox") as HTMLInputElement;
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
   localStorage.clear();
 });
 afterEach(() => {

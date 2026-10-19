@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { comboFromEvent, validateCombo } from "../firstrun/hotkeyRules";
 import * as api from "./api";
+import { Toggle } from "./Toggle";
 import { errorText, type GeneralPatch, type SettingsView, type Theme } from "./types";
 
 interface Props {
@@ -79,6 +80,11 @@ export function General({ settings, onChange }: Props) {
     if (await run("roots", api.setRoots([...settings.extraRoots, path]))) setRootInput("");
   };
 
+  const toggleDrives = async (on: boolean) => {
+    onChange({ ...settings, includeDrives: on });
+    if (!(await run("drives", api.setIncludeDrives(on)))) onChange(settings);
+  };
+
   const clear = async () => {
     try {
       await api.clearHistory("all");
@@ -146,6 +152,18 @@ export function General({ settings, onChange }: Props) {
           aria-checked={settings.launchAtStartup}
           className="s-switch"
           onClick={() => void patch("startup", { launchAtStartup: !settings.launchAtStartup })}
+        />
+      </Row>
+
+      <Row
+        label="Index all drives (D:, E: …)"
+        help="Fixed, non-system drives. System folders like Windows and Program Files are skipped."
+        error={errors.drives}
+      >
+        <Toggle
+          label="Index all drives"
+          checked={settings.includeDrives}
+          onChange={(on) => void toggleDrives(on)}
         />
       </Row>
 

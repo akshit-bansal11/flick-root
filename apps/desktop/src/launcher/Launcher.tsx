@@ -21,7 +21,7 @@ export function Launcher() {
         type="button"
         className="backdrop"
         tabIndex={-1}
-        aria-label="Close"
+        aria-hidden="true"
         onMouseDown={hide}
       />
       <div className={state.visible ? "launcher show" : "launcher"}>
