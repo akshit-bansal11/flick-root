@@ -19,6 +19,8 @@ pub struct Config {
     pub schema_version: u32,
     /// General settings.
     pub general: General,
+    /// Theme, glass strength and colour scheme.
+    pub appearance: Appearance,
     /// Launcher window geometry.
     pub window: Window,
     /// Per-mode settings.
@@ -59,12 +61,58 @@ pub struct General {
     pub hotkey: String,
     /// Explain hotkey.
     pub explain_hotkey: String,
-    /// `system`, `dark` or `light`.
-    pub theme: String,
+    /// Pre-appearance `theme` key; read once and moved to `appearance.scheme` on load, never written.
+    #[serde(rename = "theme", default, skip_serializing)]
+    pub legacy_theme: Option<String>,
     /// Start with Windows.
     pub launch_at_startup: bool,
     /// Whether the first-run flow finished.
     pub first_run_done: bool,
+}
+
+/// Theme ids the UI ships.
+pub const THEMES: [&str; 6] = ["glass", "frost", "midnight", "aurora", "ember", "solid"];
+/// Colour schemes.
+pub const SCHEMES: [&str; 3] = ["system", "dark", "light"];
+/// Allowed range of the glass tint opacity, percent.
+pub const GLASS_RANGE: std::ops::RangeInclusive<u8> = 30..=95;
+
+/// `[appearance]`
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Appearance {
+    /// One of [`THEMES`].
+    pub theme: String,
+    /// Tint opacity in percent, within [`GLASS_RANGE`].
+    pub glass: u8,
+    /// One of [`SCHEMES`].
+    pub scheme: String,
+}
+
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            theme: "glass".into(),
+            glass: 62,
+            scheme: "system".into(),
+        }
+    }
+}
+
+impl Appearance {
+    /// Checks every field; the error names the first bad one.
+    pub fn validate(&self) -> Result<(), String> {
+        if !THEMES.contains(&self.theme.as_str()) {
+            return Err(format!("theme must be one of {}", THEMES.join(", ")));
+        }
+        if !SCHEMES.contains(&self.scheme.as_str()) {
+            return Err("scheme must be system, dark or light".into());
+        }
+        if !GLASS_RANGE.contains(&self.glass) {
+            return Err("glass must be between 30 and 95".into());
+        }
+        Ok(())
+    }
 }
 
 /// `[window]`
@@ -251,7 +299,7 @@ impl Default for General {
         Self {
             hotkey: "Alt+Space".into(),
             explain_hotkey: "Alt+Shift+Space".into(),
-            theme: "system".into(),
+            legacy_theme: None,
             launch_at_startup: false,
             first_run_done: false,
         }
@@ -510,6 +558,7 @@ impl Default for Config {
         Self {
             schema_version: SCHEMA_VERSION,
             general: General::default(),
+            appearance: Appearance::default(),
             window: Window::default(),
             modes: Modes::default(),
             apps: AppsConfig::default(),
@@ -541,6 +590,13 @@ impl Config {
         // Configs written before the Custom engine existed lack it in the order.
         if !c.decision.order.iter().any(|i| i == "custom") {
             c.decision.order.push("custom".into());
+        }
+        // Old configs kept the colour scheme in `[general] theme`.
+        if let Some(t) = c.general.legacy_theme.take()
+            && SCHEMES.contains(&t.as_str())
+            && c.appearance.scheme == "system"
+        {
+            c.appearance.scheme = t;
         }
         Ok(c)
     }
@@ -651,7 +707,7 @@ threshold = 0.7
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("sub").join("config.toml");
         let mut c = Config::default();
-        c.general.theme = "dark".into();
+        c.appearance.scheme = "dark".into();
         c.save(&p).unwrap();
         assert!(!p.with_extension("toml.tmp").exists());
         assert_eq!(Config::load(&p).unwrap(), c);
@@ -675,7 +731,15 @@ threshold = 0.7
         let p = dir.path().join("config.toml");
         fs::write(&p, "[general]\ntheme = \"light\"\n").unwrap();
         let c = Config::load(&p).unwrap();
-        assert_eq!(c.general.theme, "light");
+        assert_eq!(c.appearance.scheme, "light");
+        assert_eq!(c.appearance.theme, "glass");
+        assert_eq!(c.appearance.glass, 62);
+        assert!(c.appearance.validate().is_ok());
+        let bad = Appearance {
+            glass: 20,
+            ..Appearance::default()
+        };
+        assert!(bad.validate().is_err());
         assert_eq!(c.general.hotkey, "Alt+Space");
     }
 }

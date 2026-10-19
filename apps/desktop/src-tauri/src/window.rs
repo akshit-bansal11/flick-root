@@ -141,10 +141,16 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     s.t0 = Some(t0);
     let shown_id = s.shown_id;
     drop(s);
+    let appearance = crate::commands::settings::AppearanceView::from(
+        &app.state::<std::sync::Arc<crate::state::AppState>>()
+            .config
+            .load()
+            .appearance,
+    );
     emit(
         app,
         "launcher://shown",
-        json!({ "shownId": shown_id, "reason": reason, "glass": glass }),
+        json!({ "shownId": shown_id, "reason": reason, "glass": glass, "appearance": appearance }),
     );
 }
 

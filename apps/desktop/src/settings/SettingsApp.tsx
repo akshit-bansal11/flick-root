@@ -1,7 +1,9 @@
 import { listen } from "@tauri-apps/api/event";
 import { type ReactElement, useEffect, useState } from "react";
 import { FirstRun } from "../firstrun/FirstRun";
+import { applyAppearance } from "../theme";
 import { About } from "./About";
+import { Appearance } from "./Appearance";
 import * as api from "./api";
 import { Decision } from "./Decision";
 import { Features } from "./Features";
@@ -59,11 +61,21 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     };
   }, []);
 
+  // Apply the saved appearance on load and whenever Rust says it changed.
   useEffect(() => {
-    const root = document.documentElement;
-    if (!settings || settings.theme === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", settings.theme);
-  }, [settings]);
+    const apply = () =>
+      api
+        .getAppearance()
+        .then((a) => applyAppearance(document.documentElement, { ...a, glassAvailable: true }))
+        .catch((e: unknown) => console.warn("get_appearance failed", e));
+    apply();
+    const un = api.onSettingsChanged((p) => {
+      if (p.section === "appearance") apply();
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, []);
 
   // One slot per page: later cards replace one entry each.
   const pages: Record<PageId, ReactElement> = {
@@ -74,6 +86,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
         {loadError ?? "Loading…"}
       </p>
     ),
+    appearance: <Appearance />,
     features: <Features />,
     providers: <Providers />,
     engine: <Decision />,

@@ -1,7 +1,16 @@
 // Mirrors the serde output of apps/desktop/src-tauri/src/commands/{settings,features,providers,secrets}.rs.
 // No type here carries a secret value.
 
+import type { ThemeId } from "../theme";
+
 export type Theme = "system" | "dark" | "light";
+
+/** Payload of get_appearance / set_appearance; mirrors AppearanceView in Rust. */
+export interface AppearanceView {
+  theme: ThemeId;
+  glass: number;
+  scheme: Theme;
+}
 
 export interface SettingsView {
   hotkeyLauncher: string;

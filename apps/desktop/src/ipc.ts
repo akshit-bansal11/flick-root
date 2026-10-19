@@ -4,6 +4,7 @@
 // `ask_stream(text, attachment, effort, on_event)`. Rust must not wrap them in a struct parameter.
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Appearance } from "./theme";
 import type {
   AskEvent,
   AskRequest,
@@ -63,8 +64,10 @@ export const reportShown = (shownId: number) => invoke<void>("report_shown", { s
 
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });
 
-export const onShown = (cb: (p: ShownPayload & { glass?: boolean }) => void): Promise<UnlistenFn> =>
-  listen<ShownPayload & { glass?: boolean }>("launcher://shown", (e) => cb(e.payload));
+export type ShownEvent = ShownPayload & { glass?: boolean; appearance?: Appearance };
+
+export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>
+  listen<ShownEvent>("launcher://shown", (e) => cb(e.payload));
 
 export const onExplainCaptured = (cb: (c: ExplainCaptured) => void): Promise<UnlistenFn> =>
   listen<ExplainCaptured>("explain://captured", (e) => cb(e.payload));

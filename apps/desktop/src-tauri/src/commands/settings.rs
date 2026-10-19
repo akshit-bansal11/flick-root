@@ -41,7 +41,7 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
     SettingsView {
         hotkey_launcher: c.general.hotkey.clone(),
         hotkey_explain: c.general.explain_hotkey.clone(),
-        theme: c.general.theme.clone(),
+        theme: c.appearance.scheme.clone(),
         launch_at_startup,
         find_enabled: c.modes.find.enabled,
         query_enabled: c.modes.query.enabled,
@@ -67,6 +67,69 @@ pub async fn get_settings(
     state: State<'_, Arc<AppState>>,
 ) -> Result<SettingsView, CommandError> {
     Ok(settings_view(&app, &state))
+}
+
+/// Theme, glass strength and scheme, as the UI applies them.
+#[derive(Serialize)]
+pub struct AppearanceView {
+    /// Theme id.
+    pub theme: String,
+    /// Tint opacity, percent.
+    pub glass: u8,
+    /// `system`, `dark` or `light`.
+    pub scheme: String,
+}
+
+impl From<&launcher_core::config::Appearance> for AppearanceView {
+    fn from(a: &launcher_core::config::Appearance) -> Self {
+        Self {
+            theme: a.theme.clone(),
+            glass: a.glass,
+            scheme: a.scheme.clone(),
+        }
+    }
+}
+
+/// Returns the appearance settings.
+#[tauri::command]
+pub async fn get_appearance(
+    state: State<'_, Arc<AppState>>,
+) -> Result<AppearanceView, CommandError> {
+    Ok(AppearanceView::from(&state.config.load().appearance))
+}
+
+/// Changes any of theme, glass and scheme after validating the result.
+#[tauri::command]
+pub async fn set_appearance(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    theme: Option<String>,
+    glass: Option<u8>,
+    scheme: Option<String>,
+) -> Result<AppearanceView, CommandError> {
+    let mut next = state.config.load().appearance.clone();
+    if let Some(t) = theme {
+        next.theme = t;
+    }
+    if let Some(g) = glass {
+        next.glass = g;
+    }
+    if let Some(s) = scheme {
+        next.scheme = s;
+    }
+    next.validate()
+        .map_err(|m| CommandError::new("invalid_appearance", m))?;
+    let s = Arc::clone(&state);
+    let saved = next.clone();
+    blocking(move || {
+        s.update_config(|c| {
+            c.appearance = saved;
+            Ok(())
+        })
+    })
+    .await?;
+    changed(&app, "appearance");
+    Ok(AppearanceView::from(&next))
 }
 
 /// Changes general settings; a hotkey conflict keeps the old hotkey.
@@ -107,7 +170,7 @@ pub async fn set_general(
                 c.general.explain_hotkey = h;
             }
             if let Some(t) = theme {
-                c.general.theme = t;
+                c.appearance.scheme = t;
             }
             if let Some(on) = launch_at_startup {
                 c.general.launch_at_startup = on;

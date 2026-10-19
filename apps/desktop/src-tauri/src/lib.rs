@@ -118,6 +118,8 @@ pub fn run() {
             commands::firstrun::complete_first_run,
             commands::settings::get_settings,
             commands::settings::set_general,
+            commands::settings::get_appearance,
+            commands::settings::set_appearance,
             commands::settings::set_roots,
             commands::settings::clear_history,
             commands::settings::reindex,

@@ -16,6 +16,8 @@ fn main() {
         "set_thinking_mode",
         "get_settings",
         "set_general",
+        "get_appearance",
+        "set_appearance",
         "set_roots",
         "clear_history",
         "list_features",

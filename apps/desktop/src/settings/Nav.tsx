@@ -3,6 +3,7 @@ import { APP_DISPLAY_NAME } from "../brand";
 
 export const PAGES = [
   { id: "general", label: "General" },
+  { id: "appearance", label: "Appearance" },
   { id: "features", label: "Features" },
   { id: "providers", label: "AI providers" },
   { id: "engine", label: "Decision engine" },

@@ -233,3 +233,91 @@ body,
     transition: none;
   }
 }
+
+/* Appearance page */
+.s-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--l-sp-6);
+  margin-bottom: var(--l-sp-8);
+}
+.s-theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-4);
+  position: relative;
+  padding: var(--l-sp-4);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  background: var(--l-surface);
+  cursor: pointer;
+}
+.s-theme-card:has(input:checked) {
+  border-color: var(--l-accent);
+}
+.s-theme-card:has(input:focus-visible) {
+  outline: 2px solid var(--l-focus);
+  outline-offset: 2px;
+}
+.s-theme-card input,
+.s-seg-item input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.s-theme-name {
+  font-weight: 500;
+}
+.s-swatch {
+  /* Re-declared here: the :root value was resolved against the root's own panel colour. */
+  --l-glass-tint: color-mix(in srgb, var(--l-panel) var(--l-glass-alpha), transparent);
+  display: flex;
+  flex-direction: column;
+  gap: var(--l-sp-3);
+  padding: var(--l-sp-5);
+  border: var(--l-border);
+  border-radius: var(--l-r-panel);
+  background: var(--l-glass-tint);
+  box-shadow: var(--l-glass-inner);
+}
+.s-swatch[data-theme="solid"] {
+  --l-glass-tint: var(--l-panel);
+}
+.s-swatch-dot {
+  width: var(--l-sp-6);
+  height: var(--l-sp-6);
+  border-radius: var(--l-r-pill);
+  background: var(--l-accent);
+}
+.s-swatch-line {
+  height: var(--l-sp-3);
+  border-radius: var(--l-r-pill);
+  background: var(--l-text);
+}
+.s-swatch-line-short {
+  width: 60%;
+  background: var(--l-muted);
+}
+.s-seg {
+  display: flex;
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  overflow: hidden;
+}
+.s-seg-item {
+  position: relative;
+  padding: var(--l-sp-3) var(--l-sp-6);
+  cursor: pointer;
+}
+.s-seg-item:has(input:checked) {
+  background: var(--l-sel);
+  font-weight: 500;
+}
+.s-seg-item:has(input:focus-visible) {
+  outline: 2px solid var(--l-focus);
+  outline-offset: -2px;
+}
+.s-seg-item:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}

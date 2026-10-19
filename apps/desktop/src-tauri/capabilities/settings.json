@@ -10,6 +10,8 @@
     "allow-open-link",
     "allow-get-settings",
     "allow-set-general",
+    "allow-get-appearance",
+    "allow-set-appearance",
     "allow-set-roots",
     "allow-clear-history",
     "allow-list-features",

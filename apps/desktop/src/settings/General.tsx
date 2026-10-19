@@ -2,7 +2,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 
 import { comboFromEvent, validateCombo } from "../firstrun/hotkeyRules";
 import * as api from "./api";
 import { Toggle } from "./Toggle";
-import { errorText, type GeneralPatch, type SettingsView, type Theme } from "./types";
+import { errorText, type GeneralPatch, type SettingsView } from "./types";
 
 interface Props {
   settings: SettingsView;
@@ -111,7 +111,7 @@ export function General({ settings, onChange }: Props) {
   return (
     <section>
       <h1 className="s-title">General</h1>
-      <p className="s-desc">Hotkey, theme and where Find looks.</p>
+      <p className="s-desc">Hotkey and where Find looks.</p>
 
       <Row label="Hotkey" help="Opens the launcher from anywhere." error={errors.hotkey}>
         <kbd className="s-kbd">{settings.hotkeyLauncher}</kbd>
@@ -130,19 +130,6 @@ export function General({ settings, onChange }: Props) {
             Change
           </button>
         )}
-      </Row>
-
-      <Row label="Theme" error={errors.theme}>
-        <select
-          className="s-select"
-          aria-label="Theme"
-          value={settings.theme}
-          onChange={(e) => void patch("theme", { theme: e.target.value as Theme })}
-        >
-          <option value="system">System</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
-        </select>
       </Row>
 
       <Row label="Launch at startup" error={errors.startup}>

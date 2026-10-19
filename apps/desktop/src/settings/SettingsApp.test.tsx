@@ -17,6 +17,8 @@ vi.mock("./api", () => ({
   reindex: vi.fn(() => Promise.resolve()),
   listFeatures: vi.fn(),
   onFeaturesChanged: vi.fn(() => Promise.resolve(() => {})),
+  getAppearance: vi.fn(() => Promise.resolve({ theme: "glass", glass: 62, scheme: "system" })),
+  onSettingsChanged: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 const settings: SettingsView = {
@@ -73,7 +75,7 @@ describe("SettingsApp", () => {
     act(() => {
       fireEvent.keyDown(general, { key: "ArrowDown" });
     });
-    const features = screen.getByRole("button", { name: /^Features/ });
+    const features = screen.getByRole("button", { name: "Appearance" });
     expect(document.activeElement).toBe(features);
     expect(features.getAttribute("aria-current")).toBe("page");
     expect(general.tabIndex).toBe(-1);

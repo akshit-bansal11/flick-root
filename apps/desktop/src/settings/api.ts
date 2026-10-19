@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   About,
+  AppearanceView,
   CaptureTest,
   ClearScope,
   EnginePatch,
@@ -38,6 +39,9 @@ export const setGeneral = (patch: GeneralPatch) =>
     theme: patch.theme,
     launchAtStartup: patch.launchAtStartup,
   });
+export const getAppearance = () => invoke<AppearanceView>("get_appearance");
+export const setAppearance = (patch: Partial<AppearanceView>) =>
+  invoke<AppearanceView>("set_appearance", patch);
 export const setRoots = (roots: string[]) => invoke<SettingsView>("set_roots", { roots });
 export const setIncludeDrives = (includeDrives: boolean) =>
   invoke<SettingsView>("set_roots", { includeDrives });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
+import { applyAppearance } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
@@ -93,7 +94,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   useEffect(() => {
     const unlisten = [
       ipc.onShown((p) => {
-        document.documentElement.dataset.glass = p.glass === false ? "off" : "on";
+        applyAppearance(document.documentElement, {
+          ...(p.appearance ?? { theme: "glass", glass: 62, scheme: "system" }),
+          glassAvailable: p.glass !== false,
+        });
         dispatch({ type: "shown" });
         inputRef.current?.focus();
         requestAnimationFrame(() => {

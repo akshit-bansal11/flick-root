@@ -105,9 +105,11 @@
   --motion-scale: 1;
 }
 
-/* Dark is the base; light overrides below. */
+/* Theme and scheme rules also match plain elements (not only :root) so Settings can preview a theme on a swatch.
+   Dark is the base; light overrides below. data-scheme is the resolved dark/light, data-theme the named theme (theme.ts). */
 :root,
-:root[data-theme="dark"] {
+[data-theme="glass"],
+[data-theme="solid"] {
   color-scheme: dark;
   --l-bg: #0c0e12;
   --l-surface: #1b1f27;
@@ -135,7 +137,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
+  :root:not([data-scheme]) {
     color-scheme: light;
     --l-bg: #f4f8fb;
     --l-surface: #e7eff5;
@@ -162,7 +164,8 @@
   }
 }
 
-:root[data-theme="light"] {
+[data-scheme="light"],
+[data-theme="frost"] {
   color-scheme: light;
   --l-bg: #f4f8fb;
   --l-surface: #e7eff5;
@@ -186,6 +189,88 @@
   --l-glass-border: linear-gradient(to bottom, rgb(255 255 255 / 0.9), rgb(15 35 51 / 0.14));
   --l-glass-sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.55), transparent);
   --l-glass-inner: inset 0 1px 0 rgb(255 255 255 / 0.7), inset 0 0 18px rgb(255 255 255 / 0.25);
+}
+
+/* Named themes. Text and muted colours were chosen to meet WCAG AA (4.5:1) against the panel tint at the default
+   glass strength; contrast was targeted, not measured. Glass tokens not listed keep the base values. */
+
+/* frost: light, cool blue-white. Forces the light scheme (theme.ts). Target: dark navy text on near-white tint. */
+[data-theme="frost"] {
+  --l-bg: #eef4fb;
+  --l-panel: #f1f7fd;
+  --l-surface: #dde9f6;
+  --l-line: #c3d5e9;
+  --l-text: #0c2036;
+  --l-muted: #475f77;
+  --l-muted-strong: #3f566d;
+  --l-accent: #2563c9;
+  --l-accent-text: #1d4fa6;
+  --l-ink: #ffffff;
+  --l-sel: #d0e1f5;
+  --l-glass-border: linear-gradient(to bottom, rgb(255 255 255 / 1), rgb(60 110 180 / 0.2));
+  --l-glass-sheen: linear-gradient(to bottom, rgb(255 255 255 / 0.7), rgb(190 220 255 / 0.12));
+}
+
+/* midnight: deep navy, cyan accent. Forces dark. Target: pale text on near-black navy. */
+[data-theme="midnight"] {
+  --l-bg: #050912;
+  --l-panel: #0a1020;
+  --l-surface: #131c32;
+  --l-line: #1c2842;
+  --l-text: #e6eefc;
+  --l-muted: #93a3c2;
+  --l-muted-strong: #93a3c2;
+  --l-accent: #22d3ee;
+  --l-accent-text: #22d3ee;
+  --l-ink: #021a22;
+  --l-sel: #10263a;
+  --l-glass-border: linear-gradient(to bottom, rgb(120 200 255 / 0.4), rgb(120 200 255 / 0.05));
+  --l-glass-sheen: linear-gradient(to bottom, rgb(120 200 255 / 0.1), transparent);
+}
+
+/* aurora: dark with a teal-to-violet sheen, violet accent. Forces dark. Target: pale text on deep indigo. */
+[data-theme="aurora"] {
+  --l-bg: #0a0814;
+  --l-panel: #120f24;
+  --l-surface: #1d1838;
+  --l-line: #2b2450;
+  --l-text: #ece9fb;
+  --l-muted: #a39ec4;
+  --l-muted-strong: #a39ec4;
+  --l-accent: #a78bfa;
+  --l-accent-text: #b8a2fb;
+  --l-ink: #160a38;
+  --l-sel: #251d49;
+  --l-glass-border: linear-gradient(135deg, rgb(45 212 191 / 0.5), rgb(167 139 250 / 0.5));
+  --l-glass-sheen: linear-gradient(
+    135deg,
+    rgb(45 212 191 / 0.16),
+    rgb(167 139 250 / 0.16) 60%,
+    transparent
+  );
+}
+
+/* ember: dark warm, amber accent. Forces dark. Target: warm off-white text on near-black brown. */
+[data-theme="ember"] {
+  --l-bg: #100a07;
+  --l-panel: #1a110c;
+  --l-surface: #261913;
+  --l-line: #3a281d;
+  --l-text: #f6ece4;
+  --l-muted: #b39a89;
+  --l-muted-strong: #b39a89;
+  --l-accent: #f5a524;
+  --l-accent-text: #f5a524;
+  --l-ink: #2a1600;
+  --l-sel: #33210f;
+  --l-glass-border: linear-gradient(to bottom, rgb(255 190 110 / 0.4), rgb(255 190 110 / 0.05));
+  --l-glass-sheen: linear-gradient(to bottom, rgb(255 190 110 / 0.1), transparent);
+}
+
+/* solid: opaque panel (tint = panel). theme.ts sets data-glass="off", which also drops the sheen. Uses the base palette. */
+[data-theme="solid"] {
+  --l-glass-tint: var(--l-panel);
+  --l-glass-sheen: none;
 }
 
 /* Opaque panel: Windows transparency off (data-glass set from Rust) or reduced transparency. */
