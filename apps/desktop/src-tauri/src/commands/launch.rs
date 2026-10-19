@@ -58,15 +58,17 @@ fn item(state: &AppState, id: &str) -> Result<Item, CommandError> {
         .ok_or_else(not_found)
 }
 
-fn app_entry(state: &AppState, parsing: &str) -> Result<index_apps::AppEntry, CommandError> {
-    // app_match holds real apps and scanned programs.
-    state
-        .app_match
-        .load()
-        .entries
-        .iter()
-        .find(|a| a.parsing_name == parsing)
-        .cloned()
+/// The app entry for a parsing name and whether it is a scanned program (not a real app).
+fn app_entry(
+    state: &AppState,
+    parsing: &str,
+) -> Result<(index_apps::AppEntry, bool), CommandError> {
+    let find = |l: &[index_apps::AppEntry]| l.iter().find(|a| a.parsing_name == parsing).cloned();
+    if let Some(e) = find(&state.app_match.load().entries) {
+        return Ok((e, false));
+    }
+    find(&state.programs.load().entries)
+        .map(|e| (e, true))
         .ok_or_else(not_found)
 }
 
@@ -103,17 +105,6 @@ fn copy_value(it: &Item) -> Option<String> {
     it.payload.get("value")?.as_str().map(str::to_owned)
 }
 
-/// Scanned programs (absolute-path entries) run elevated only when they are exe or msi.
-fn can_run_as_admin(e: &index_apps::AppEntry) -> bool {
-    let p = Path::new(&e.parsing_name);
-    if !p.is_absolute() {
-        return true; // Start-menu and packaged apps keep their existing behaviour.
-    }
-    p.extension()
-        .and_then(|x| x.to_str())
-        .is_some_and(|x| x.eq_ignore_ascii_case("exe") || x.eq_ignore_ascii_case("msi"))
-}
-
 /// Launches or opens a result and hides the launcher when appropriate.
 #[tauri::command]
 pub async fn launch(
@@ -126,8 +117,8 @@ pub async fn launch(
     let t0 = Instant::now();
     let outcome = match parse_id(&item_id) {
         IdRef::App(parsing) => {
-            let entry = app_entry(&state, parsing)?;
-            if admin && !can_run_as_admin(&entry) {
+            let (entry, program) = app_entry(&state, parsing)?;
+            if admin && !features::search::can_run_as_admin(&entry, program) {
                 return Err(CommandError::new(
                     "unsupported",
                     "only .exe and .msi files can run as administrator",
@@ -201,8 +192,16 @@ pub async fn reveal(state: State<'_, Arc<AppState>>, item_id: String) -> Result<
     let it = item(&state, &item_id)?;
     match parse_id(&item_id) {
         IdRef::App(parsing) => {
-            let entry = app_entry(&state, parsing)?;
-            blocking_com(move || ia::reveal(&entry)).await?;
+            let (entry, program) = app_entry(&state, parsing)?;
+            // Program entries carry no target; their parsing name is the file path.
+            blocking_com(move || {
+                if program {
+                    ia::reveal_path(Path::new(&entry.parsing_name))
+                } else {
+                    ia::reveal(&entry)
+                }
+            })
+            .await?;
         }
         IdRef::File(_) => {
             let p = path_of(&it).ok_or_else(not_found)?;
@@ -252,21 +251,6 @@ mod tests {
         ] {
             assert_eq!(check_link(bad).unwrap_err().code, "invalid_url", "{bad}");
         }
-    }
-
-    #[test]
-    fn admin_only_for_exe_and_msi_paths() {
-        let e = |p: &str| index_apps::AppEntry {
-            id: "i".into(),
-            name: "n".into(),
-            parsing_name: p.into(),
-            target: None,
-            is_packaged: false,
-        };
-        assert!(can_run_as_admin(&e(r"C:\a\x.EXE")));
-        assert!(can_run_as_admin(&e(r"C:\a\x.msi")));
-        assert!(!can_run_as_admin(&e(r"C:\a\x.apk")));
-        assert!(can_run_as_admin(&e("Microsoft.Edge_8wekyb3d8bbwe!App")));
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! The `search` command.
 use crate::error::CommandError;
 use crate::state::AppState;
-use features::search::{SearchScope, command_search_scoped};
+use features::search::{SearchScope, command_search_scoped, merge_items, program_items};
 use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
 use std::sync::Arc;
@@ -51,7 +51,7 @@ pub async fn search(
     };
     let items = match mode {
         Mode::Query => Vec::new(),
-        Mode::Command => command(&state, &input, scope.unwrap_or_default()),
+        Mode::Command => command(&state, &input, scope.unwrap_or_default()).await?,
         Mode::Find => {
             if !state.config.load().modes.find.enabled {
                 return Err(CommandError::new("mode_disabled", "Find mode is off"));
@@ -85,11 +85,15 @@ pub async fn search(
     Ok(reply(seq, items))
 }
 
-fn command(state: &Arc<AppState>, input: &Input, scope: SearchScope) -> Vec<Item> {
+/// Apps and features run inline (2 ms budget); the programs index is matched on the blocking pool.
+async fn command(
+    state: &Arc<AppState>,
+    input: &Input,
+    scope: SearchScope,
+) -> Result<Vec<Item>, CommandError> {
     let am = state.app_match.load();
-    let mut items = command_search_scoped(
+    let items = command_search_scoped(
         &am.entries,
-        am.programs_from,
         scope,
         &am.index,
         &mut state.matcher.lock(),
@@ -97,24 +101,49 @@ fn command(state: &Arc<AppState>, input: &Input, scope: SearchScope) -> Vec<Item
         input,
         K,
     );
+    let programs = if scope == SearchScope::Commands || input.text.is_empty() {
+        Vec::new()
+    } else {
+        let st = state.clone();
+        let text = input.text.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let set = st.programs.load();
+            program_items(
+                &set.entries,
+                &set.index,
+                &mut st.prog_matcher.lock(),
+                &text,
+                K,
+            )
+        })
+        .await
+        .map_err(|e| CommandError::new("internal", e.to_string()))?
+    };
+    let mut items = merge_items(items, programs, K);
+    let set = state.programs.load();
     let mut missing = Vec::new();
     for it in items.iter_mut().filter(|i| i.source == "apps") {
+        let program = it.payload.get("program").is_some();
         let entry = it
             .payload
-            .get("appId")
-            .and_then(|v| v.as_str())
-            .and_then(|id| am.entries.iter().find(|a| a.id == id));
+            .get("entry")
+            .and_then(|v| v.as_u64())
+            .and_then(|i| {
+                let list = if program { &set.entries } else { &am.entries };
+                list.get(i as usize)
+            });
         let Some(entry) = entry else { continue };
         if let Some(url) = crate::icons::icon_data_url(&state.icons, entry, ICON_PX) {
             it.icon = Some(IconRef::DataUrl(url));
-        } else if it.payload.get("program").is_some() {
+        } else if program {
             missing.push(entry.clone());
         }
     }
+    let missing = state.icons.claim(missing);
     if !missing.is_empty() {
         // Only the K shown program rows are extracted, off the keystroke path; shown on the next search.
         let st = state.clone();
         tauri::async_runtime::spawn_blocking(move || st.icons.extract_and_memo(&missing, ICON_PX));
     }
-    items
+    Ok(items)
 }

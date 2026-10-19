@@ -33,6 +33,8 @@ pub struct SettingsView {
     pub extra_roots: Vec<String>,
     /// Index every fixed non-system drive.
     pub include_drives: bool,
+    /// Scan fixed drives for programs (exe, msi, apk, ...).
+    pub scan_programs: bool,
 }
 
 fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
@@ -48,6 +50,7 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
         roots: c.modes.find.roots.clone(),
         extra_roots: c.modes.find.extra_roots.clone(),
         include_drives: c.modes.find.include_drives,
+        scan_programs: c.apps.scan_programs,
     }
 }
 
@@ -141,6 +144,7 @@ pub async fn set_general(
     hotkey_explain: Option<String>,
     theme: Option<String>,
     launch_at_startup: Option<bool>,
+    scan_programs: Option<bool>,
 ) -> Result<SettingsView, CommandError> {
     if let Some(t) = &theme
         && !matches!(t.as_str(), "system" | "dark" | "light")
@@ -175,10 +179,21 @@ pub async fn set_general(
             if let Some(on) = launch_at_startup {
                 c.general.launch_at_startup = on;
             }
+            if let Some(on) = scan_programs {
+                c.apps.scan_programs = on;
+            }
             Ok(())
         })
     })
     .await?;
+    match scan_programs {
+        Some(true) => {
+            let s = Arc::clone(&state);
+            tauri::async_runtime::spawn(async move { state::scan_programs_task(&s).await });
+        }
+        Some(false) => state::stop_programs(&state),
+        None => {}
+    }
     changed(&app, "general");
     Ok(settings_view(&app, &state))
 }

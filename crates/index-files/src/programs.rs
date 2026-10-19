@@ -45,9 +45,9 @@ pub const PROGRAM_EXTS: &[&str] = &[
 ];
 
 /// Hard cap on returned programs; the walk stops when reached.
-pub const MAX_PROGRAMS: usize = 200_000;
+pub const MAX_PROGRAMS: usize = 50_000;
 
-const CACHE_HEADER: &str = "flick-programs 1";
+const CACHE_HEADER: &str = "programs v1";
 const ATTR_SYSTEM: u32 = 0x4;
 const SKIP_DIRS: &[&str] = &[
     "windows",
@@ -66,6 +66,7 @@ const SKIP_DIRS: &[&str] = &[
     "temp",
     "tmp",
     "recent",
+    "start menu", // shortcuts there duplicate the app list
     "onedrivetemp",
 ];
 

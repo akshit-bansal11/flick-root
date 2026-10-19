@@ -45,14 +45,29 @@ pub fn phase(name: &str) {
     tracing::info!(phase = name, ms, "startup");
 }
 
-/// Apps and the fuzzy index built over their names; swapped together.
+/// Real apps and the fuzzy index built over their names; swapped together.
 pub struct AppMatch {
     /// Entries, same order as the index.
     pub entries: Arc<Vec<AppEntry>>,
-    /// Entries before this index are real apps; the rest are scanned programs.
-    pub programs_from: usize,
     /// Fuzzy index over entry names.
     pub index: MatchIndex,
+}
+
+/// Scanned programs and their own fuzzy index, kept apart so the Command budget never pays for them.
+pub struct ProgramSet {
+    /// Entries, same order as the index.
+    pub entries: Vec<AppEntry>,
+    /// Fuzzy index over entry names.
+    pub index: MatchIndex,
+}
+
+impl Default for ProgramSet {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            index: MatchIndex::new::<&str>(&[]),
+        }
+    }
 }
 
 /// Cancel flag of the current Find run; starting a run cancels the previous one.
@@ -82,12 +97,17 @@ pub struct AppState {
     pub store: Arc<Store>,
     /// Installed apps.
     pub apps: Arc<AppIndex>,
-    /// Scanned programs, merged into `app_match` after the real apps.
-    pub programs: ArcSwap<Vec<ProgramFile>>,
+    /// Scanned programs plus their fuzzy index; empty while `apps.scan_programs` is off.
+    pub programs: ArcSwap<ProgramSet>,
+    /// Cancel flag of the programs scan (off, a new scan, or exit).
+    pub programs_run: FindRun,
+    programs_gate: Mutex<()>,
     /// Apps plus fuzzy index.
     pub app_match: ArcSwap<AppMatch>,
-    /// Reused matcher scratch.
+    /// Reused matcher scratch for apps and features (keystroke thread).
     pub matcher: Mutex<FuzzyMatcher>,
+    /// Matcher scratch for the programs match (blocking pool).
+    pub prog_matcher: Mutex<FuzzyMatcher>,
     /// File index.
     pub files: Arc<FileIndex>,
     /// Live file changes.
@@ -129,28 +149,20 @@ impl EventSink for TauriSink {
     }
 }
 
-/// Builds the fuzzy index for `entries`; the first `programs_from` are real apps.
-pub fn build_match(entries: Arc<Vec<AppEntry>>, programs_from: usize) -> AppMatch {
+/// Builds the fuzzy index for the real apps `entries`.
+pub fn build_match(entries: Arc<Vec<AppEntry>>) -> AppMatch {
     let names: Vec<&str> = entries.iter().map(|a| a.name.as_str()).collect();
     let index = MatchIndex::new(&names);
-    AppMatch {
-        entries,
-        programs_from,
-        index,
-    }
+    AppMatch { entries, index }
 }
 
-fn program_id(lower_path: &str) -> String {
-    use std::hash::{DefaultHasher, Hash, Hasher};
-    // DefaultHasher::new() has fixed keys, so ids are stable across runs.
-    let mut h = DefaultHasher::new();
-    lower_path.hash(&mut h);
-    format!("{:016x}", h.finish())
+fn is_shortcut(p: &ProgramFile) -> bool {
+    matches!(p.ext.as_str(), "lnk" | "url")
 }
 
-/// Real apps first, then programs as [`AppEntry`]s, minus any whose path an app already launches.
-/// Returns the entries and the number of real apps.
-pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> (Vec<AppEntry>, usize) {
+/// Programs as [`AppEntry`]s, minus any whose path an app already launches and any shortcut
+/// named like a real app (Start Menu and Desktop shortcuts to apps already listed).
+pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> Vec<AppEntry> {
     let mut seen: std::collections::HashSet<String> = apps
         .iter()
         .flat_map(|a| {
@@ -162,22 +174,34 @@ pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> (Vec<AppEn
         })
         .flatten()
         .collect();
-    let mut out = apps.to_vec();
+    let app_names: std::collections::HashSet<String> =
+        apps.iter().map(|a| a.name.to_lowercase()).collect();
+    let mut out = Vec::with_capacity(programs.len());
     for p in programs {
+        if is_shortcut(p) && app_names.contains(&p.name.to_lowercase()) {
+            continue;
+        }
         let path = p.path.to_string_lossy().into_owned();
-        let lower = path.to_lowercase();
-        if !seen.insert(lower.clone()) {
+        if !seen.insert(path.to_lowercase()) {
             continue;
         }
         out.push(AppEntry {
-            id: program_id(&lower),
+            id: index_apps::make_id(&path),
             name: p.name.clone(),
-            parsing_name: path,
-            target: Some(p.path.clone()),
+            parsing_name: path, // the shell path; `target` stays None to save memory
+            target: None,
             is_packaged: false,
         });
     }
-    (out, apps.len())
+    out
+}
+
+/// [`merge_programs`] plus the fuzzy index.
+pub fn build_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> ProgramSet {
+    let entries = merge_programs(apps, programs);
+    let names: Vec<&str> = entries.iter().map(|a| a.name.as_str()).collect();
+    let index = MatchIndex::new(&names);
+    ProgramSet { entries, index }
 }
 
 impl AppState {
@@ -204,9 +228,8 @@ impl AppState {
     }
 
     fn rebuild_match(&self) {
-        let (entries, from) = merge_programs(&self.apps.entries(), &self.programs.load());
         self.app_match
-            .store(Arc::new(build_match(Arc::new(entries), from)));
+            .store(Arc::new(build_match(self.apps.entries())));
     }
 
     fn programs_path(&self) -> PathBuf {
@@ -313,11 +336,11 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         config,
         store,
-        app_match: ArcSwap::from_pointee({
-            let from = apps.entries().len();
-            build_match(apps.entries(), from)
-        }),
-        programs: ArcSwap::from_pointee(Vec::new()),
+        app_match: ArcSwap::from_pointee(build_match(apps.entries())),
+        programs: ArcSwap::from_pointee(ProgramSet::default()),
+        programs_run: FindRun::default(),
+        programs_gate: Mutex::new(()),
+        prog_matcher: Mutex::new(FuzzyMatcher::new()),
         apps,
         matcher: Mutex::new(FuzzyMatcher::new()),
         files: Arc::new(FileIndex::new()),
@@ -406,19 +429,27 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
 }
 
 /// Loads the programs cache, rescans every fixed drive (system drive included), saves and merges.
-/// Off when `apps.scan_programs` is false.
+/// Off when `apps.scan_programs` is false; turning it off cancels the scan (see [`stop_programs`]).
 pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
     if !s.config.load().apps.scan_programs {
         return;
     }
     let st = s.clone();
+    let cancel = st.programs_run.begin();
     let res = tauri::async_runtime::spawn_blocking(move || {
         let started = Instant::now();
-        match load_programs(&st.programs_path()) {
-            Ok(Some(list)) => {
-                st.programs.store(Arc::new(list));
-                st.rebuild_match();
+        let live = || !cancel.load(Ordering::Relaxed) && st.config.load().apps.scan_programs;
+        // Cancel is set before `stop_programs` takes the gate, so a store here either lands first
+        // (and is cleared) or sees the flag.
+        let publish = |list: &[ProgramFile]| {
+            let set = build_programs(&st.apps.entries(), list);
+            let _gate = st.programs_gate.lock();
+            if live() {
+                st.programs.store(Arc::new(set));
             }
+        };
+        match load_programs(&st.programs_path()) {
+            Ok(Some(list)) => publish(&list),
             Ok(None) => {}
             Err(err) => tracing::warn!(%err, "programs cache unreadable"),
         }
@@ -427,26 +458,33 @@ pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
             .map(|d| PathBuf::from(format!("{d}:\\")))
             .filter(|r| win::drives::is_fixed_drive(r))
             .collect();
-        // ponytail: never cancelled; the scan is short and bounded by MAX_PROGRAMS.
-        let never = AtomicBool::new(false);
         let list = {
             let _bg = win::thread::BackgroundGuard::new();
-            index_files::scan_programs(&roots, &scan_parallelism(), &never)?
+            index_files::scan_programs(&roots, &scan_parallelism(), &cancel)?
         };
+        if !live() {
+            return Err(index_files::FilesError::Cancelled);
+        }
         if let Err(err) = save_programs(&st.programs_path(), &list) {
             tracing::warn!(%err, "saving programs cache failed");
         }
-        let count = list.len();
-        st.programs.store(Arc::new(list));
-        st.rebuild_match();
-        Ok::<_, index_files::FilesError>((count, started.elapsed().as_millis() as u64))
+        publish(&list);
+        Ok::<_, index_files::FilesError>((list.len(), started.elapsed().as_millis() as u64))
     })
     .await;
     match res {
         Ok(Ok((count, ms))) => tracing::info!(count, ms, "programs scanned"),
+        Ok(Err(index_files::FilesError::Cancelled)) => tracing::debug!("programs scan cancelled"),
         Ok(Err(err)) => tracing::warn!(%err, "programs scan failed"),
         Err(err) => tracing::warn!(%err, "programs scan task failed"),
     }
+}
+
+/// Programs off: cancels a running scan and frees the program entries and index.
+pub(crate) fn stop_programs(s: &AppState) {
+    s.programs_run.cancel();
+    let _gate = s.programs_gate.lock();
+    s.programs.store(Arc::new(ProgramSet::default()));
 }
 
 /// Two background-mode workers, built once, so a full-drive scan leaves CPU and disk to the UI.
@@ -539,6 +577,7 @@ pub fn shutdown(app: &AppHandle) {
         return;
     };
     state.find_run.cancel();
+    state.programs_run.cancel();
     state.watch.lock().take();
     tauri::async_runtime::block_on(state.registry.stop_all());
     state.store.shutdown();
@@ -567,23 +606,32 @@ mod tests {
     }
 
     #[test]
-    fn merge_keeps_apps_first_and_drops_duplicates() {
+    fn merge_drops_duplicates_and_app_shortcuts() {
         let apps = vec![
             entry("A", "shell.A", Some(r"C:\x\a.exe")),
             entry("B", r"C:\x\b.lnk", None),
+            entry("Notepad", "Microsoft.Notepad!App", None),
         ];
         let progs = vec![
             prog(r"C:\X\A.EXE"),
             prog(r"C:\x\b.lnk"),
             prog(r"C:\x\c.msi"),
             prog(r"C:\x\c.msi"),
+            prog(r"C:\Users\me\Desktop\notepad.LNK"), // shortcut named like an app
+            prog(r"C:\tools\notepad.exe"),            // same name but a real exe: kept
         ];
-        let (out, from) = merge_programs(&apps, &progs);
-        assert_eq!(from, 2);
-        assert_eq!(out.len(), 3);
-        assert_eq!(out[2].name, "c");
-        assert_eq!(out[2].parsing_name, r"C:\x\c.msi");
-        assert_eq!(out[2].target.as_deref(), Some(Path::new(r"C:\x\c.msi")));
+        let out = merge_programs(&apps, &progs);
+        let names: Vec<_> = out.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, ["c", "notepad"]);
+        assert_eq!(out[0].parsing_name, r"C:\x\c.msi");
+        assert!(out[0].target.is_none());
+        assert_eq!(out[0].id, index_apps::make_id(r"C:\x\c.msi"));
+    }
+
+    #[test]
+    fn empty_program_set_is_empty() {
+        let set = ProgramSet::default();
+        assert!(set.entries.is_empty() && set.index.is_empty());
     }
 
     #[test]

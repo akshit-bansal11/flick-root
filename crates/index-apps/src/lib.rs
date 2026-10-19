@@ -66,7 +66,8 @@ impl Default for AppIndex {
     }
 }
 
-fn make_id(parsing_name: &str) -> String {
+/// Stable 16-hex-digit id (SHA-256 prefix) of a parsing name.
+pub fn make_id(parsing_name: &str) -> String {
     Sha256::digest(parsing_name.as_bytes())
         .iter()
         .take(8)

@@ -30,6 +30,7 @@ fn scan_filters_and_caches() {
         "node_modules/x.exe",
         "temp/c.exe",
         "Temp2/d.exe",
+        "Start Menu/Programs/s.lnk",
         "hid/b.exe",
     ] {
         touch(&r.join(f));
@@ -49,7 +50,7 @@ fn scan_filters_and_caches() {
     save_programs(&cache, &got).unwrap();
     assert_eq!(load_programs(&cache).unwrap(), Some(got));
     assert_eq!(load_programs(&r.join("missing")).unwrap(), None);
-    fs::write(&cache, "flick-programs 9\nC:\\a.exe").unwrap();
+    fs::write(&cache, "flick-programs 1\nC:\\a.exe").unwrap();
     assert_eq!(load_programs(&cache).unwrap(), None);
 }
 

@@ -1,8 +1,10 @@
-//! Command search over 2,000 apps with every built-in feature running (budget 2 ms per query).
+//! Command search over 2,000 apps with every built-in feature running (budget 2 ms per query),
+//! and the separate programs match over 50,000 synthetic names (budget 25 ms).
 
 use arc_swap::ArcSwap;
 use criterion::{Criterion, criterion_group, criterion_main};
 use features::math::Math;
+use features::search::program_items;
 use features::{EventSink, Feature, FeatureCtx, Registry, TaskScope, command_search};
 use index_apps::AppEntry;
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -168,6 +170,26 @@ fn bench(c: &mut Criterion) {
             b.iter(|| command_search(&apps, &idx, &mut matcher, &reg, black_box(&i), 8))
         });
     }
+    // Programs live in their own index and are matched off the keystroke thread (Find's 25 ms budget).
+    let stems = [
+        "setup", "install", "update", "launcher", "tool", "driver", "game", "helper",
+    ];
+    let programs: Vec<AppEntry> = (0..50_000)
+        .map(|i| app(i, format!("{} {} v{}", stems[i % stems.len()], i, i % 97)))
+        .collect();
+    let pnames: Vec<&str> = programs.iter().map(|a| a.name.as_str()).collect();
+    let pidx = MatchIndex::new(&pnames);
+    let mut pmatcher = FuzzyMatcher::new();
+    for t in ["c", "co", "setup", "inst 4", "zzzz"] {
+        c.bench_function(&format!("programs_50k/{t}"), |b| {
+            b.iter(|| program_items(&programs, &pidx, &mut pmatcher, black_box(t), 8))
+        });
+    }
+    // The apps part alone, with 50k programs present in memory but not in the apps index.
+    let i = input("code");
+    c.bench_function("apps_part_2k/code", |b| {
+        b.iter(|| command_search(&apps, &idx, &mut matcher, &reg, black_box(&i), 8))
+    });
     let cur = input("250 usd in inr");
     c.bench_function("math_query/250 usd in inr (rates loaded)", |b| {
         b.iter(|| Math.query(black_box(&cur)))
