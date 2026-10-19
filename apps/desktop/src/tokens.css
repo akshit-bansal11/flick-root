@@ -58,6 +58,7 @@
   --l-sp-10: 24px;
 
   --l-r: 6px;
+  --l-r-panel: 14px;
   --l-r2: 3px;
   --l-r-tile: 4px;
   --l-r-pill: 999px;
@@ -66,6 +67,18 @@
   --l-tile: 20px;
   --l-tile-row: 26px;
   --l-tile-lg: 32px;
+  --l-group-h: 28px;
+  --l-foot-h: 36px;
+  /* Input + 8 rows + action row + 3 group labels + footer + list padding: a full list is exactly centred. */
+  --l-panel-max: calc(
+    var(--l-input) +
+    var(--l-row) *
+    9 +
+    var(--l-group-h) *
+    3 +
+    var(--l-foot-h) +
+    var(--l-sp-7)
+  );
   --l-sel-mix: 14%;
   --l-hover-mix: 7%;
   --l-tile-settings: 32px;
@@ -84,26 +97,26 @@
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --l-bg: #0f1720;
-  --l-surface: #17232f;
-  --l-line: #25394b;
-  --l-text: #e6f1f8;
-  --l-muted: #8aa3b5;
+  --l-bg: #0c0e12;
+  --l-surface: #1b1f27;
+  --l-line: #262b34;
+  --l-text: #e8ebf0;
+  --l-muted: #8f96a3;
   --l-accent: #5cc8e8;
   --l-ink: #062130;
-  --l-sel: #1c3542;
+  --l-sel: #1d2a33;
   --l-ok: #4cc38a;
   --l-hover: var(--l-surface);
-  --l-muted-strong: #8aa3b5;
+  --l-muted-strong: #8f96a3;
   --l-accent-text: #5cc8e8;
   --l-ok-text: #4cc38a;
   --l-err: #f0766b;
   --l-warn: #e8b04a;
   --l-scrim: rgba(0, 0, 0, 0.5);
-  --l-panel: var(--l-bg);
+  --l-panel: #14171d;
   --l-border: 1px solid var(--l-line);
   --l-shadow: 0 22px 48px -18px rgba(0, 0, 0, 0.5);
-  --l-shadow-panel: 0 24px 64px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
+  --l-shadow-panel: 0 32px 80px rgb(0 0 0 / 0.6), 0 4px 16px rgb(0 0 0 / 0.4);
   --l-highlight: inset 0 1px 0 rgb(255 255 255 / 0.05);
   --l-shadow-settings: 0 30px 60px -24px rgba(0, 0, 0, 0.5);
   --l-focus: var(--l-accent);
@@ -127,6 +140,7 @@
     --l-err: #b3382c;
     --l-warn: #8a5a00;
     --l-scrim: rgba(15, 35, 51, 0.35);
+    --l-panel: #ffffff;
     --l-shadow: 0 22px 48px -18px rgba(30, 30, 50, 0.22);
     --l-shadow-panel: 0 24px 64px rgb(30 30 50 / 0.25), 0 2px 8px rgb(30 30 50 / 0.15);
     --l-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);
@@ -150,6 +164,7 @@
   --l-err: #b3382c;
   --l-warn: #8a5a00;
   --l-scrim: rgba(15, 35, 51, 0.35);
+  --l-panel: #ffffff;
   --l-shadow: 0 22px 48px -18px rgba(30, 30, 50, 0.22);
   --l-shadow-panel: 0 24px 64px rgb(30 30 50 / 0.25), 0 2px 8px rgb(30 30 50 / 0.15);
   --l-highlight: inset 0 1px 0 rgb(255 255 255 / 0.7);

@@ -72,6 +72,13 @@ describe("Launcher", () => {
     expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 
+  it("shows a group label, subtitle and footer", async () => {
+    await mount();
+    expect(screen.getByText("Apps")).toBeTruthy();
+    expect(screen.getAllByText("App")).toHaveLength(2);
+    expect(screen.getByText("Tab mode")).toBeTruthy();
+  });
+
   it("ArrowDown moves aria-activedescendant", async () => {
     await mount();
     const input = screen.getByRole("combobox");

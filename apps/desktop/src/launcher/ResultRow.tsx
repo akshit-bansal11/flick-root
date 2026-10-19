@@ -1,4 +1,6 @@
 import type { Item } from "../types";
+import { highlight } from "./highlight";
+import { kindName } from "./kinds";
 import { Tile } from "./Tile";
 
 interface Props {
@@ -6,10 +8,11 @@ interface Props {
   id: string;
   index: number;
   selected: boolean;
+  query: string;
   onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
 }
 
-export function ResultRow({ item, id, index, selected, onActivate }: Props) {
+export function ResultRow({ item, id, index, selected, query, onActivate }: Props) {
   return (
     <div
       id={id}
@@ -24,10 +27,16 @@ export function ResultRow({ item, id, index, selected, onActivate }: Props) {
     >
       <Tile item={item} />
       <span className="row-text">
-        <span className="row-title">{item.title}</span>
-        <span className="row-sub">{item.subtitle}</span>
+        <span className="row-title">
+          {highlight(item.title, query).map((s) =>
+            s.hit ? <b key={s.at}>{s.text}</b> : <span key={s.at}>{s.text}</span>,
+          )}
+        </span>
+        <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>
       </span>
-      {selected && <kbd className="kbd">↵</kbd>}
+      <span className="row-meta" aria-hidden="true">
+        {selected ? "↵ Open" : item.kind}
+      </span>
     </div>
   );
 }

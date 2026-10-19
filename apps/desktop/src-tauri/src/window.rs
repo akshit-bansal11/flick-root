@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use crate::error::CommandError;
 use serde_json::json;
-use tauri::window::{Color, Effect, EffectsBuilder};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 /// Label of the single launcher window.
@@ -31,14 +30,6 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     let win = app
         .get_webview_window(LABEL)
         .ok_or_else(|| anyhow::anyhow!("launcher window missing from tauri.conf.json"))?;
-    // Applied once; the UI draws its own dark tint if this is unsupported.
-    let acrylic = EffectsBuilder::new()
-        .effect(Effect::Acrylic)
-        .color(Color(0, 0, 0, 140))
-        .build();
-    if let Err(err) = win.set_effects(acrylic) {
-        tracing::warn!(%err, "acrylic effect unavailable; UI tint only");
-    }
     let handle = app.handle().clone();
     let w = win.clone();
     win.on_window_event(move |event| match event {

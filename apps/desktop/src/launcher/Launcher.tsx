@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { QueryView } from "../query/QueryView";
 import { Actions } from "./Actions";
+import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
 import { Overlay, useOverlay } from "./Overlay";
 import { Results } from "./Results";
@@ -51,10 +52,16 @@ export function Launcher() {
               onOpenLink={openLink}
             />
           ) : (
-            <Results items={state.items} selected={state.selected} onActivate={activate} />
+            <Results
+              items={state.items}
+              selected={state.selected}
+              query={state.input}
+              onActivate={activate}
+            />
           )}
         </div>
         {state.mode === "find" && state.items.length > 0 && <Actions onPress={press} />}
+        <Footer mode={state.mode} />
       </div>
     </>
   );
