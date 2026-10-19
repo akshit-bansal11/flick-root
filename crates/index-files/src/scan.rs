@@ -82,12 +82,14 @@ pub fn scan(
             .skip_hidden(false)
             .follow_links(false)
             .parallelism(parallelism.clone())
-            .process_read_dir(|_, _, _, children| {
+            .process_read_dir(|depth, _, _, children| {
+                // `depth == None` is the walk root itself: never skipped (drive roots are hidden+system).
+                let is_root = depth.is_none();
                 children.retain_mut(|c| {
                     let Ok(e) = c else { return false };
                     let md = e.metadata().ok();
                     let attrs = md.as_ref().map_or(0, MetadataExt::file_attributes);
-                    if should_skip(&e.file_name, attrs, e.file_type.is_dir()) {
+                    if !is_root && should_skip(&e.file_name, attrs, e.file_type.is_dir()) {
                         return false;
                     }
                     e.client_state = md.as_ref().map(|m| (attrs, minutes(m)));

@@ -84,3 +84,34 @@ fn single_thread_pool_still_finds_files() {
     .unwrap();
     assert_eq!(s.len(), 3);
 }
+
+#[test]
+fn hidden_system_root_is_walked() {
+    let d = tempfile::tempdir().unwrap();
+    let p = d.path();
+    fs::create_dir_all(p.join("sub")).unwrap();
+    fs::write(p.join("sub").join("b.txt"), "x").unwrap();
+    let attrib = |flags: [&str; 2]| {
+        std::process::Command::new("attrib")
+            .args(flags)
+            .arg(p)
+            .status()
+            .unwrap()
+            .success()
+    };
+    assert!(attrib(["+h", "+s"]));
+    let roots = [Root {
+        id: 0,
+        path: p.to_path_buf(),
+        label: "t".into(),
+    }];
+    let s = scan(
+        &roots,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+        |_| {},
+    );
+    assert!(attrib(["-h", "-s"]));
+    let s = s.unwrap();
+    assert!((0..s.len()).any(|i| s.name(i) == "b.txt"));
+}

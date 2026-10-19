@@ -122,8 +122,12 @@ pub fn scan_programs(
             .skip_hidden(false)
             .follow_links(false)
             .parallelism(parallelism.clone())
-            .process_read_dir(|_, _, _, children| {
-                // The walk root is never in `children`, so it is never skipped.
+            .process_read_dir(|depth, _, _, children| {
+                // jwalk first calls this with `depth == None` and the walk root as the only
+                // child; keep it even when it is hidden/system (drive roots are).
+                if depth.is_none() {
+                    return;
+                }
                 // A `.app` directory is a macOS bundle: listed, never descended into.
                 for c in children.iter_mut().flatten() {
                     if c.file_type.is_dir() && is_app_bundle(&c.file_name) {

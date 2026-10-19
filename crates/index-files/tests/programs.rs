@@ -90,3 +90,28 @@ fn extra_types_and_app_bundle() {
     save_programs(&cache, &got).unwrap();
     assert_eq!(load_programs(&cache).unwrap(), Some(got));
 }
+
+#[test]
+fn hidden_system_root_is_walked() {
+    let d = tempfile::tempdir().unwrap();
+    let r = d.path();
+    touch(&r.join("a.exe"));
+    touch(&r.join("sub/b.txt"));
+    let attrib = |flags: [&str; 2]| {
+        std::process::Command::new("attrib")
+            .args(flags)
+            .arg(r)
+            .status()
+            .unwrap()
+            .success()
+    };
+    assert!(attrib(["+h", "+s"]));
+    let found = scan_programs(
+        &[r.to_path_buf()],
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+    );
+    assert!(attrib(["-h", "-s"]));
+    let found = found.unwrap();
+    assert!(found.iter().any(|p| p.name == "a" && p.ext == "exe"));
+}
