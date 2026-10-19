@@ -18,8 +18,33 @@ fn icon_err(what: &str, e: impl std::fmt::Display) -> AppsError {
     AppsError::Icon(format!("{what}: {e}"))
 }
 
+/// Whether the shell may render this entry's icon. Link-like files (.lnk, .url, .appref-ms)
+/// can name an icon on a UNC path; rendering it makes Windows fetch `\\host\share` and leak
+/// the user's NTLM hash. So only AppsFolder entries (trusted) and local `.exe` files pass.
+pub fn icon_allowed(entry: &AppEntry) -> bool {
+    let sp = entry.shell_path();
+    let p = Path::new(&sp);
+    let lower = sp.to_ascii_lowercase();
+    let remote = lower.starts_with("\\\\") && !lower.starts_with("\\\\?\\")
+        || lower.starts_with("//")
+        || lower.starts_with("\\\\?\\unc\\");
+    if remote {
+        return false;
+    }
+    if !p.is_absolute() {
+        return true; // shell:AppsFolder\... (Start menu / Store apps)
+    }
+    p.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe"))
+}
+
 /// Render the app icon at `size` x `size` and return PNG bytes. Needs COM on the calling thread.
+/// Refuses entries failing [`icon_allowed`] without touching the shell.
 pub fn extract_icon(entry: &AppEntry, size: u32) -> Result<Vec<u8>, AppsError> {
+    if !icon_allowed(entry) {
+        return Err(AppsError::Icon(
+            "icon not allowed for untrusted file".into(),
+        ));
+    }
     let path = HSTRING::from(entry.shell_path());
     // SAFETY: `path` is a valid NUL-terminated HSTRING for the call; COM is initialised by the caller.
     let factory: IShellItemImageFactory = unsafe { SHCreateItemFromParsingName(&path, None) }
@@ -142,6 +167,39 @@ impl IconCache {
 mod tests {
     use super::*;
     use crate::AppIndex;
+
+    fn entry(parsing_name: &str) -> AppEntry {
+        AppEntry {
+            id: "x".into(),
+            name: "x".into(),
+            parsing_name: parsing_name.into(),
+            target: None,
+            is_packaged: false,
+        }
+    }
+
+    #[test]
+    fn icon_allowed_only_trusted() {
+        for ok in [
+            "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App",
+            r"C:\x\a.exe",
+            r"C:\x\A.EXE",
+        ] {
+            assert!(icon_allowed(&entry(ok)), "{ok}");
+        }
+        for no in [
+            r"\\srv\share\a.exe",
+            "//srv/share/a.exe",
+            r"\\?\UNC\srv\share\a.exe",
+            r"C:\x\a.url",
+            r"C:\x\a.lnk",
+            r"C:\x\a.appref-ms",
+            r"C:\x\a.msi",
+            r"C:\x\a.bat",
+        ] {
+            assert!(!icon_allowed(&entry(no)), "{no}");
+        }
+    }
 
     #[test]
     #[ignore = "uses the shell"]
