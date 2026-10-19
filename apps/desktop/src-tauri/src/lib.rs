@@ -95,6 +95,8 @@ pub fn run() {
             commands::engines::list_engines,
             commands::engines::probe_decision_engines,
             commands::engines::set_engine,
+            commands::integrations::get_integrations,
+            commands::integrations::set_integration,
             commands::secrets::set_secret,
             commands::secrets::delete_secret,
             commands::secrets::test_secret,

@@ -177,3 +177,47 @@ export interface EnginePatch {
   threshold?: number;
   timeoutMs?: number;
 }
+
+// Rust IntegrationsView: snake_case on the wire. Flags only, never values.
+export interface WebhookView {
+  name: string;
+  enabled: boolean;
+  host: string;
+  url_present: boolean;
+}
+
+export interface IntegrationsView {
+  spotify: { client_id: string; redirect_uri: string; connected: boolean };
+  youtube_use_api: boolean;
+  youtube_key_present: boolean;
+  obsidian_vault: string;
+  obsidian_daily_folder: string;
+  obsidian_daily_format: string;
+  markdown_file: string;
+  notion_database_id: string;
+  notion_token_present: boolean;
+  webhooks: WebhookView[];
+}
+
+export type IntegrationTarget =
+  | "spotify"
+  | "youtube"
+  | "obsidian"
+  | "markdown"
+  | "notion"
+  | "webhook";
+
+/** Webhook URLs are never part of a patch: they go through setSecret. */
+export interface IntegrationPatch {
+  clientId?: string;
+  enabled?: boolean;
+  vault?: string;
+  dailyFolder?: string;
+  dailyFormat?: string;
+  file?: string;
+  databaseId?: string;
+  name?: string;
+  host?: string;
+  newName?: string;
+  remove?: boolean;
+}

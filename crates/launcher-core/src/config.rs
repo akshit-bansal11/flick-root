@@ -168,6 +168,8 @@ pub struct Integrations {
     pub notion: Notion,
     /// Webhooks; the URL itself lives in Credential Manager.
     pub webhooks: Vec<Webhook>,
+    /// Markdown capture file (empty when unset).
+    pub markdown_file: String,
 }
 
 /// `[integrations.spotify]`
@@ -216,6 +218,8 @@ pub struct Webhook {
     pub name: String,
     /// Enabled flag.
     pub enabled: bool,
+    /// Host of the secret URL; the secret is bound to it (not secret itself).
+    pub host: String,
 }
 
 impl Default for General {
@@ -555,6 +559,16 @@ mod tests {
                 assert!(!line.trim_start().starts_with(bad), "{line}");
             }
         }
+    }
+
+    #[test]
+    fn old_integrations_without_new_fields_load() {
+        let c: Config = toml::from_str(
+            "[integrations]\n[[integrations.webhooks]]\nname = \"a\"\nenabled = true\n",
+        )
+        .unwrap();
+        assert_eq!(c.integrations.webhooks[0].host, "");
+        assert_eq!(c.integrations.markdown_file, "");
     }
 
     #[test]

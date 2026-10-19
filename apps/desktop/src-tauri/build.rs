@@ -26,6 +26,8 @@ fn main() {
         "list_engines",
         "probe_decision_engines",
         "set_engine",
+        "get_integrations",
+        "set_integration",
         "set_secret",
         "delete_secret",
         "test_secret",

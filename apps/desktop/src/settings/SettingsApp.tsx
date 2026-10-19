@@ -6,20 +6,11 @@ import * as api from "./api";
 import { Decision } from "./Decision";
 import { Features } from "./Features";
 import { General } from "./General";
+import { Integrations } from "./Integrations";
 import { Nav, PAGES, type PageId } from "./Nav";
 import { Providers } from "./Providers";
 import { errorText, type SettingsView } from "./types";
 import "./settings.css";
-
-function Placeholder({ id }: { id: PageId }) {
-  const label = PAGES.find((p) => p.id === id)?.label;
-  return (
-    <section>
-      <h1 className="s-title">{label}</h1>
-      <p className="s-help">Coming soon.</p>
-    </section>
-  );
-}
 
 export type View = "first-run" | PageId;
 
@@ -86,7 +77,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     features: <Features />,
     providers: <Providers />,
     engine: <Decision />,
-    integrations: <Placeholder id="integrations" />,
+    integrations: <Integrations />,
     about: <About />,
   };
 

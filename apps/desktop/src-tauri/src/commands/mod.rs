@@ -5,6 +5,7 @@ pub mod ask;
 pub mod engines;
 pub mod features;
 pub mod firstrun;
+pub mod integrations;
 pub mod launch;
 pub mod providers;
 pub mod search;

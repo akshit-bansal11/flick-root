@@ -23,6 +23,8 @@
     "allow-list-engines",
     "allow-probe-decision-engines",
     "allow-set-engine",
+    "allow-get-integrations",
+    "allow-set-integration",
     "allow-set-secret",
     "allow-delete-secret",
     "allow-test-secret",

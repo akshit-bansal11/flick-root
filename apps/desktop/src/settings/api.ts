@@ -11,6 +11,9 @@ import type {
   FeatureList,
   FeatureView,
   GeneralPatch,
+  IntegrationPatch,
+  IntegrationsView,
+  IntegrationTarget,
   ModeToggle,
   ProbeResult,
   ProviderPatch,
@@ -84,3 +87,7 @@ export const onFeaturesChanged = (cb: (p: FeatureChanged) => void): Promise<Unli
   listen<FeatureChanged>(FEATURES_CHANGED, (e) => cb(e.payload));
 export const onSettingsChanged = (cb: (p: SettingsChanged) => void): Promise<UnlistenFn> =>
   listen<SettingsChanged>(SETTINGS_CHANGED, (e) => cb(e.payload));
+
+export const getIntegrations = () => invoke<IntegrationsView>("get_integrations");
+export const setIntegration = (target: IntegrationTarget, patch: IntegrationPatch) =>
+  invoke<IntegrationsView>("set_integration", { target, patch });

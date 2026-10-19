@@ -29,6 +29,7 @@ fn bound_host(cfg: &Config, name: &SecretName) -> Option<String> {
             .engines
             .get(name.id())
             .and_then(super::engines::effective_host),
+        "integration" => super::integrations::bound_host(cfg, name.id()),
         _ => None,
     }
 }
@@ -239,6 +240,30 @@ mod tests {
         assert!(validate_set(&cfg, "engine.laya@localhost", true).is_ok());
         assert_eq!(code("engine.jev@evil.test"), "host_unbound");
         assert_eq!(code("integration.spotify@spotify.com"), "host_unbound");
+        assert!(validate_set(&cfg, "integration.notion@api.notion.com", true).is_ok());
+        assert!(validate_set(&cfg, "integration.youtube@www.googleapis.com", true).is_ok());
+        assert_eq!(code("integration.notion@evil.test"), "host_unbound");
+        // The Spotify refresh token is written only by the connect flow.
+        assert_eq!(
+            code("integration.spotify.refresh@accounts.spotify.com"),
+            "host_unbound"
+        );
+        assert_eq!(code("integration.webhook.a@hooks.test"), "host_unbound");
+    }
+
+    #[test]
+    fn webhook_binds_to_its_configured_host() {
+        let mut cfg = Config::default();
+        cfg.integrations
+            .webhooks
+            .push(launcher_core::config::Webhook {
+                name: "a".into(),
+                enabled: false,
+                host: "hooks.test".into(),
+            });
+        assert!(validate_set(&cfg, "integration.webhook.a@hooks.test", true).is_ok());
+        let e = validate_set(&cfg, "integration.webhook.a@evil.test", true).unwrap_err();
+        assert_eq!(e.code, "host_unbound");
     }
 
     #[test]
