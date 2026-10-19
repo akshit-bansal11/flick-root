@@ -62,16 +62,28 @@ pub fn daily_path(cfg: &Obsidian, date: NaiveDate) -> Result<PathBuf, CaptureErr
 pub fn append(cfg: &Obsidian, date: NaiveDate, line: &str) -> Result<(), CaptureError> {
     let path = daily_path(cfg, date)?;
     let dir = path.parent().ok_or(bad("No daily note folder"))?;
-    std::fs::create_dir_all(dir).map_err(|e| CaptureError::Io(e.kind().to_string()))?;
-    let (real_dir, real_vault) = (
-        dir.canonicalize()
-            .map_err(|e| CaptureError::Io(e.kind().to_string()))?,
-        Path::new(cfg.vault.trim())
-            .canonicalize()
-            .map_err(|e| CaptureError::Io(e.kind().to_string()))?,
-    );
-    if !real_dir.starts_with(&real_vault) {
+    let io = |e: std::io::Error| CaptureError::Io(e.kind().to_string());
+    let real_vault = Path::new(cfg.vault.trim()).canonicalize().map_err(io)?;
+    // Before creating anything: the deepest existing ancestor must already resolve inside the
+    // vault, so a linked folder can't make create_dir_all write elsewhere.
+    let existing = dir.ancestors().find(|a| a.exists()).unwrap_or(dir);
+    if !existing
+        .canonicalize()
+        .map_err(io)?
+        .starts_with(&real_vault)
+    {
         return Err(bad("The daily note folder must be inside the vault"));
+    }
+    std::fs::create_dir_all(dir).map_err(io)?;
+    if !dir.canonicalize().map_err(io)?.starts_with(&real_vault) {
+        return Err(bad("The daily note folder must be inside the vault"));
+    }
+    // The note itself must not be a link (symlink or reparse point) out of the vault.
+    if let Ok(md) = std::fs::symlink_metadata(&path)
+        && (md.file_type().is_symlink()
+            || !path.canonicalize().map_err(io)?.starts_with(&real_vault))
+    {
+        return Err(bad("The daily note is a link outside the vault"));
     }
     markdown::append_line(&path, line)
 }
