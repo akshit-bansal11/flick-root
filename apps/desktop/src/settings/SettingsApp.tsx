@@ -1,6 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
 import { type ReactElement, useEffect, useState } from "react";
 import { FirstRun } from "../firstrun/FirstRun";
+import * as ipc from "../ipc";
+import { fromEvent, idFor } from "../shortcuts";
 import { applyAppearance } from "../theme";
 import { About } from "./About";
 import { Appearance } from "./Appearance";
@@ -22,6 +24,14 @@ export function resolveView(section: string | null | undefined, current: View | 
   if (s === "first-run") return "first-run";
   if (s === "ai-providers") return "providers";
   return PAGES.find((p) => p.id === s)?.id ?? current;
+}
+
+const TEXT_FIELD = "input, textarea, select, [contenteditable='true']";
+
+/** Next page id, wrapping; the page list order is the Nav order. */
+export function stepPage(page: PageId, delta: number): PageId {
+  const i = PAGES.findIndex((p) => p.id === page);
+  return PAGES[(i + delta + PAGES.length) % PAGES.length]?.id ?? page;
 }
 
 /** Root of the settings window: first run or the pages, driven by the hash and navigate events. */
@@ -60,6 +70,26 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
       un.then((f) => f());
     };
   }, []);
+
+  // Window shortcuts. Page keys never fire while typing; Esc and Ctrl+W always close, except Esc inside a dialog.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const id = idFor("settings", fromEvent(e));
+      if (!id) return;
+      const target = e.target instanceof Element ? e.target : null;
+      if (id === "closeSettings" || id === "closeSettingsW") {
+        if (id === "closeSettings" && target?.closest("dialog, [role='dialog']")) return;
+        e.preventDefault();
+        ipc.closeWindow().catch((err: unknown) => console.warn("close failed", err));
+        return;
+      }
+      if (target?.closest(TEXT_FIELD)) return;
+      e.preventDefault();
+      onPage(stepPage(page, id === "pageNext" ? 1 : -1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [page, onPage]);
 
   // Apply the saved appearance on load and whenever Rust says it changed.
   useEffect(() => {

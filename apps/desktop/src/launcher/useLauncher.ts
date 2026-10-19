@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
+import { fromEvent, parseChord, shortcut } from "../shortcuts";
 import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace"]);
+const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace", "Delete", "F1"]);
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
@@ -15,6 +16,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   const cancelled = useRef(new Set<number>());
   const lastHeight = useRef(0);
   const syncHeight = useRef((_force: boolean) => {});
+  const copiedTimer = useRef<number | undefined>(undefined);
 
   const dispatch = useCallback((ev: Event): boolean => {
     const prev = stateRef.current;
@@ -49,6 +51,16 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           break;
         case "copyPath":
           ipc.copyPath(e.itemId).catch(warn);
+          break;
+        case "copyText":
+          ipc.copyText(e.text).catch(warn);
+          break;
+        case "clearCopied":
+          window.clearTimeout(copiedTimer.current);
+          copiedTimer.current = window.setTimeout(
+            () => dispatch({ type: "copiedDone" }),
+            e.afterMs,
+          );
           break;
         case "hide":
           ipc.hideLauncher().catch(warn);
@@ -150,23 +162,13 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = inputRef.current;
-      const handled = dispatch({
-        type: "key",
-        key: {
-          key: e.key,
-          ctrl: e.ctrlKey,
-          shift: e.shiftKey,
-          alt: e.altKey,
-          hasSelection: !!el && el.selectionStart !== el.selectionEnd,
-        },
-      });
+      const handled = dispatch({ type: "key", key: fromEvent(e) });
       if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey || e.altKey)))
         e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dispatch, inputRef]);
+  }, [dispatch]);
 
   const setText = useCallback((text: string) => dispatch({ type: "text", text }), [dispatch]);
   const activate = useCallback(
@@ -176,11 +178,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   );
 
   const press = useCallback(
-    (key: string, ctrl: boolean) =>
-      dispatch({ type: "key", key: { key, ctrl, shift: false, alt: false } }),
+    (chord: string) => dispatch({ type: "key", key: parseChord(chord) }),
     [dispatch],
   );
-  const toggleEffort = useCallback(() => press("t", true), [press]);
+  const toggleEffort = useCallback(() => press(shortcut("effort").keys), [press]);
   const enterMode = useCallback(
     (mode: LaunchMode) => {
       dispatch({ type: "enterMode", mode });

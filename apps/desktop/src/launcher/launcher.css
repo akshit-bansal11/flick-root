@@ -348,3 +348,51 @@ body,
 .input:focus-visible {
   outline: none;
 }
+
+.copied {
+  color: var(--l-accent);
+}
+
+.sheet {
+  max-height: calc(var(--l-row) * 8);
+  overflow-y: auto;
+  padding: var(--l-sp-3) var(--l-sp-7);
+}
+
+.sheet-title {
+  margin: 0 0 var(--l-sp-3);
+  font: 600 13px var(--l-ui);
+  color: var(--l-text);
+}
+
+.sheet-scope {
+  margin: var(--l-sp-5) 0 var(--l-sp-2);
+  font: 600 var(--l-fs-meta) var(--l-ui);
+  color: var(--l-muted);
+}
+
+.sheet-list {
+  margin: 0;
+}
+
+.sheet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--l-sp-6);
+  padding: var(--l-sp-1) 0;
+}
+
+.sheet-row dt {
+  color: var(--l-text);
+}
+
+.sheet-row dd {
+  display: flex;
+  gap: var(--l-sp-2);
+  margin: 0;
+}
+
+.sheet-when {
+  color: var(--l-muted);
+}

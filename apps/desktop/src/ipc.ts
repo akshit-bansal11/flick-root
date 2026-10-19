@@ -4,6 +4,7 @@
 // `ask_stream(text, attachment, effort, on_event)`. Rust must not wrap them in a struct parameter.
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Appearance } from "./theme";
 import type {
   AskEvent,
@@ -31,6 +32,12 @@ export const launch = (itemId: string, admin: boolean) =>
 export const reveal = (itemId: string) => invoke<void>("reveal", { itemId });
 
 export const copyPath = (itemId: string) => invoke<void>("copy_path", { itemId });
+
+/** Copies text the user already sees (an answer or result value); no network, WebView clipboard only. */
+export const copyText = (text: string) => navigator.clipboard.writeText(text);
+
+/** Closes the calling window (Settings). Needs core:window:allow-close in its capability. */
+export const closeWindow = () => getCurrentWindow().close();
 
 export const runSystemCommand = (commandId: string, confirmToken?: string, kill = false) =>
   invoke<Outcome>("run_system_command", { commandId, confirmToken, kill });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Item, LaunchMode } from "../types";
 import {
   type Attachment,
+  COPIED_MS,
   type Event,
   initialState,
   type KeyInput,
@@ -137,18 +138,96 @@ describe("reducer", () => {
     expect(r.effects).toEqual([]);
   });
 
-  it("Ctrl+C copies path in Find", () => {
-    const r = reduce(withItems(inMode("find")), k("c", { ctrl: true }));
-    expect(r.effects).toEqual([{ type: "copyPath", itemId: "i0" }]);
+  it("Ctrl+Shift+C copies the path in Find and flags Copied", () => {
+    const r = reduce(withItems(inMode("find")), k("C", { ctrl: true, shift: true }));
+    expect(r.effects).toEqual([
+      { type: "copyPath", itemId: "i0" },
+      { type: "clearCopied", afterMs: COPIED_MS },
+    ]);
+    expect(r.state.copied).toBe(true);
+    expect(reduce(r.state, { type: "copiedDone" }).state.copied).toBe(false);
   });
 
-  it("Ctrl+C ignored with text selection", () => {
-    const r = reduce(withItems(inMode("find")), k("c", { ctrl: true, hasSelection: true }));
-    expect(r.effects).toEqual([]);
+  it("plain Ctrl+C is never taken: the input copies natively", () => {
+    for (const mode of ["find", "commands", "query"] as const) {
+      const s = withItems(inMode(mode));
+      const r = reduce(s, k("c", { ctrl: true }));
+      expect(r.state).toBe(s);
+      expect(r.effects).toEqual([]);
+    }
   });
 
-  it("Ctrl+C ignored outside Find", () => {
-    expect(reduce(withItems(inMode("commands")), k("c", { ctrl: true })).effects).toEqual([]);
+  it("Ctrl+Shift+C copies a Commands result value, and nothing without one", () => {
+    const withValue = {
+      ...inMode("commands"),
+      items: [
+        { ...item("r"), actions: [{ type: "copyResult" } as const], payload: { value: "42" } },
+      ],
+    };
+    const r = reduce(withValue, k("C", { ctrl: true, shift: true }));
+    expect(r.effects[0]).toEqual({ type: "copyText", text: "42" });
+    const plain = withItems(inMode("commands"));
+    expect(reduce(plain, k("C", { ctrl: true, shift: true })).effects).toEqual([]);
+  });
+
+  it("Ctrl+Shift+C copies the Ask answer once there is one", () => {
+    const answered = inMode("query", { query: { ...initialState().query, text: "hi there" } });
+    expect(reduce(answered, k("C", { ctrl: true, shift: true })).effects[0]).toEqual({
+      type: "copyText",
+      text: "hi there",
+    });
+    expect(reduce(inMode("query"), k("C", { ctrl: true, shift: true })).effects).toEqual([]);
+  });
+
+  it("Ctrl+1..4 enter modes, carry typed text and respect disabled modes", () => {
+    const typed = { ...initialState(), input: "abc" };
+    const r = reduce(typed, k("3", { ctrl: true }));
+    expect(r.state).toMatchObject({ mode: "find", input: "abc" });
+    expect(r.effects[0]).toMatchObject({ type: "search", mode: "find", text: "abc" });
+    expect(reduce(typed, k("1", { ctrl: true })).state.mode).toBe("commands");
+    expect(reduce(typed, k("2", { ctrl: true })).state.mode).toBe("run");
+    expect(reduce(typed, k("4", { ctrl: true })).state.mode).toBe("query");
+    const off = initialState(["command"]);
+    expect(reduce(off, k("3", { ctrl: true })).state).toBe(off);
+    expect(reduce(off, k("4", { ctrl: true })).state).toBe(off);
+  });
+
+  it("Ctrl+, opens Settings", () => {
+    expect(reduce(initialState(), k(",", { ctrl: true })).effects).toEqual([
+      { type: "openSettings", section: "general" },
+    ]);
+  });
+
+  describe("shortcut sheet", () => {
+    it("F1 and Ctrl+/ toggle it", () => {
+      const open = reduce(initialState(), k("F1")).state;
+      expect(open.sheet).toBe(true);
+      expect(reduce(open, k("F1")).state.sheet).toBe(false);
+      expect(
+        reduce(reduce(initialState(), k("/", { ctrl: true })).state, k("/", { ctrl: true })).state
+          .sheet,
+      ).toBe(false);
+    });
+
+    it("Esc closes it first, before clearing input or hiding", () => {
+      const open = { ...inMode("find", { input: "x" }), sheet: true };
+      const r = reduce(open, k("Escape"));
+      expect(r.state).toMatchObject({ sheet: false, input: "x" });
+      expect(r.effects).toEqual([]);
+    });
+
+    it("swallows other keys while open", () => {
+      const open = { ...withItems(inMode("commands")), sheet: true };
+      expect(reduce(open, k("ArrowDown")).state).toBe(open);
+      expect(reduce(open, k("Enter")).effects).toEqual([]);
+    });
+  });
+
+  it("Ctrl+Shift+X removes the attachment", () => {
+    const s = inMode("query", {
+      attachment: { preview: "p", length: 1, sourceApp: "", blocked: false, reason: null },
+    });
+    expect(reduce(s, k("X", { ctrl: true, shift: true })).state.attachment).toBeNull();
   });
 
   it.each(["Tab", "Shift+Tab"])("%s does not change mode", (name) => {
@@ -419,7 +498,7 @@ describe("query state flags", () => {
     expect(e.errorCode).toBe("no_provider");
   });
 
-  describe("Backspace kill", () => {
+  describe("Delete kill", () => {
     const procs = (): State => ({
       ...inMode("commands"),
       items: [
@@ -429,12 +508,17 @@ describe("query state flags", () => {
     });
 
     it("edits text until an arrow moved the selection", () => {
-      expect(reduce(procs(), k("Backspace")).effects).toEqual([]);
+      expect(reduce(procs(), k("Delete")).effects).toEqual([]);
     });
 
-    it("after an arrow it asks to kill, then Enter confirms the kill", () => {
+    it("Backspace never kills, even after an arrow", () => {
       const armed = reduce(procs(), k("ArrowDown")).state;
-      const r = reduce(armed, k("Backspace"));
+      expect(reduce(armed, k("Backspace")).effects).toEqual([]);
+    });
+
+    it("after an arrow Delete asks to kill, then Enter confirms the kill", () => {
+      const armed = reduce(procs(), k("ArrowDown")).state;
+      const r = reduce(armed, k("Delete"));
       expect(r.effects).toEqual([{ type: "kill", itemId: "p1" }]);
       const pending = reduce(r.state, {
         type: "outcome",
@@ -448,7 +532,7 @@ describe("query state flags", () => {
 
     it("ignores non-process rows", () => {
       const s = reduce(withItems(inMode("commands")), k("ArrowDown")).state;
-      expect(reduce(s, k("Backspace")).effects).toEqual([]);
+      expect(reduce(s, k("Delete")).effects).toEqual([]);
     });
   });
 });

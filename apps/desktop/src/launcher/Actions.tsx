@@ -1,31 +1,24 @@
-export interface ActionKey {
-  key: string;
-  ctrl: boolean;
-}
+import { capsText, shortcut } from "../shortcuts";
 
-const ACTIONS: { label: string; hint: string; key: ActionKey }[] = [
-  { label: "Open", hint: "↵", key: { key: "Enter", ctrl: false } },
-  { label: "Open file location", hint: "Ctrl ↵", key: { key: "Enter", ctrl: true } },
-  { label: "Copy path", hint: "Ctrl C", key: { key: "c", ctrl: true } },
-];
+const ACTIONS = ["open", "location", "copyPath"] as const;
 
 interface Props {
-  onPress: (key: string, ctrl: boolean) => void;
+  onPress: (chord: string) => void;
 }
 
 /** Find-mode action row; each button sends the same key the shortcut would. */
 export function Actions({ onPress }: Props) {
   return (
     <div className="actions">
-      {ACTIONS.map((a) => (
+      {ACTIONS.map((id) => (
         <button
-          key={a.label}
+          key={id}
           type="button"
           className="action"
-          onClick={() => onPress(a.key.key, a.key.ctrl)}
+          onClick={() => onPress(shortcut(id).keys)}
         >
-          {a.label}
-          <kbd className="kbd">{a.hint}</kbd>
+          {shortcut(id).label}
+          <kbd className="kbd">{capsText(id)}</kbd>
         </button>
       ))}
     </div>

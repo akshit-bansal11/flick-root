@@ -1,4 +1,8 @@
+import { caps, capsText } from "../shortcuts";
 import type { LaunchMode } from "../types";
+
+/** Shortcut keys as one phrase for step text: "Ctrl Shift ↵". */
+const key = capsText;
 
 /** What a step's `done` can look at: the launcher as the user sees it. */
 export interface TutorialView {
@@ -31,32 +35,32 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "apps",
     title: "! Apps and programs",
-    body: "Type ! then a name to open any app or program on your drives. Enter opens it, Ctrl+Enter shows its location, Ctrl+Shift+Enter runs it as admin.",
-    keys: ["!", "Enter", "Ctrl Enter"],
+    body: `Type ! then a name to open any app or program on your drives. ${key("open")} opens it, ${key("location")} shows its location, ${key("admin")} runs it as admin.`,
+    keys: ["!", ...caps("open"), key("location")],
     example: "! notepad",
     done: (v) => v.mode === "run" && v.input.trim() !== "",
   },
   {
     id: "commands",
     title: "> Commands",
-    body: "Math (2+2), units (5 km to mi), currency (250 usd in inr), time zones (5pm ist in pst), web search (g cats), projects, system commands (lock), ports (port 3000, proc chrome: arrow to the row, then Backspace ends it), media (play, pause, play lofi on spotify) and capture (log 250 lunch).",
-    keys: [">", "↑ ↓", "Backspace"],
+    body: `Math (2+2), units (5 km to mi), currency (250 usd in inr), time zones (5pm ist in pst), web search (g cats), projects, system commands (lock), ports (port 3000, proc chrome: arrow to the row, then ${key("kill")} ends it), media (play, pause, play lofi on spotify) and capture (log 250 lunch).`,
+    keys: [">", "↑ ↓", ...caps("kill")],
     example: "> 5 km to mi",
     done: (v) => v.mode === "commands" && v.itemsCount > 0,
   },
   {
     id: "find",
     title: "/ Find",
-    body: "Search files and folders. Enter opens, Ctrl+Enter shows the location, Ctrl+C copies the path. Plain language works too: pdf from yesterday.",
-    keys: ["/", "Enter", "Ctrl Enter", "Ctrl C"],
+    body: `Search files and folders. ${key("open")} opens, ${key("location")} shows the location, ${key("copyPath")} copies the path. Plain language works too: pdf from yesterday.`,
+    keys: ["/", ...caps("open"), key("location"), key("copyPath")],
     example: "/ pdf from yesterday",
     done: (v) => v.mode === "find" && v.input.trim() !== "" && v.itemsCount > 0,
   },
   {
     id: "ask",
     title: "? Ask",
-    body: "Ask your own AI provider. Tab and Shift+Tab switch thinking mode (provider and model), Ctrl+T toggles fast and think. No provider yet? Connect one in Settings > Providers.",
-    keys: ["?", "Tab", "Ctrl T"],
+    body: `Ask your own AI provider. ${key("model")} and ${key("modelPrev")} switch thinking mode (provider and model), ${key("effort")} toggles fast and think, ${key("copyAnswer")} copies the answer. No provider yet? Connect one in Settings > Providers.`,
+    keys: ["?", ...caps("model"), key("effort")],
     example: "? what is a CIDR block",
   },
   {
@@ -68,8 +72,8 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
   {
     id: "settings",
     title: "Themes and Settings",
-    body: "Pick a theme in Settings > Appearance. Open Settings from the tray icon. Press F1 here to replay this tour.",
-    keys: ["F1"],
+    body: `Pick a theme in Settings > Appearance. Open Settings from the tray icon or with ${key("openSettings")}. Press ${key("sheet")} in the launcher to see every keyboard shortcut.`,
+    keys: [...caps("sheet"), key("openSettings")],
   },
   {
     id: "finish",

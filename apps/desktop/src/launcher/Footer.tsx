@@ -1,24 +1,30 @@
 import { APP_DISPLAY_NAME } from "../brand";
+import { type Condition, capsText, inScope, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
-
-const KEYS: Record<LaunchMode, string[]> = {
-  none: ["> commands", "! apps", "/ find", "? ask"],
-  commands: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
-  run: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
-  find: ["↵ open", "Ctrl ↵ location", "Ctrl C copy path"],
-  query: ["↵ ask", "Tab model", "Ctrl T think"],
-};
+import { MODES } from "./reducer";
 
 interface Props {
   mode: LaunchMode;
-  canKill?: boolean;
-  /** Whether the selected item has an admin action (Commands mode shows the hint only then). */
-  canAdmin?: boolean;
+  /** Which conditional hints apply to the current selection. */
+  ctx?: Partial<Record<Condition, boolean>>;
+  /** Shows the short "Copied" confirmation. */
+  copied?: boolean;
 }
 
-export function Footer({ mode, canKill = false, canAdmin = false }: Props) {
-  const base = KEYS[mode].filter((k) => mode !== "commands" || canAdmin || !k.endsWith("admin"));
-  const keys = canKill ? ["⌫ kill", ...base] : base;
+/** Footer hints per mode, straight from the shortcut table. */
+export function footHints(mode: LaunchMode, ctx: Props["ctx"] = {}): string[] {
+  if (mode === "none") {
+    const prefixes = (Object.keys(MODES) as Exclude<LaunchMode, "none">[]).map(
+      (m) => `${MODES[m].prefix} ${MODES[m].label.toLowerCase()}`,
+    );
+    return [...prefixes, `${capsText("sheet")} ${shortcut("sheet").foot}`];
+  }
+  return inScope(mode)
+    .filter((s) => s.foot && (!s.when || ctx[s.when]))
+    .map((s) => `${capsText(s.id)} ${s.foot}`);
+}
+
+export function Footer({ mode, ctx, copied = false }: Props) {
   return (
     <div className="foot">
       <span className="brand">
@@ -26,7 +32,12 @@ export function Footer({ mode, canKill = false, canAdmin = false }: Props) {
         {APP_DISPLAY_NAME}
       </span>
       <span className="keys">
-        {keys.map((k) => (
+        {copied && (
+          <span className="copied" role="status">
+            Copied
+          </span>
+        )}
+        {footHints(mode, ctx).map((k) => (
           <span key={k}>{k}</span>
         ))}
       </span>

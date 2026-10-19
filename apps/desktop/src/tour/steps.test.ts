@@ -44,6 +44,13 @@ describe("tutorial steps", () => {
     expect(autoAdvance(cmd, view({ mode: "run", input: "x", itemsCount: 1 }))).toBe(cmd);
     expect(autoAdvance(at("ask"), view({ mode: "query", input: "hi" }))).toBe(at("ask"));
   });
+  it("step text reads its shortcuts from the table", () => {
+    const body = (id: string) => TUTORIAL_STEPS[at(id)]?.body ?? "";
+    expect(body("find")).toContain("Ctrl Shift C copies the path");
+    expect(body("commands")).toContain("Delete ends it");
+    expect(body("commands")).not.toContain("Backspace");
+    expect(body("settings")).toContain("F1");
+  });
   it("splits an example into prefix and text", () => {
     expect(splitExample("! notepad")).toEqual({ prefix: "!", text: "notepad" });
   });

@@ -1,3 +1,4 @@
+import { idFor, type KeyInput } from "../shortcuts";
 import type {
   AskEvent,
   Effort,
@@ -10,14 +11,10 @@ import type {
 } from "../types";
 import { isProgram } from "./kinds";
 
-export interface KeyInput {
-  key: string;
-  ctrl: boolean;
-  shift: boolean;
-  alt: boolean;
-  /** True when the input has a non-empty text selection (Ctrl+C then copies natively). */
-  hasSelection?: boolean;
-}
+export type { KeyInput };
+
+/** How long the "Copied" confirmation stays up. */
+export const COPIED_MS = 1200;
 
 /** Text captured by Explain this, shown before it is sent. */
 export interface Attachment {
@@ -57,8 +54,12 @@ export interface State {
   /** Thinking modes (provider + model) Tab cycles through; `selected` is null until chosen. */
   thinkingModes: { modes: ThinkingMode[]; selected: string | null };
   pendingConfirm: { commandId: string; token: string } | null;
-  /** True once an arrow key moved the selection; only then does Backspace kill a process row. */
+  /** True once an arrow key moved the selection; only then does Delete end a process row. */
   armed: boolean;
+  /** True while the shortcut sheet covers the body. */
+  sheet: boolean;
+  /** True for ~1.2 s after a copy action, for the "Copied" confirmation. */
+  copied: boolean;
   visible: boolean;
   attachment: Attachment | null;
   /** One muted line under the bar, for example "No text selected". */
@@ -77,6 +78,7 @@ export type Event =
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
+  | { type: "copiedDone" }
   | { type: "shown" }
   | { type: "hidden" };
 
@@ -87,6 +89,8 @@ export type Effect =
   | { type: "kill"; itemId: string }
   | { type: "reveal"; itemId: string }
   | { type: "copyPath"; itemId: string }
+  | { type: "copyText"; text: string }
+  | { type: "clearCopied"; afterMs: number }
   | {
       type: "ask";
       token: number;
@@ -182,6 +186,8 @@ export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]
   thinkingModes: { modes: [], selected: null },
   pendingConfirm: null,
   armed: false,
+  sheet: false,
+  copied: false,
   visible: false,
   attachment: null,
   notice: null,
@@ -244,7 +250,7 @@ function move(s: State, delta: number): Result {
   return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
 
-function enter(s: State, k: KeyInput): Result {
+function enter(s: State): Result {
   if (s.mode === "query") {
     const att = s.attachment;
     // Blocked text is never sent; the Rust ask path refuses it as well.
@@ -284,20 +290,22 @@ function enter(s: State, k: KeyInput): Result {
     const mode = availableModes(s.enabledModes)[s.selected];
     return mode ? enterMode(s, mode) : out(s);
   }
-  return openSelected(s, k);
+  return openSelected(s, "open");
 }
 
+type Intent = "open" | "location" | "admin";
+
 /** Enter on the selected row, shared by keyboard and mouse activation. */
-function openSelected(s: State, k: Pick<KeyInput, "ctrl" | "shift">): Result {
+function openSelected(s: State, intent: Intent): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
-  if (k.ctrl && k.shift) {
+  if (intent === "admin") {
     const admin = s.mode === "commands" || s.mode === "run";
     // Scanned programs only offer Admin when Rust listed it (.exe/.msi).
     if (!admin || (isProgram(item) && !item.actions.some((a) => a.type === "admin"))) return out(s);
     return out(s, { type: "launch", itemId: item.id, admin: true });
   }
-  if (k.ctrl) return out(s, { type: "reveal", itemId: item.id });
+  if (intent === "location") return out(s, { type: "reveal", itemId: item.id });
   const pending = s.pendingConfirm;
   if (pending && pending.commandId === item.id) {
     return out(
@@ -340,41 +348,84 @@ function cycleThinking(s: State, delta: number): Result {
   );
 }
 
+/** Copy confirmation: shows "Copied" and asks the shell to clear it. */
+const copied = (s: State, copy: Effect): Result =>
+  out({ ...s, copied: true }, copy, { type: "clearCopied", afterMs: COPIED_MS });
+
+/** Text a Commands result copies (`payload.value` when it has a copy action), else null. */
+function resultValue(item: Item | undefined): string | null {
+  if (!item?.actions.some((a) => a.type === "copyResult")) return null;
+  const v = (item.payload as { value?: unknown } | null)?.value;
+  return typeof v === "string" ? v : null;
+}
+
+/** Ctrl+1..4: jump to a mode, carrying typed text; disabled modes and the current mode do nothing. */
+function goMode(s: State, mode: Entered): Result {
+  if (mode === s.mode || !availableModes(s.enabledModes).includes(mode)) return out(s);
+  return switchMode(s, mode, s.input);
+}
+
 function key(s: State, k: KeyInput): Result {
-  switch (k.key) {
-    case "ArrowDown":
+  const id = idFor(s.mode, k);
+  if (s.sheet) {
+    // The sheet covers the body: only its toggles and Esc act.
+    return id === "sheet" || id === "sheetAlt" || id === "back"
+      ? out({ ...s, sheet: false })
+      : out(s);
+  }
+  const item = s.items[s.selected];
+  switch (id) {
+    case "sheet":
+    case "sheetAlt":
+      return out({ ...s, sheet: true });
+    case "down":
       return move(s, 1);
-    case "ArrowUp":
+    case "up":
       return move(s, -1);
-    case "Enter":
-      return enter(s, k);
-    case "Tab":
-      // Prefix-only modes; Tab only cycles thinking modes in Ask. Always handled to keep focus.
-      return s.mode === "query" ? cycleThinking(s, k.shift ? -1 : 1) : out(s);
-    case "Escape":
+    case "enterMode":
+    case "open":
+    case "ask":
+      return enter(s);
+    case "location":
+      return openSelected(s, "location");
+    case "admin":
+      return openSelected(s, "admin");
+    case "model":
+    case "modelAlt":
+      return cycleThinking(s, 1);
+    case "modelPrev":
+      return cycleThinking(s, -1);
+    case "back":
       return onEscape(s);
-    case "Backspace": {
-      // Edits text until the user arrowed to a row; then it asks to end that process.
-      const item = s.items[s.selected];
-      if (s.armed && item?.kind === "process") return out(s, { type: "kill", itemId: item.id });
+    case "kill":
+      // Only after an arrow moved the selection; until then Delete edits text.
+      return s.armed && item?.kind === "process"
+        ? out(s, { type: "kill", itemId: item.id })
+        : out(s);
+    case "leave":
       // Empty input inside a mode: step back out to the hint panel.
       return s.input === "" && s.mode !== "none" ? enterMode(s, "none") : out(s);
+    case "copyPath":
+      return item ? copied(s, { type: "copyPath", itemId: item.id }) : out(s);
+    case "copyResult": {
+      const value = resultValue(item);
+      return value === null ? out(s) : copied(s, { type: "copyText", text: value });
     }
-    default:
-      break;
+    case "copyAnswer":
+      return s.query.text === "" ? out(s) : copied(s, { type: "copyText", text: s.query.text });
+    case "removeAttachment":
+      return s.attachment ? out({ ...s, attachment: null, notice: null }) : out(s);
+    case "effort": {
+      const effort: Effort = s.query.effort === "fast" ? "think" : "fast";
+      return out({ ...s, query: { ...s.query, effort } });
+    }
+    case "openSettings":
+      return out(s, { type: "openSettings", section: "general" });
+    default: {
+      const target = ENTERED.find((m) => id === `go:${m}`);
+      return target ? goMode(s, target) : out(s);
+    }
   }
-  const lower = k.key.toLowerCase();
-  if (k.ctrl && !k.shift && lower === "c") {
-    const item = s.items[s.selected];
-    if (s.mode !== "find" || k.hasSelection || !item) return out(s);
-    return out(s, { type: "copyPath", itemId: item.id });
-  }
-  if (k.ctrl && lower === "t" && s.mode === "query") {
-    const effort: Effort = s.query.effort === "fast" ? "think" : "fast";
-    return out({ ...s, query: { ...s.query, effort } });
-  }
-  if (k.ctrl && lower === "p" && s.mode === "query") return cycleThinking(s, 1);
-  return out(s);
 }
 
 function ask(s: State, token: number, e: AskEvent): Result {
@@ -428,7 +479,7 @@ export function reduce(s: State, ev: Event): Result {
       if (!s.items[ev.index]) return out(s);
       return openSelected(
         { ...s, selected: ev.index },
-        { ctrl: ev.ctrl ?? false, shift: ev.shift ?? false },
+        ev.ctrl && ev.shift ? "admin" : ev.ctrl ? "location" : "open",
       );
     case "text":
       return textChange(s, ev.text);
@@ -458,6 +509,8 @@ export function reduce(s: State, ev: Event): Result {
         : out(s);
     case "removeAttachment":
       return out({ ...s, attachment: null, notice: null });
+    case "copiedDone":
+      return out({ ...s, copied: false });
     case "thinkingModes":
       return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
     case "enterMode":

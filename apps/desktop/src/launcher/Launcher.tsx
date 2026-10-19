@@ -7,6 +7,7 @@ import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
 import { HINTS_ID, hintId, LISTBOX_ID, optionId, PrefixHints, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION } from "./reducer";
+import { ShortcutSheet } from "./ShortcutSheet";
 import { useLauncher } from "./useLauncher";
 
 export function Launcher() {
@@ -27,6 +28,7 @@ export function Launcher() {
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
   const none = state.mode === "none";
+  const selected = state.items[state.selected];
   const hints = availableModes(state.enabledModes);
   const hasList = none ? hints.length > 0 : state.items.length > 0;
   const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
@@ -46,7 +48,9 @@ export function Launcher() {
           <Attachment attachment={state.attachment} onRemove={removeAttachment} />
         )}
         {state.mode === "query" && state.notice && <p className="attach-notice">{state.notice}</p>}
-        {state.mode === "query" ? (
+        {state.sheet ? (
+          <ShortcutSheet />
+        ) : state.mode === "query" ? (
           <QueryView
             question={q.status === "idle" ? "" : state.input || DEFAULT_QUESTION}
             provider={q.provider}
@@ -79,11 +83,19 @@ export function Launcher() {
           />
         )}
       </div>
-      {state.mode === "find" && state.items.length > 0 && <Actions onPress={press} />}
+      {!state.sheet && state.mode === "find" && state.items.length > 0 && (
+        <Actions onPress={press} />
+      )}
       <Footer
         mode={state.mode}
-        canKill={state.armed && state.items[state.selected]?.kind === "process"}
-        canAdmin={state.items[state.selected]?.actions.some((a) => a.type === "admin")}
+        copied={state.copied}
+        ctx={{
+          armedProcess: state.armed && selected?.kind === "process",
+          adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,
+          copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,
+          attachment: state.attachment !== null,
+          answer: q.text !== "",
+        }}
       />
     </div>
   );

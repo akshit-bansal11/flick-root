@@ -20,6 +20,7 @@ vi.mock("../ipc", () => ({
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(),
   openLink: vi.fn(() => Promise.resolve()),
+  copyText: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
   onExplainCaptured: vi.fn(() => Promise.resolve(() => {})),
@@ -171,6 +172,47 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Backspace" });
     });
     expect(screen.queryByTestId("mode-chip")).toBeNull();
+  });
+
+  it("F1 opens the shortcut sheet and Esc closes it before anything else", async () => {
+    await mount();
+    await type(">");
+    act(() => {
+      fireEvent.keyDown(window, { key: "F1" });
+    });
+    expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeTruthy();
+    act(() => {
+      fireEvent.keyDown(window, { key: "Escape" });
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Commands");
+    expect(ipc.hideLauncher).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+Shift+C in Find copies the path, shows Copied, then clears it", async () => {
+    vi.useFakeTimers();
+    try {
+      await mount();
+      await type("/");
+      act(() => {
+        fireEvent.keyDown(window, { key: "C", ctrlKey: true, shiftKey: true });
+      });
+      expect(ipc.copyPath).toHaveBeenCalledWith("a");
+      expect(screen.getByRole("status").textContent).toBe("Copied");
+      act(() => {
+        vi.advanceTimersByTime(1300);
+      });
+      expect(screen.queryByRole("status")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("find footer advertises Ctrl Shift C, not Ctrl C", async () => {
+    await mount();
+    await type("/");
+    expect(screen.getAllByText("Ctrl Shift C copy path").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Ctrl C copy path")).toBeNull();
   });
 
   it("Escape on empty input hides the launcher", async () => {

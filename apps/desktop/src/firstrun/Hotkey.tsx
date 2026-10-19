@@ -1,6 +1,12 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import * as api from "../settings/api";
-import { comboFromEvent, conflictMessage, displayCombo, validateCombo } from "./hotkeyRules";
+import {
+  comboFromEvent,
+  conflictMessage,
+  displayCombo,
+  validateCombo,
+  warnCombo,
+} from "./hotkeyRules";
 
 interface Props {
   initial: string;
@@ -86,7 +92,11 @@ export function Hotkey({ initial, initialConflict, explainHotkey, onValid }: Pro
         role="status"
         aria-live="polite"
       >
-        {status.kind === "ok" ? "Shortcut works" : status.kind === "error" ? status.text : ""}
+        {status.kind === "error"
+          ? status.text
+          : [status.kind === "ok" ? "Shortcut works." : "", warnCombo(combo) ?? ""]
+              .filter(Boolean)
+              .join(" ")}
       </p>
     </div>
   );
