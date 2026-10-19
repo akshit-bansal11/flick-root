@@ -35,6 +35,16 @@ const inMode = (mode: LaunchMode, extra: Partial<State> = {}): State => ({
   ...extra,
 });
 
+const tm = ["a/1", "b/2", "c/3"].map((id) => ({
+  id,
+  providerId: id.slice(0, 1),
+  providerLabel: id,
+  model: id.slice(2),
+  local: false,
+}));
+const withModes = (selected: string | null, mode: LaunchMode = "query") =>
+  inMode(mode, { thinkingModes: { modes: tm, selected } });
+
 const streaming = (extra: Partial<State> = {}): State =>
   inMode("query", { query: { ...initialState().query, status: "streaming" }, ...extra });
 
@@ -162,7 +172,7 @@ describe("reducer", () => {
   it("? enters query without searching", () => {
     const r = reduce(initialState(), { type: "text", text: "?" });
     expect(r.state).toMatchObject({ mode: "query", input: "" });
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([{ type: "loadThinkingModes" }]);
   });
 
   it("prefix table is one-to-one", () => {
@@ -279,9 +289,10 @@ describe("reducer", () => {
     expect(reduce(inMode("commands"), k("t", { ctrl: true })).state.query.effort).toBe("fast");
   });
 
-  it("Ctrl+P emits nextProvider in Query only", () => {
-    expect(reduce(inMode("query"), k("p", { ctrl: true })).effects).toEqual([
-      { type: "nextProvider" },
+  it("Ctrl+P cycles thinking modes like Tab, in Query only", () => {
+    const s = inMode("query", { thinkingModes: { modes: tm, selected: "a/1" } });
+    expect(reduce(s, k("p", { ctrl: true })).effects).toEqual([
+      { type: "setThinkingMode", id: "b/2" },
     ]);
     expect(reduce(inMode("commands"), k("p", { ctrl: true })).effects).toEqual([]);
   });
@@ -458,7 +469,7 @@ describe("explain attachment", () => {
     const r = reduce(initialState(), { type: "captured", attachment: att() });
     expect(r.state.mode).toBe("query");
     expect(r.state.attachment?.preview).toBe("some text");
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([{ type: "loadThinkingModes" }]);
   });
 
   it("nothing selected opens empty Query mode with a notice", () => {
@@ -507,5 +518,36 @@ describe("explain attachment", () => {
     expect(
       reduce(captured(att()), { type: "enterMode", mode: "find" }).state.attachment,
     ).toBeNull();
+  });
+});
+
+describe("thinking modes", () => {
+  it("Tab cycles forward and wraps, Shift+Tab back, each persisted", () => {
+    let r = reduce(withModes("a/1"), k("Tab"));
+    expect(r.state.thinkingModes.selected).toBe("b/2");
+    expect(r.effects).toEqual([{ type: "setThinkingMode", id: "b/2" }]);
+    expect(reduce(withModes("c/3"), k("Tab")).state.thinkingModes.selected).toBe("a/1");
+    r = reduce(withModes("a/1"), k("Tab", { shift: true }));
+    expect(r.state.thinkingModes.selected).toBe("c/3");
+  });
+
+  it("is a no-op with one mode, none, or outside query", () => {
+    const one = inMode("query", { thinkingModes: { modes: tm.slice(0, 1), selected: "a/1" } });
+    expect(reduce(one, k("Tab")).effects).toEqual([]);
+    expect(reduce(inMode("query"), k("Tab")).effects).toEqual([]);
+    expect(reduce(withModes("a/1", "find"), k("Tab")).effects).toEqual([]);
+  });
+
+  it("ask carries the selected thinkingMode", () => {
+    const r = reduce({ ...withModes("b/2"), input: "hi" }, k("Enter"));
+    expect(r.effects).toContainEqual(expect.objectContaining({ type: "ask", thinkingMode: "b/2" }));
+  });
+
+  it("entering query loads modes; the event stores them", () => {
+    expect(reduce(initialState(), { type: "enterMode", mode: "query" }).effects).toContainEqual({
+      type: "loadThinkingModes",
+    });
+    const r = reduce(initialState(), { type: "thinkingModes", modes: tm, selected: "c/3" });
+    expect(r.state.thinkingModes.selected).toBe("c/3");
   });
 });

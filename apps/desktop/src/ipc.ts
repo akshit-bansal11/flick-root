@@ -13,6 +13,7 @@ import type {
   SearchResponse,
   SearchScope,
   ShownPayload,
+  ThinkingModes,
 } from "./types";
 
 export const search = (req: { seq: number; mode: Mode; text: string; scope?: SearchScope }) =>
@@ -41,9 +42,14 @@ export function askStream(req: AskRequest, onEvent: (e: AskEvent) => void): Prom
     text: req.text,
     attachment: req.attachment,
     effort: req.effort,
+    thinkingMode: req.thinkingMode,
     onEvent: onEventChannel,
   });
 }
+
+export const listThinkingModes = () => invoke<ThinkingModes>("list_thinking_modes");
+
+export const setThinkingMode = (id: string) => invoke<void>("set_thinking_mode", { id });
 
 export const cancelAsk = (askId: string) => invoke<void>("cancel_ask", { askId });
 

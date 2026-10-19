@@ -19,6 +19,7 @@ vi.mock("./api", () => ({
 const base = {
   enabled: false,
   model: "",
+  models: [] as string[],
   supports_effort: false,
   status: "off",
 } as const;
@@ -130,6 +131,19 @@ describe("Providers", () => {
       target: { value: "https://api.anthropic.com:8443/x" },
     });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("saves extra models as a trimmed list", async () => {
+    await mount([list[0] as ProviderView]);
+    await click("Options");
+    fireEvent.change(screen.getByLabelText("Extra models"), {
+      target: { value: " llama3 , ,qwen " },
+    });
+    await click("Save options");
+    expect(api.setProvider).toHaveBeenCalledWith(
+      "ollama",
+      expect.objectContaining({ models: ["llama3", "qwen"] }),
+    );
   });
 
   it("keeps reordering within a group", async () => {

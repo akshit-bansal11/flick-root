@@ -67,6 +67,8 @@ export function Launcher() {
               text={q.text}
               error={noProvider ? null : q.error}
               noProvider={noProvider}
+              modes={state.thinkingModes.modes}
+              selectedMode={state.thinkingModes.selected}
               thinking={q.thinking}
               streaming={q.status === "streaming"}
               reasoning={q.reasoning}

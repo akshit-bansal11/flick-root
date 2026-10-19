@@ -114,6 +114,8 @@ export interface ProviderView {
   enabled: boolean;
   base_url: string;
   model: string;
+  /** Extra models offered as thinking modes. */
+  models: string[];
   key_required: boolean;
   key: SecretInfo | null;
   supports_effort: boolean;
@@ -124,6 +126,7 @@ export interface ProviderPatch {
   enabled?: boolean;
   baseUrl?: string;
   model?: string;
+  models?: string[];
   effort?: EffortSetting;
 }
 

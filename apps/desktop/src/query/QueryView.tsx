@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { Effort } from "../types";
+import type { Effort, ThinkingMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { Markdown } from "./Markdown";
 import "./query.css";
@@ -15,6 +15,9 @@ interface Props {
   text: string;
   error: string | null;
   noProvider: boolean;
+  /** Thinking modes Tab cycles through; none or one hides the cycling hint. */
+  modes?: ThinkingMode[];
+  selectedMode?: string | null;
   onToggleEffort: () => void;
   onOpenSettings: () => void;
   onOpenLink: (url: string) => void;
@@ -25,12 +28,20 @@ export function QueryView(p: Props) {
   useEffect(() => {
     ref.current?.style.setProperty("--query-max", `${window.screen.availHeight * 0.6}px`);
   }, []);
+  const modes = p.modes ?? [];
+  const mode = modes.find((m) => m.id === p.selectedMode) ?? modes[0];
   if (p.noProvider) return <EmptyState onOpenSettings={p.onOpenSettings} />;
   return (
     <div ref={ref} className="query">
       {p.question && <div className="query-q">{p.question}</div>}
       <div className="query-chips">
-        {p.provider && <span className="query-chip">{p.provider}</span>}
+        {mode ? (
+          <span className="query-chip" aria-live="polite">
+            {`${mode.providerLabel} · ${mode.model} · ${p.effort === "think" ? "Think" : "Fast"}${mode.local ? " · local" : ""}`}
+          </span>
+        ) : (
+          p.provider && <span className="query-chip">{p.provider}</span>
+        )}
         {p.reasoning !== false && (
           <button
             type="button"

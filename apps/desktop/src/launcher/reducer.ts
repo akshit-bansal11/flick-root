@@ -1,4 +1,13 @@
-import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, SearchScope } from "../types";
+import type {
+  AskEvent,
+  Effort,
+  Item,
+  LaunchMode,
+  Mode,
+  Outcome,
+  SearchScope,
+  ThinkingMode,
+} from "../types";
 import { isProgram } from "./kinds";
 
 export interface KeyInput {
@@ -45,6 +54,8 @@ export interface State {
   items: Item[];
   selected: number;
   query: QueryState;
+  /** Thinking modes (provider + model) Tab cycles through; `selected` is null until chosen. */
+  thinkingModes: { modes: ThinkingMode[]; selected: string | null };
   pendingConfirm: { commandId: string; token: string } | null;
   /** True once an arrow key moved the selection; only then does Backspace kill a process row. */
   armed: boolean;
@@ -62,6 +73,7 @@ export type Event =
   | { type: "results"; seq: number; items: Item[] }
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
+  | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
   | { type: "enterMode"; mode: LaunchMode }
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "captured"; attachment: Attachment | null }
@@ -76,9 +88,17 @@ export type Effect =
   | { type: "kill"; itemId: string }
   | { type: "reveal"; itemId: string }
   | { type: "copyPath"; itemId: string }
-  | { type: "ask"; token: number; text: string; attachment?: string; effort: Effort }
+  | {
+      type: "ask";
+      token: number;
+      text: string;
+      attachment?: string;
+      effort: Effort;
+      thinkingMode?: string;
+    }
   | { type: "cancelAsk"; token: number }
-  | { type: "nextProvider" }
+  | { type: "loadThinkingModes" }
+  | { type: "setThinkingMode"; id: string }
   | { type: "hide" }
   | { type: "openSettings"; section: string };
 
@@ -160,6 +180,7 @@ export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]
     model: null,
     reasoning: true,
   },
+  thinkingModes: { modes: [], selected: null },
   pendingConfirm: null,
   armed: false,
   overlay: { firstRun: false },
@@ -199,7 +220,8 @@ function switchMode(s: State, mode: LaunchMode, input: string): Result {
     },
   };
   const r = search(cleared, mode, input);
-  return { state: r.state, effects: [...cancel, ...r.effects] };
+  const load: Effect[] = mode === "query" ? [{ type: "loadThinkingModes" }] : [];
+  return { state: r.state, effects: [...cancel, ...r.effects, ...load] };
 }
 
 function enterMode(s: State, mode: LaunchMode): Result {
@@ -247,7 +269,14 @@ function enter(s: State, k: KeyInput): Result {
         },
       },
       ...cancel,
-      { type: "ask", token, text, attachment: att?.preview, effort: s.query.effort },
+      {
+        type: "ask",
+        token,
+        text,
+        attachment: att?.preview,
+        effort: s.query.effort,
+        thinkingMode: s.thinkingModes.selected ?? undefined,
+      },
     );
   }
   if (s.mode === "none") {
@@ -294,6 +323,22 @@ function onEscape(s: State): Result {
   return out(s, { type: "hide" });
 }
 
+/** Select the next or previous thinking mode (wraps); persisted through setThinkingMode. */
+function cycleThinking(s: State, delta: number): Result {
+  const { modes, selected } = s.thinkingModes;
+  if (modes.length < 2) return out(s);
+  const at = Math.max(
+    0,
+    modes.findIndex((m) => m.id === selected),
+  );
+  const next = modes[(at + delta + modes.length) % modes.length];
+  if (!next) return out(s);
+  return out(
+    { ...s, thinkingModes: { modes, selected: next.id } },
+    { type: "setThinkingMode", id: next.id },
+  );
+}
+
 function key(s: State, k: KeyInput): Result {
   switch (k.key) {
     case "ArrowDown":
@@ -303,8 +348,8 @@ function key(s: State, k: KeyInput): Result {
     case "Enter":
       return enter(s, k);
     case "Tab":
-      // No tab switcher: modes are prefix-only. Handled so focus stays in the input.
-      return out(s);
+      // Prefix-only modes; Tab only cycles thinking modes in Ask. Always handled to keep focus.
+      return s.mode === "query" ? cycleThinking(s, k.shift ? -1 : 1) : out(s);
     case "Escape":
       return onEscape(s);
     case "Backspace": {
@@ -327,7 +372,7 @@ function key(s: State, k: KeyInput): Result {
     const effort: Effort = s.query.effort === "fast" ? "think" : "fast";
     return out({ ...s, query: { ...s.query, effort } });
   }
-  if (k.ctrl && lower === "p" && s.mode === "query") return out(s, { type: "nextProvider" });
+  if (k.ctrl && lower === "p" && s.mode === "query") return cycleThinking(s, 1);
   return out(s);
 }
 
@@ -395,20 +440,25 @@ export function reduce(s: State, ev: Event): Result {
       return outcome(s, ev.commandId, ev.outcome);
     case "captured":
       return s.enabledModes.includes("query")
-        ? out({
-            ...s,
-            mode: "query",
-            input: "",
-            items: [],
-            selected: 0,
-            armed: false,
-            pendingConfirm: null,
-            attachment: ev.attachment,
-            notice: ev.attachment ? null : "No text selected",
-          })
+        ? out(
+            {
+              ...s,
+              mode: "query",
+              input: "",
+              items: [],
+              selected: 0,
+              armed: false,
+              pendingConfirm: null,
+              attachment: ev.attachment,
+              notice: ev.attachment ? null : "No text selected",
+            },
+            { type: "loadThinkingModes" },
+          )
         : out(s);
     case "removeAttachment":
       return out({ ...s, attachment: null, notice: null });
+    case "thinkingModes":
+      return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
     case "enterMode":
       return enterMode(s, ev.mode);
     case "enabledModes":
@@ -416,13 +466,19 @@ export function reduce(s: State, ev: Event): Result {
     case "shown":
       return out({
         ...initialState(s.enabledModes),
+        thinkingModes: s.thinkingModes,
         seq: s.seq,
         askToken: s.askToken,
         visible: true,
       });
     case "hidden":
       return out(
-        { ...initialState(s.enabledModes), seq: s.seq, askToken: s.askToken },
+        {
+          ...initialState(s.enabledModes),
+          thinkingModes: s.thinkingModes,
+          seq: s.seq,
+          askToken: s.askToken,
+        },
         ...(s.query.status === "streaming"
           ? [{ type: "cancelAsk", token: s.askToken } as const]
           : []),

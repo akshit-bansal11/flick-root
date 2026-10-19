@@ -6,7 +6,7 @@ const KEYS: Record<LaunchMode, string[]> = {
   commands: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
   run: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
   find: ["↵ open", "Ctrl ↵ location", "Ctrl C copy path"],
-  query: ["↵ ask", "Ctrl T effort", "Ctrl P provider"],
+  query: ["↵ ask", "Tab model", "Ctrl T think"],
 };
 
 export function Footer({ mode, canKill = false }: { mode: LaunchMode; canKill?: boolean }) {

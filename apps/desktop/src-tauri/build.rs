@@ -11,6 +11,8 @@ fn main() {
         "run_system_command",
         "ask_stream",
         "cancel_ask",
+        "list_thinking_modes",
+        "set_thinking_mode",
         "get_settings",
         "set_general",
         "set_roots",

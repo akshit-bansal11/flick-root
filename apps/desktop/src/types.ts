@@ -70,6 +70,21 @@ export interface AskRequest {
   text: string;
   attachment?: string;
   effort: Effort;
+  thinkingMode?: string;
+}
+
+/** One selectable provider + model, from `list_thinking_modes`. */
+export interface ThinkingMode {
+  id: string;
+  providerId: string;
+  providerLabel: string;
+  model: string;
+  local: boolean;
+}
+
+export interface ThinkingModes {
+  modes: ThinkingMode[];
+  selected: string | null;
 }
 
 export type AskEvent =

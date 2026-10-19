@@ -62,6 +62,7 @@ export const setProvider = (id: string, patch: ProviderPatch) =>
     enabled: patch.enabled,
     baseUrl: patch.baseUrl,
     model: patch.model,
+    models: patch.models,
     effort: patch.effort,
   });
 export const setProviderOrder = (ids: string[]) => invoke<void>("set_provider_order", { ids });

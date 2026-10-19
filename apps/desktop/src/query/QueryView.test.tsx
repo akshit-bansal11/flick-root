@@ -29,6 +29,19 @@ afterEach(() => {
 });
 
 describe("QueryView", () => {
+  it("shows a live chip for the selected thinking mode", () => {
+    const modes = [
+      { id: "a/m1", providerId: "a", providerLabel: "Ollama", model: "m1", local: true },
+      { id: "b/m2", providerId: "b", providerLabel: "OpenAI", model: "m2", local: false },
+    ];
+    const c = render({ modes, selectedMode: "b/m2" });
+    const chip = c.querySelector(".query-chip");
+    expect(chip?.textContent).toBe("OpenAI · m2 · Fast");
+    expect(chip?.getAttribute("aria-live")).toBe("polite");
+    act(() => root?.render(<QueryView {...base} modes={modes} selectedMode="a/m1" />));
+    expect(c.querySelector(".query-chip")?.textContent).toBe("Ollama · m1 · Fast · local");
+  });
+
   it("appends streamed deltas in order", () => {
     const c = render({ text: "Hel" });
     act(() => root?.render(<QueryView {...base} text="Hello, world" />));

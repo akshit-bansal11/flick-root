@@ -27,6 +27,8 @@ pub struct ProviderView {
     pub base_url: String,
     /// Model name.
     pub model: String,
+    /// Extra models offered as thinking modes.
+    pub models: Vec<String>,
     /// Whether a key is required.
     pub key_required: bool,
     /// Stored key info, if any.
@@ -109,6 +111,7 @@ fn view(vault: &SecretVault, cfg: &Config, id: &str, e: &ProviderEntry) -> Provi
         enabled: e.enabled,
         base_url: e.base_url.clone(),
         model: e.model.clone(),
+        models: e.models.clone(),
         key_required: pr.key_required,
         key,
         supports_effort: pr.supports_effort,
@@ -190,12 +193,16 @@ pub async fn probe_providers(
     Ok(out)
 }
 
+const MAX_MODELS: usize = 20;
+const MAX_MODEL_LEN: usize = 100;
+
 /// Fields `set_provider` may change.
 #[derive(Debug, Default)]
 pub(crate) struct Patch {
     pub enabled: Option<bool>,
     pub base_url: Option<String>,
     pub model: Option<String>,
+    pub models: Option<Vec<String>>,
     pub effort: Option<String>,
 }
 
@@ -229,6 +236,14 @@ pub(crate) fn apply_patch(
     }
     if let Some(m) = patch.model {
         new.model = m.trim().to_owned();
+    }
+    if let Some(ms) = patch.models {
+        new.models = ms
+            .iter()
+            .map(|m| m.trim().chars().take(MAX_MODEL_LEN).collect::<String>())
+            .filter(|m| !m.is_empty())
+            .take(MAX_MODELS)
+            .collect();
     }
     if let Some(e) = patch.effort {
         new.effort = match e.as_str() {
@@ -273,6 +288,7 @@ pub async fn set_provider(
     enabled: Option<bool>,
     base_url: Option<String>,
     model: Option<String>,
+    models: Option<Vec<String>>,
     effort: Option<String>,
 ) -> Result<ProviderView, CommandError> {
     let s = Arc::clone(&state);
@@ -281,6 +297,7 @@ pub async fn set_provider(
             enabled,
             base_url,
             model,
+            models,
             effort,
         };
         s.update_config(|cfg| apply_patch(&s.vault, cfg, &id, patch))?;

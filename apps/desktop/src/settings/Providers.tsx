@@ -46,6 +46,8 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
   const [model, setModel] = useState(p.model);
   useEffect(() => setUrl(p.base_url), [p.base_url]);
   useEffect(() => setModel(p.model), [p.model]);
+  const [extra, setExtra] = useState(p.models.join(", "));
+  useEffect(() => setExtra(p.models.join(", ")), [p.models]);
   const [dialog, setDialog] = useState<"add" | "replace" | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const hostChanged = hostOf(url) !== hostOf(p.base_url);
@@ -103,10 +105,29 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
             Model
             <input value={model} onChange={(e) => setModel(e.target.value)} />
           </label>
+          <label>
+            Extra models
+            <input
+              value={extra}
+              placeholder="comma-separated"
+              onChange={(e) => setExtra(e.target.value)}
+            />
+          </label>
           <div className="pv-head">
             <button
               type="button"
-              onClick={() => run(() => api.setProvider(p.id, { baseUrl: url, model }))}
+              onClick={() =>
+                run(() =>
+                  api.setProvider(p.id, {
+                    baseUrl: url,
+                    model,
+                    models: extra
+                      .split(",")
+                      .map((m) => m.trim())
+                      .filter(Boolean),
+                  }),
+                )
+              }
             >
               Save options
             </button>

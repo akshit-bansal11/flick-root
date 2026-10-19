@@ -54,8 +54,14 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           break;
         case "ask":
           ipc
-            .askStream({ text: e.text, attachment: e.attachment, effort: e.effort }, (event) =>
-              dispatch({ type: "ask", token: e.token, event }),
+            .askStream(
+              {
+                text: e.text,
+                attachment: e.attachment,
+                effort: e.effort,
+                thinkingMode: e.thinkingMode,
+              },
+              (event) => dispatch({ type: "ask", token: e.token, event }),
             )
             .then((id) => {
               if (cancelled.current.delete(e.token)) ipc.cancelAsk(id).catch(warn);
@@ -70,8 +76,14 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
             ipc.cancelAsk(ask.current.id).catch(warn);
           else cancelled.current.add(e.token);
           break;
-        // Provider switching is T2.8.
-        case "nextProvider":
+        case "loadThinkingModes":
+          ipc
+            .listThinkingModes()
+            .then((r) => dispatch({ type: "thinkingModes", modes: r.modes, selected: r.selected }))
+            .catch(warn);
+          break;
+        case "setThinkingMode":
+          ipc.setThinkingMode(e.id).catch(warn);
           break;
       }
     }

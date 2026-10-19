@@ -17,6 +17,8 @@
     "allow-run-system-command",
     "allow-ask-stream",
     "allow-cancel-ask",
+    "allow-list-thinking-modes",
+    "allow-set-thinking-mode",
     "allow-get-first-run",
     "allow-complete-first-run",
     "allow-probe-providers"
