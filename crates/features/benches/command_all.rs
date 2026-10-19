@@ -1,4 +1,4 @@
-//! Command search over 2,000 apps with every v0.0.1 feature running (budget 2 ms per query).
+//! Command search over 2,000 apps with every built-in feature running (budget 2 ms per query).
 
 use arc_swap::ArcSwap;
 use criterion::{Criterion, criterion_group, criterion_main};
@@ -158,6 +158,10 @@ fn bench(c: &mut Criterion) {
         "5pm ist in pst",
         "notepad",
         "zzzz",
+        "port 3000",
+        "proc chrome",
+        "play lofi on spotify",
+        "log 250 lunch #food",
     ] {
         let i = input(t);
         c.bench_function(&format!("command_all/{t}"), |b| {

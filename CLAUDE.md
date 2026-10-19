@@ -13,7 +13,7 @@ Free, open-source, keyboard-first Windows launcher: Command, Find and Query mode
 
 - Desktop dev: `pnpm --filter desktop tauri dev`
 - Rust: `cargo check -p <crate>`, `cargo test -p <crate>`, `cargo clippy --all-targets -- -D warnings`, `cargo fmt --check`
-- Benches: `cargo bench -p launcher-core`, `cargo bench -p index-files`
+- Benches, on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (never run them locally)
 - UI: `pnpm --filter desktop typecheck`, `pnpm --filter desktop test`, `pnpm lint`
 - Web: `pnpm --filter web dev`, `pnpm --filter web build`
 - Release: `pwsh -File scripts/release.ps1 <version>` (needs HEAD pushed and green in CI; builds nothing locally)

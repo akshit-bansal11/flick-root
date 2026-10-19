@@ -1,0 +1,32 @@
+name: Bench
+
+# Benches run here, never on a dev laptop. Trigger: gh workflow run bench.yml
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: bench
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Run benches
+        run: cargo bench -p features -p launcher-core -p index-files -- --noplot 2>&1 | Tee-Object -FilePath bench.txt
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bench
+          path: |
+            bench.txt
+            target/criterion/**/new/estimates.json
+          retention-days: 14

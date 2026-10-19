@@ -67,3 +67,23 @@ harness = false
 [[bench]]
 name = "command_all"
 harness = false
+
+[[bench]]
+name = "nlfind"
+harness = false
+
+[[bench]]
+name = "ports"
+harness = false
+
+[[bench]]
+name = "media"
+harness = false
+
+[[bench]]
+name = "explain"
+harness = false
+
+[[bench]]
+name = "capture"
+harness = false
