@@ -24,6 +24,7 @@ impl Backend for Gsmtc {
         win::media::now_playing().map_err(|e| e.to_string())
     }
     fn open(&self, url: &str) -> Result<(), String> {
+        let _com = index_apps::com::ComGuard::new().map_err(|e| e.to_string())?;
         index_apps::launch::open_path(Path::new(url)).map_err(|e| e.to_string())
     }
 }

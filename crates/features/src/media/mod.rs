@@ -269,7 +269,17 @@ impl Media {
         match arg("sp") {
             "play" => match api.play_query(arg("q")).await.map_err(fe)? {
                 Played::Api => {}
-                Played::Fallback(uri) => self.open(&uri).await?,
+                Played::Fallback(uri) => {
+                    // The URI comes from the API: open only a track link, else the search link.
+                    let uri = if uri.starts_with("spotify:track:")
+                        || uri.starts_with("spotify:search:")
+                    {
+                        uri
+                    } else {
+                        links::spotify(arg("q"))
+                    };
+                    self.open(&uri).await?
+                }
             },
             "queue" => api.queue(arg("q")).await.map_err(fe)?,
             "like" => api.like().await.map_err(fe)?,

@@ -159,9 +159,14 @@ impl DecisionEngine for SystemOneEngine {
         let mut req = Self::client(self.timeout)?
             .post(url.clone())
             .json(&build_request(self.id, q));
+        // The phrase and file names must not go over plain http to a remote either.
+        let bound = self
+            .key_host
+            .as_deref()
+            .or_else(|| url.host_str())
+            .unwrap_or_default();
+        check_url(&url, bound).map_err(|e| EngineError::Unreachable(e.to_string()))?;
         if let Some(key) = &self.bearer {
-            let bound = self.key_host.as_deref().unwrap_or_default();
-            check_url(&url, bound).map_err(|e| EngineError::Unreachable(e.to_string()))?;
             let mut v =
                 reqwest::header::HeaderValue::from_str(&format!("Bearer {}", key.expose_secret()))
                     .map_err(|_| EngineError::Unreachable("key not header-safe".into()))?;
@@ -293,6 +298,18 @@ mod tests {
         let e = eng(&s, true, "other.example").choose(&q()).await;
         assert!(matches!(e, Err(EngineError::Unreachable(_))));
         assert!(s.received_requests().await.unwrap().is_empty());
+    }
+    #[tokio::test]
+    async fn plain_http_remote_refused_even_without_key() {
+        let e = SystemOneEngine {
+            id: "laya",
+            base_url: Url::parse("http://example.invalid").unwrap(),
+            key_host: None,
+            bearer: None,
+            timeout: Duration::from_millis(400),
+        };
+        let r = e.choose(&q()).await;
+        assert!(matches!(r, Err(EngineError::Unreachable(m)) if m.contains("http")));
     }
     #[tokio::test]
     async fn probe_reachable() {

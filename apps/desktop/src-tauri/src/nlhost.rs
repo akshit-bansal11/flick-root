@@ -3,7 +3,7 @@ use crate::state::AppState;
 use features::NlHost;
 use index_files::{FileHit, FindQuery};
 use secrecy::SecretString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Weak;
 
 /// Holds the state weakly so the registry (owned by the state) does not keep it alive.
@@ -25,6 +25,13 @@ impl NlHost for ShellHost {
             .iter()
             .find(|r| r.label.eq_ignore_ascii_case(label))
             .map(|r| r.id)
+    }
+
+    fn folder_path(&self, label: &str) -> Option<PathBuf> {
+        index_files::scan::default_roots()
+            .into_iter()
+            .find(|r| r.label.eq_ignore_ascii_case(label))
+            .map(|r| r.path)
     }
 
     fn open(&self, path: &Path) -> Result<(), String> {

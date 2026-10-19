@@ -38,6 +38,7 @@ const list: EngineView[] = [
     needs_key: true,
     order: 3,
   }),
+  mk("custom", "Custom", { order: 4 }),
 ];
 
 let root: Root | undefined;
@@ -61,7 +62,7 @@ describe("Decision", () => {
     expect((screen.getByLabelText("Enable Built-in parser") as HTMLInputElement).checked).toBe(
       true,
     );
-    for (const t of ["Laya", "Kev", "Your AI provider", "Jev"]) {
+    for (const t of ["Laya", "Kev", "Your AI provider", "Jev", "Custom"]) {
       expect((screen.getByLabelText(`Enable ${t}`) as HTMLInputElement).checked).toBe(false);
     }
   });

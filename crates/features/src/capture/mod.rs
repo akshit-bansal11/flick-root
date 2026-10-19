@@ -398,6 +398,9 @@ impl Capture {
     /// Asks the Query provider to fill empty fields, only when one is enabled. Failures mean
     /// "capture the raw text".
     async fn fill(&self, p: &mut Parsed, rest: &str, ctx: &FeatureCtx) {
+        if !fill_allowed(&ctx.config.load()) {
+            return;
+        }
         let Some(provider) = ctx.providers.load().first() else {
             return;
         };
@@ -586,6 +589,11 @@ impl Feature for Capture {
         self.deliver(&cfg, id, &p).await?;
         Ok(Outcome::HideLauncher)
     }
+}
+
+/// Text goes to a model provider only while Query mode is on.
+fn fill_allowed(cfg: &Config) -> bool {
+    cfg.modes.query.enabled
 }
 
 #[cfg(test)]

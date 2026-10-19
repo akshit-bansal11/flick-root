@@ -258,3 +258,12 @@ fn query_is_cheap() {
     let per = t.elapsed() / 200;
     assert!(per < Duration::from_micros(500), "{per:?}");
 }
+
+#[test]
+fn fill_needs_query_mode_on() {
+    let mut cfg = Config::default();
+    cfg.modes.query.enabled = true;
+    assert!(fill_allowed(&cfg));
+    cfg.modes.query.enabled = false;
+    assert!(!fill_allowed(&cfg));
+}

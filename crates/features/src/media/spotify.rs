@@ -163,6 +163,8 @@ pub async fn wait_callback(
     let run = async {
         loop {
             let Ok((mut s, _)) = listener.accept().await else {
+                // A failing accept (e.g. out of handles) must not spin the CPU.
+                tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             };
             let mut buf = vec![0u8; 8192];
@@ -253,6 +255,8 @@ pub struct Spotify {
     api: String,
     connected: AtomicBool,
     token: tokio::sync::Mutex<Option<Access>>,
+    /// Called after the connection is dropped because Spotify revoked the grant.
+    on_lost: parking_lot::Mutex<Option<Arc<dyn Fn() + Send + Sync>>>,
 }
 
 impl std::fmt::Debug for Spotify {
@@ -262,6 +266,9 @@ impl std::fmt::Debug for Spotify {
             .finish_non_exhaustive()
     }
 }
+
+/// Marker for a 400 `invalid_grant` token response.
+const INVALID_GRANT: &str = "Spotify rejected the saved sign-in - connect again";
 
 fn net(_: reqwest::Error) -> SpotifyError {
     SpotifyError::Network
@@ -294,7 +301,13 @@ impl Spotify {
             api: API_BASE.into(),
             connected: AtomicBool::new(false),
             token: tokio::sync::Mutex::new(None),
+            on_lost: parking_lot::Mutex::new(None),
         })
+    }
+
+    /// Registers what to run when a refresh finds the grant revoked and the connection is dropped.
+    pub fn on_lost(&self, f: impl Fn() + Send + Sync + 'static) {
+        *self.on_lost.lock() = Some(Arc::new(f));
     }
 
     #[cfg(test)]
@@ -359,6 +372,9 @@ impl Spotify {
             .await
             .ok_or(SpotifyError::Network)?;
         if !status.is_success() {
+            if status.as_u16() == 400 && String::from_utf8_lossy(&body).contains("invalid_grant") {
+                return Err(SpotifyError::Other(INVALID_GRANT));
+            }
             return Err(SpotifyError::Api(status.as_u16()));
         }
         serde_json::from_slice(&body).map_err(|_| SpotifyError::Other("bad token response"))
@@ -472,13 +488,30 @@ impl Spotify {
             .await?
             .ok_or(SpotifyError::NotConnected)?;
         let client_id = self.config.load().integrations.spotify.client_id.clone();
-        let t = self
+        let t = match self
             .token_request(&[
                 ("grant_type", "refresh_token"),
                 ("refresh_token", stored.expose_secret()),
                 ("client_id", &client_id),
             ])
-            .await?;
+            .await
+        {
+            Ok(t) => t,
+            Err(SpotifyError::Other(INVALID_GRANT)) => {
+                // Revoked or issued for another Client ID: forget it and tell the UI.
+                let v = Arc::clone(&self.vault);
+                blocking(move || v.delete(&refresh_name()?).map_err(|_| SpotifyError::Vault))
+                    .await??;
+                *g = None;
+                self.connected.store(false, Ordering::Relaxed);
+                let cb = self.on_lost.lock().clone();
+                if let Some(cb) = cb {
+                    cb();
+                }
+                return Err(SpotifyError::NotConnected);
+            }
+            Err(e) => return Err(e),
+        };
         if let Some(r) = t.refresh_token.clone() {
             self.store_refresh(r).await?;
         }
@@ -779,6 +812,31 @@ mod tests {
         assert_eq!(
             (t.access_token.as_str(), t.refresh_token.as_deref()),
             ("acc", Some("ref"))
+        );
+    }
+
+    #[tokio::test]
+    async fn invalid_grant_disconnects_and_notifies() {
+        let m = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/token"))
+            .respond_with(
+                ResponseTemplate::new(400).set_body_json(json!({ "error": "invalid_grant" })),
+            )
+            .mount(&m)
+            .await;
+        let s = sp(&m.uri());
+        put_refresh(&s, "old");
+        let hits = Arc::new(AtomicBool::new(false));
+        let h = hits.clone();
+        s.on_lost(move || h.store(true, Ordering::Relaxed));
+        let e = s.devices().await.unwrap_err();
+        assert!(matches!(e, SpotifyError::NotConnected));
+        assert!(hits.load(Ordering::Relaxed));
+        assert!(
+            s.vault
+                .integration_secret("spotify.refresh", ACCOUNTS_HOST)
+                .is_none()
         );
     }
 

@@ -87,8 +87,17 @@ fn engine(index: usize, p: f32) -> (Arc<Fake>, Vec<Box<dyn DecisionEngine>>) {
 }
 
 async fn run(h: &Arc<Host>, store: &Store, engines: &[Box<dyn DecisionEngine>]) -> Outcome {
+    run_phrase(h, store, engines, PHRASE).await
+}
+
+async fn run_phrase(
+    h: &Arc<Host>,
+    store: &Store,
+    engines: &[Box<dyn DecisionEngine>],
+    phrase: &str,
+) -> Outcome {
     let today = NaiveDate::from_ymd_opt(2026, 10, 19).unwrap();
-    resolve(h.clone(), store, PHRASE, today, engines, 0.6, 8)
+    resolve(h.clone(), store, phrase, today, engines, 0.6, 8)
         .await
         .unwrap()
 }
@@ -177,6 +186,7 @@ async fn engine_choice_ignored_below_threshold_or_unsafe_type() {
 
 #[tokio::test]
 async fn cache_hit_skips_search() {
+    const PHRASE: &str = "the tax invoice pdf";
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("cached.pdf");
     std::fs::write(&file, b"x").unwrap();
@@ -190,16 +200,17 @@ async fn cache_hit_skips_search() {
     });
     s.flush();
     let h = host(vec![hit("other.pdf", 300)]);
-    assert_eq!(run(&h, &s, &[]).await, Outcome::HideLauncher);
+    assert_eq!(run_phrase(&h, &s, &[], PHRASE).await, Outcome::HideLauncher);
     assert_eq!(opened(&h), ["cached.pdf"]);
     assert!(h.queries.lock().is_empty());
 }
 
 #[tokio::test]
 async fn auto_open_is_cached() {
+    const PHRASE: &str = "the tax invoice pdf";
     let h = host(vec![hit("tax-invoice.pdf", 300)]);
     let s = Store::open_in_memory().unwrap();
-    run(&h, &s, &[]).await;
+    run_phrase(&h, &s, &[], PHRASE).await;
     s.flush();
     let c = s.nl_cache_get(&cache_key(PHRASE)).unwrap().unwrap();
     assert_eq!(c.engine, "parser");
@@ -222,6 +233,78 @@ async fn roots_restrict_the_query() {
     .await
     .unwrap();
     assert_eq!(h.queries.lock()[0].root, Some(2));
+}
+
+#[tokio::test]
+async fn relative_date_phrases_skip_the_cache() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("cached.pdf");
+    std::fs::write(&file, b"x").unwrap();
+    let s = Store::open_in_memory().unwrap();
+    s.nl_cache_put(NlCacheEntry {
+        cache_key: cache_key(PHRASE),
+        phrase: PHRASE.into(),
+        chosen_path: file.to_string_lossy().into_owned(),
+        engine: "laya".into(),
+        p: None,
+    });
+    s.flush();
+    let h = host(vec![hit("tax-invoice.pdf", 300)]);
+    run(&h, &s, &[]).await;
+    assert_eq!(opened(&h), ["tax-invoice.pdf"]);
+    s.flush();
+    // The stale entry is neither read nor overwritten.
+    let c = s.nl_cache_get(&cache_key(PHRASE)).unwrap().unwrap();
+    assert_eq!(c.engine, "laya");
+}
+
+struct MovedHost(Host);
+
+impl NlHost for MovedHost {
+    fn find(&self, q: &FindQuery) -> Vec<FileHit> {
+        self.0.find(q)
+    }
+    fn root_id(&self, _: &str) -> Option<u8> {
+        None
+    }
+    fn folder_path(&self, label: &str) -> Option<PathBuf> {
+        (label == "Downloads").then(|| PathBuf::from(r"C:\Users\a\Downloads"))
+    }
+    fn open(&self, path: &Path) -> Result<(), String> {
+        self.0.open(path)
+    }
+    fn engine_key(&self, _: &str, _: &str) -> Option<SecretString> {
+        None
+    }
+}
+
+#[tokio::test]
+async fn known_folder_inside_a_drive_root_is_filtered_by_path() {
+    let mut outside = hit("elsewhere.pdf", 500);
+    outside.path = PathBuf::from(r"D:\other\elsewhere.pdf");
+    let h = Arc::new(MovedHost(Host {
+        hits: vec![outside, hit("inside.pdf", 300)],
+        opened: Mutex::default(),
+        queries: Mutex::default(),
+    }));
+    let s = Store::open_in_memory().unwrap();
+    let today = NaiveDate::from_ymd_opt(2026, 10, 19).unwrap();
+    let out = resolve(
+        h.clone(),
+        &s,
+        "invoice pdf in downloads folder",
+        today,
+        &[],
+        0.6,
+        8,
+    )
+    .await
+    .unwrap();
+    assert_eq!(out, Outcome::HideLauncher);
+    let opened = h.0.opened.lock();
+    assert_eq!(opened.len(), 1);
+    assert!(opened[0].ends_with("inside.pdf"));
+    assert_eq!(h.0.queries.lock()[0].root, None);
 }
 
 fn input(text: &str, mode: Mode) -> Input {

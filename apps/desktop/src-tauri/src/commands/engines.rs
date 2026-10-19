@@ -17,11 +17,12 @@ const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
 const CACHE_TTL: Duration = Duration::from_secs(60);
 
 /// Known engine ids and titles, in default order.
-const ENGINES: [(&str, &str); 4] = [
+const ENGINES: [(&str, &str); 5] = [
     ("laya", "Laya"),
     ("kev", "Kev"),
     ("llm", "Your AI provider"),
     ("jev", "Jev"),
+    ("custom", "Custom"),
 ];
 
 /// One engine as the settings UI sees it. Carries no secret value.
@@ -224,14 +225,32 @@ fn invalid_url() -> CommandError {
     )
 }
 
-/// Applies `patch` to engine `id`. On a host change the key bound to the old host is
-/// deleted (ADR-011 rule 6) and the binding moves to the new host.
+/// Applies the patch and deletes an orphaned key at once. Tests only: the command saves first.
+#[cfg(test)]
 pub(crate) fn apply_patch(
     vault: &SecretVault,
     cfg: &mut Config,
     id: &str,
     patch: Patch,
 ) -> Result<(), CommandError> {
+    for n in plan(vault, cfg, id, patch)? {
+        vault
+            .delete(&n)
+            .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
+    }
+    Ok(())
+}
+
+/// Applies `patch` to engine `id`. On a host change the key bound to the old host is
+/// orphaned (ADR-011 rule 6) and returned for deletion once the config is saved; the binding
+/// moves to the new host.
+pub(crate) fn plan(
+    vault: &SecretVault,
+    cfg: &mut Config,
+    id: &str,
+    patch: Patch,
+) -> Result<Vec<SecretName>, CommandError> {
+    let mut doomed = Vec::new();
     if !ENGINES.iter().any(|(i, _)| *i == id) {
         return Err(bad("unknown_engine", "no such engine"));
     }
@@ -267,14 +286,15 @@ pub(crate) fn apply_patch(
         if old_host != new.key_host
             && let Some(Ok(name)) = old_host.map(|h| SecretName::parse(&format!("engine.{id}@{h}")))
         {
-            vault
-                .delete(&name)
-                .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
+            doomed.push(name);
         }
     }
     if let Some(v) = patch.enabled {
         if v && id == "jev" && !key_present(vault, id, &new) {
             return Err(bad("key_needed", "add a key before enabling Jev"));
+        }
+        if v && id == "custom" && new.base_url.as_deref().is_none_or(|u| u.trim().is_empty()) {
+            return Err(bad("url_needed", "set a base URL before enabling Custom"));
         }
         new.enabled = v;
     }
@@ -288,7 +308,7 @@ pub(crate) fn apply_patch(
         cfg.decision.threshold = t;
     }
     cfg.decision.engines.insert(id.to_owned(), new);
-    Ok(())
+    Ok(doomed)
 }
 
 /// Patches one engine (or the global candidates/threshold), saves the config and returns
@@ -312,7 +332,13 @@ pub async fn set_engine(
             threshold,
             timeout_ms,
         };
-        s.update_config(|cfg| apply_patch(&s.vault, cfg, &id, patch))?;
+        let doomed = s.update_config(|cfg| plan(&s.vault, cfg, &id, patch))?;
+        // Only after the save: a failed save must not lose the stored key.
+        for n in doomed {
+            s.vault
+                .delete(&n)
+                .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
+        }
         *CACHE.lock() = None;
         Ok(views(&s.vault, &s.config.load()))
     })
@@ -348,7 +374,7 @@ mod tests {
     #[test]
     fn views_cover_all_engines_off() {
         let all = views(&vault(), &Config::default());
-        assert_eq!(all.len(), 4);
+        assert_eq!(all.len(), 5);
         assert!(all.iter().all(|v| !v.enabled && !v.key_present));
         assert!(all.iter().any(|v| v.id == "jev" && v.needs_key));
     }
@@ -396,6 +422,20 @@ mod tests {
         jev_key(&v);
         apply_patch(&v, &mut cfg, "jev", on()).unwrap();
         assert!(cfg.decision.engines["jev"].enabled);
+    }
+
+    #[test]
+    fn custom_needs_url_to_enable() {
+        let (v, mut cfg) = (vault(), Config::default());
+        let on = || Patch {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let e = apply_patch(&v, &mut cfg, "custom", on()).unwrap_err();
+        assert_eq!(e.code, "url_needed");
+        apply_patch(&v, &mut cfg, "custom", url("https://engine.example.org")).unwrap();
+        apply_patch(&v, &mut cfg, "custom", on()).unwrap();
+        assert!(cfg.decision.engines["custom"].enabled);
     }
 
     #[test]

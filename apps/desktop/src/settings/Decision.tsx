@@ -68,6 +68,12 @@ function Row({ e, probe, apply, reload }: RowProps) {
           setup), then point this at it. Default http://localhost:8000.
         </p>
       )}
+      {e.id === "custom" && (
+        <p className="s-help">
+          Any server that implements <code>/v1/systemone</code>. Set its URL, then optionally add a
+          key (sent only to that host).
+        </p>
+      )}
       {hasUrl && (
         <div className="pv-opts">
           <label>

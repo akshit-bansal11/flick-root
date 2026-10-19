@@ -105,7 +105,16 @@ pub async fn set_feature_enabled(
     changed(&app, &v);
     if id == "explain" {
         let accel = state.config.load().general.explain_hotkey.clone();
-        crate::hotkey::sync_explain(&app, &accel)?;
+        // The toggle is saved; a hotkey problem is reported as an event, not a command error.
+        if let Err(err) = crate::hotkey::sync_explain(&app, &accel) {
+            tracing::warn!(%err, "explain hotkey sync failed");
+            if let Err(e) = app.emit(
+                "hotkey://conflict",
+                serde_json::json!({ "which": "explain", "accelerator": accel }),
+            ) {
+                tracing::warn!(%e, "emit failed");
+            }
+        }
     }
     if enabled && v.status == FeatureState::Failed {
         return Err(CommandError::new(

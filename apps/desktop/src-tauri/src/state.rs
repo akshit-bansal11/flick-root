@@ -236,6 +236,13 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     let keys: Arc<dyn KeySource> = Arc::new(VaultKeys(vault.clone()));
     let spotify =
         Arc::new(Spotify::new(vault.clone(), config.clone()).context("building spotify client")?);
+    let lost = handle.clone();
+    spotify.on_lost(move || {
+        let payload = serde_json::json!({ "connected": false, "name": serde_json::Value::Null });
+        if let Err(err) = lost.emit("spotify://state", payload) {
+            tracing::warn!(%err, "emit failed");
+        }
+    });
     let hub = ProviderHub::from_config(&config.load().providers, &keys);
     let ctx = FeatureCtx {
         config: config.clone(),

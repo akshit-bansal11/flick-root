@@ -13,6 +13,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
     VIRTUAL_KEY, VK_C, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
+use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow};
 use windows::core::Interface;
 
 /// Maximum characters returned.
@@ -27,8 +28,22 @@ fn cap(mut s: String) -> String {
     s
 }
 
+/// Outcome of a UIA probe: no TextPattern, TextPattern with nothing selected, or the text.
+enum Uia {
+    Unsupported,
+    Empty,
+    Text(String),
+}
+
 /// Selected text read through the UIA TextPattern of the focused element; `None` if unsupported or empty.
 pub fn selected_text_uia() -> Result<Option<String>, WinError> {
+    Ok(match probe()? {
+        Uia::Text(t) => Some(t),
+        _ => None,
+    })
+}
+
+fn probe() -> Result<Uia, WinError> {
     let _com = ComGuard::new()?;
     // SAFETY: COM is initialised by the guard; all interfaces are released on drop.
     unsafe {
@@ -38,10 +53,10 @@ pub fn selected_text_uia() -> Result<Option<String>, WinError> {
             .GetFocusedElement()
             .map_err(|e| WinError::os(e, "GetFocusedElement"))?;
         let Ok(pat) = el.GetCurrentPattern(UIA_TextPatternId) else {
-            return Ok(None);
+            return Ok(Uia::Unsupported);
         };
         let Ok(tp) = pat.cast::<IUIAutomationTextPattern>() else {
-            return Ok(None);
+            return Ok(Uia::Unsupported);
         };
         let ranges = tp
             .GetSelection()
@@ -58,7 +73,11 @@ pub fn selected_text_uia() -> Result<Option<String>, WinError> {
                 break;
             }
         }
-        Ok(if out.is_empty() { None } else { Some(cap(out)) })
+        Ok(if out.is_empty() {
+            Uia::Empty
+        } else {
+            Uia::Text(cap(out))
+        })
     }
 }
 
@@ -110,10 +129,71 @@ impl Drop for Restore {
     }
 }
 
+/// Window classes where Ctrl+C interrupts the running process instead of copying.
+fn is_terminal_class(class: &str) -> bool {
+    matches!(
+        class,
+        "ConsoleWindowClass" | "CASCADIA_HOSTING_WINDOW_CLASS" | "VirtualConsoleClass" | "mintty"
+    )
+}
+
+/// Executables that host a terminal (standalone or embedded) where Ctrl+C can mean SIGINT.
+fn is_terminal_host_app(exe: &str) -> bool {
+    const HOSTS: &[&str] = &[
+        "code.exe",
+        "code - insiders.exe",
+        "cursor.exe",
+        "windsurf.exe",
+        "zed.exe",
+        "windowsterminal.exe",
+        "conhost.exe",
+        "openconsole.exe",
+        "wezterm-gui.exe",
+        "alacritty.exe",
+        "mintty.exe",
+        "putty.exe",
+        "hyper.exe",
+        "tabby.exe",
+        "idea64.exe",
+        "pycharm64.exe",
+        "webstorm64.exe",
+        "rider64.exe",
+        "clion64.exe",
+        "goland64.exe",
+        "rustrover64.exe",
+        "studio64.exe",
+    ];
+    HOSTS.contains(&exe.to_lowercase().as_str())
+}
+
+/// Class name of the foreground window; empty if there is none.
+fn foreground_class() -> String {
+    let mut buf = [0u16; 256];
+    // SAFETY: GetForegroundWindow takes no input; `buf` is a valid writable slice for GetClassNameW,
+    // which returns the number of characters written (0 on failure).
+    let n = unsafe {
+        let hwnd = GetForegroundWindow();
+        GetClassNameW(hwnd, &mut buf)
+    };
+    String::from_utf16_lossy(&buf[..usize::try_from(n).unwrap_or(0)])
+}
+
 /// Selected text of the focused control: UIA, else a simulated Ctrl+C with the clipboard restored.
 pub fn selected_text() -> Result<Option<String>, WinError> {
-    if let Some(t) = selected_text_uia().ok().flatten() {
-        return Ok(Some(t));
+    match probe() {
+        Ok(Uia::Text(t)) => return Ok(Some(t)),
+        // Supported but nothing selected: a Ctrl+C would only copy nothing (or interrupt a process).
+        Ok(Uia::Empty) => return Ok(None),
+        _ => {}
+    }
+    if is_terminal_class(&foreground_class()) {
+        return Ok(None);
+    }
+    // Apps with an embedded terminal share one window class with their editor, so go by exe:
+    // Ctrl+C there may interrupt a process, and an unknown app is safer than a lost build.
+    let app = crate::foreground::foreground_app().ok().flatten();
+    if app.as_deref().is_none_or(is_terminal_host_app) {
+        return Ok(None);
     }
     let seq = clipboard::sequence_number();
     let mut guard = Restore {
@@ -159,6 +239,17 @@ mod tests {
         assert_eq!(flags[4], (VK_CONTROL.0, false));
         assert_eq!(flags[5], (VK_C.0, false));
         assert_eq!(flags[7], (VK_CONTROL.0, true));
+    }
+
+    #[test]
+    fn terminal_classes_never_get_ctrl_c() {
+        assert!(is_terminal_class("ConsoleWindowClass"));
+        assert!(is_terminal_class("CASCADIA_HOSTING_WINDOW_CLASS"));
+        assert!(!is_terminal_class("Notepad"));
+        assert!(!is_terminal_class(""));
+        assert!(is_terminal_host_app("Code.exe"));
+        assert!(is_terminal_host_app("WindowsTerminal.exe"));
+        assert!(!is_terminal_host_app("notepad.exe"));
     }
 
     #[test]

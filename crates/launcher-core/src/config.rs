@@ -359,6 +359,7 @@ impl Default for Decision {
                 engine(Some("http://localhost:8000"), None, None),
             ),
             ("kev".to_string(), engine(Some(""), None, None)),
+            ("custom".to_string(), engine(Some(""), None, None)),
             ("llm".to_string(), engine(None, None, None)),
             (
                 "jev".to_string(),
@@ -370,7 +371,9 @@ impl Default for Decision {
             ),
         ]);
         Self {
-            order: ["laya", "kev", "llm", "jev"].map(String::from).to_vec(),
+            order: ["laya", "kev", "llm", "jev", "custom"]
+                .map(String::from)
+                .to_vec(),
             candidates: 8,
             threshold: 0.6,
             engines,
@@ -504,10 +507,15 @@ impl Config {
                 });
             }
         };
-        toml::from_str(&text).map_err(|source| CoreError::ConfigParse {
+        let mut c: Config = toml::from_str(&text).map_err(|source| CoreError::ConfigParse {
             path: path.to_path_buf(),
             source,
-        })
+        })?;
+        // Configs written before the Custom engine existed lack it in the order.
+        if !c.decision.order.iter().any(|i| i == "custom") {
+            c.decision.order.push("custom".into());
+        }
+        Ok(c)
     }
 
     /// Save atomically: write `<path>.tmp`, then rename over `path`.
@@ -546,6 +554,29 @@ pub fn local_data_dir() -> Result<PathBuf, CoreError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_config_without_custom_engine_still_loads() {
+        let dir = std::env::temp_dir().join(format!("flick-cfg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("config.toml");
+        std::fs::write(
+            &f,
+            "[decision]
+order = [\"laya\", \"kev\", \"llm\", \"jev\"]
+candidates = 5
+threshold = 0.7
+",
+        )
+        .unwrap();
+        let c = Config::load(&f).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(c.decision.order.last().map(String::as_str), Some("custom"));
+        assert_eq!(c.decision.candidates, 5);
+        let d = Config::default().decision;
+        assert_eq!(d.order.last().map(String::as_str), Some("custom"));
+        assert!(!d.engines["custom"].enabled);
+    }
 
     #[test]
     fn default_has_nothing_enabled_and_no_secrets() {

@@ -253,8 +253,16 @@ fn check_client_id(id: &str) -> Result<(), CommandError> {
     }
 }
 
-fn drop_url(vault: &SecretVault, w: &Webhook) -> Result<(), CommandError> {
+/// Queues the webhook's stored URL for deletion once the config save has succeeded.
+fn drop_url(w: &Webhook, doomed: &mut Vec<SecretName>) {
     if let Ok(n) = SecretName::parse(&format!("integration.webhook.{}@{}", w.name, w.host)) {
+        doomed.push(n);
+    }
+}
+
+/// Deletes secrets queued by [`plan`], after the config that orphaned them was saved.
+fn delete_all(vault: &SecretVault, doomed: Vec<SecretName>) -> Result<(), CommandError> {
+    for n in doomed {
         vault
             .delete(&n)
             .map_err(|e| CommandError::new("store_failed", e.to_string()))?;
@@ -266,6 +274,7 @@ fn webhook(
     vault: &SecretVault,
     cfg: &mut Config,
     patch: IntegrationPatch,
+    doomed: &mut Vec<SecretName>,
 ) -> Result<(), CommandError> {
     let name = patch.name.as_deref().unwrap_or_default().to_owned();
     check_name(&name)?;
@@ -273,7 +282,7 @@ fn webhook(
     let pos = list.iter().position(|w| w.name == name);
     if patch.remove == Some(true) {
         let at = pos.ok_or_else(|| bad("invalid_name", "no such webhook"))?;
-        drop_url(vault, &list[at])?;
+        drop_url(&list[at], doomed);
         list.remove(at);
         return Ok(());
     }
@@ -305,7 +314,7 @@ fn webhook(
         w.enabled = e;
     }
     if (w.name != old.name || w.host != old.host) && present(vault, &secret_of(&old)) {
-        drop_url(vault, &old)?;
+        drop_url(&old, doomed);
     }
     list[at] = w;
     Ok(())
@@ -315,13 +324,26 @@ fn secret_of(w: &Webhook) -> String {
     format!("integration.webhook.{}@{}", w.name, w.host)
 }
 
-/// Applies `patch` to `target`. Validation happens before any change.
+/// Applies `patch` and deletes orphaned secrets at once. Tests only: the command saves first.
+#[cfg(test)]
 pub(crate) fn apply(
     vault: &SecretVault,
     cfg: &mut Config,
     target: &str,
     patch: IntegrationPatch,
 ) -> Result<(), CommandError> {
+    delete_all(vault, plan(vault, cfg, target, patch)?)
+}
+
+/// Applies `patch` to `target` and returns the secrets it orphaned (not yet deleted).
+/// Validation happens before any change.
+pub(crate) fn plan(
+    vault: &SecretVault,
+    cfg: &mut Config,
+    target: &str,
+    patch: IntegrationPatch,
+) -> Result<Vec<SecretName>, CommandError> {
+    let mut doomed = Vec::new();
     let i = &mut cfg.integrations;
     match target {
         "spotify" => {
@@ -365,25 +387,37 @@ pub(crate) fn apply(
                 i.notion.database_id = d.into();
             }
         }
-        "webhook" => return webhook(vault, cfg, patch),
+        "webhook" => webhook(vault, cfg, patch, &mut doomed)?,
         _ => return Err(bad("unknown_target", "no such integration")),
     }
-    Ok(())
+    Ok(doomed)
 }
 
 /// Patches one integration, saves the config and returns the refreshed view.
 #[tauri::command]
 pub async fn set_integration(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     target: String,
     patch: IntegrationPatch,
 ) -> Result<IntegrationsView, CommandError> {
     let s = Arc::clone(&state);
-    blocking(move || {
-        s.update_config(|cfg| apply(&s.vault, cfg, &target, patch))?;
-        Ok(view(&s.vault, &s.config.load()))
+    let (view, client_changed) = blocking(move || {
+        let old_id = s.config.load().integrations.spotify.client_id.clone();
+        let doomed = s.update_config(|cfg| plan(&s.vault, cfg, &target, patch))?;
+        // Only after the save: a failed save must not lose the stored secret.
+        delete_all(&s.vault, doomed)?;
+        let changed =
+            !old_id.is_empty() && s.config.load().integrations.spotify.client_id != old_id;
+        Ok((view(&s.vault, &s.config.load()), changed))
     })
-    .await
+    .await?;
+    if client_changed {
+        // The refresh token belongs to the old Client ID.
+        state.spotify.disconnect().await.map_err(spotify_err)?;
+        spotify_event(&app, false, None);
+    }
+    Ok(view)
 }
 
 /// Result of `connect_spotify`.

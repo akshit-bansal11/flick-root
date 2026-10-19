@@ -104,7 +104,7 @@ unsafe fn set_registered(name: &str, data: &[u8]) {
 }
 
 /// Replace the clipboard content with `text`, marked so clipboard history, cloud clipboard and
-/// clipboard monitors skip it (Flick only writes back restores; they must not leave new copies).
+/// clipboard monitors skip it (the app only writes back restores; they must not leave new copies).
 pub fn write_text(text: &str) -> Result<(), WinError> {
     let mut wide: Vec<u16> = text.encode_utf16().collect();
     wide.push(0);
@@ -141,8 +141,8 @@ mod tests {
     #[ignore = "touches the real clipboard"]
     fn round_trip_restores() {
         let before = read_text().unwrap();
-        write_text("flick-test").unwrap();
-        assert_eq!(read_text().unwrap().as_deref(), Some("flick-test"));
+        write_text("launcher-test").unwrap();
+        assert_eq!(read_text().unwrap().as_deref(), Some("launcher-test"));
         write_text(before.as_deref().unwrap_or("")).unwrap();
         assert_eq!(
             read_text().unwrap().unwrap_or_default(),

@@ -33,6 +33,8 @@ const AUTO_MIN_SCORE: u32 = 80;
 const LEAD: f64 = 1.1;
 /// Hits fetched per root.
 const FETCH: usize = 20;
+/// Hits fetched when a known folder has no root of its own and the result is filtered by path.
+const FETCH_UNROOTED: usize = 400;
 /// Default engine request timeout.
 const ENGINE_TIMEOUT_MS: u64 = 3000;
 
@@ -43,6 +45,11 @@ pub trait NlHost: Send + Sync {
     fn find(&self, q: &FindQuery) -> Vec<FileHit>;
     /// Index root id for a known-folder label ("Downloads"), if that root is indexed.
     fn root_id(&self, label: &str) -> Option<u8>;
+    /// Folder path of a known-folder label, even when no root of that name is indexed (the
+    /// folder may sit inside an indexed drive root). `None` if unknown.
+    fn folder_path(&self, _label: &str) -> Option<PathBuf> {
+        None
+    }
     /// Opens `path` with its default handler. Blocking.
     fn open(&self, path: &Path) -> Result<(), String>;
     /// Key of engine `id` bound to `host`, if stored. Blocking; never log it.
@@ -125,12 +132,24 @@ fn search(host: &dyn NlHost, p: &Parsed) -> Vec<FileHit> {
     } else {
         p.roots
             .iter()
-            .filter_map(|r| host.root_id(root_label(*r)))
-            .flat_map(|id| {
-                host.find(&FindQuery {
-                    root: Some(id),
+            .flat_map(|r| {
+                let label = root_label(*r);
+                if let Some(id) = host.root_id(label) {
+                    return host.find(&FindQuery {
+                        root: Some(id),
+                        ..base.clone()
+                    });
+                }
+                // Not a root of its own (e.g. inside an indexed drive root): filter by path.
+                let Some(dir) = host.folder_path(label) else {
+                    return Vec::new();
+                };
+                let mut v = host.find(&FindQuery {
+                    limit: FETCH_UNROOTED,
                     ..base.clone()
-                })
+                });
+                v.retain(|h| h.path.starts_with(&dir));
+                v
             })
             .collect()
     };
@@ -171,17 +190,27 @@ async fn resolve(
     max_cands: usize,
 ) -> Result<Outcome, FeatureError> {
     let key = cache_key(text);
-    if let Ok(Some(c)) = store.nl_cache_get(&key) {
-        let path = PathBuf::from(&c.chosen_path);
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if may_auto_open(ext) && path.is_file() {
-            store.nl_cache_put(c);
-            return tokio::task::spawn_blocking(move || open_outcome(&*host, &path))
-                .await
-                .map_err(join_err)?;
+    let parsed = parse(text, today);
+    // A relative-date phrase ("last week") means something different later: never cached.
+    let cacheable = parsed.modified.is_none();
+    if cacheable {
+        let (st, h, k) = (store.clone(), host.clone(), key.clone());
+        let hit = tokio::task::spawn_blocking(move || {
+            let c = st.nl_cache_get(&k).ok().flatten()?;
+            let path = PathBuf::from(&c.chosen_path);
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !(may_auto_open(ext) && path.is_file()) {
+                return None;
+            }
+            st.nl_cache_put(c);
+            Some(open_outcome(&*h, &path))
+        })
+        .await
+        .map_err(join_err)?;
+        if let Some(r) = hit {
+            return r;
         }
     }
-    let parsed = parse(text, today);
     let h = host.clone();
     let hits = tokio::task::spawn_blocking(move || search(&*h, &parsed))
         .await
@@ -218,13 +247,19 @@ async fn resolve(
     }
     if let Some((i, engine, p)) = chosen {
         let path = hits[i].path.clone();
-        store.nl_cache_put(NlCacheEntry {
-            cache_key: key,
-            phrase: text.to_owned(),
-            chosen_path: path.to_string_lossy().into_owned(),
-            engine: engine.to_owned(),
-            p,
-        });
+        if cacheable {
+            let st = store.clone();
+            let entry = NlCacheEntry {
+                cache_key: key,
+                phrase: text.to_owned(),
+                chosen_path: path.to_string_lossy().into_owned(),
+                engine: engine.to_owned(),
+                p,
+            };
+            tokio::task::spawn_blocking(move || st.nl_cache_put(entry))
+                .await
+                .map_err(join_err)?;
+        }
         return tokio::task::spawn_blocking(move || open_outcome(&*host, &path))
             .await
             .map_err(join_err)?;
@@ -268,6 +303,7 @@ fn system_one(
         "laya" => "laya",
         "kev" => "kev",
         "jev" => "jev",
+        "custom" => "custom",
         _ => return None,
     };
     let base_url = Url::parse(e.base_url.as_deref().filter(|u| !u.is_empty())?).ok()?;
