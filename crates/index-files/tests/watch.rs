@@ -1,6 +1,6 @@
 //! Watcher integration through notify with a polling deadline.
 
-use index_files::scan::{Root, scan};
+use index_files::scan::{Parallelism, Root, scan};
 use index_files::{FileHit, FileIndex, FindQuery};
 use std::fs;
 use std::path::Path;
@@ -52,7 +52,15 @@ fn watcher_lifecycle() {
     let d = tempfile::tempdir().unwrap();
     let roots = setup(d.path());
     let ix = FileIndex::new();
-    ix.replace(scan(&roots, &AtomicBool::new(false), |_| {}).unwrap());
+    ix.replace(
+        scan(
+            &roots,
+            &Parallelism::RayonNewPool(2),
+            &AtomicBool::new(false),
+            |_| {},
+        )
+        .unwrap(),
+    );
     let w = FileIndex::watch(&roots).unwrap();
     let ov = w.overlay();
     let has = |h: &[FileHit]| !h.is_empty();

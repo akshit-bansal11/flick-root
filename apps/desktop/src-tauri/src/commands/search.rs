@@ -5,6 +5,7 @@ use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 use tauri::State;
 
 /// Results returned at most; icons are only read for these.
@@ -38,6 +39,7 @@ pub async fn search(
     mode: Mode,
     text: String,
 ) -> Result<SearchResponse, CommandError> {
+    let started = Instant::now();
     state.latest_seq.fetch_max(seq, Ordering::SeqCst);
     let input = Input {
         raw: text.clone(),
@@ -62,6 +64,13 @@ pub async fn search(
             .map_err(|e| CommandError::new("internal", e.to_string()))?
         }
     };
+    let micros = started.elapsed().as_micros() as u64;
+    let budget_us = if mode == Mode::Find { 25_000 } else { 2_000 };
+    if micros > budget_us {
+        tracing::info!(?mode, items = items.len(), micros, "slow search");
+    } else {
+        tracing::debug!(?mode, items = items.len(), micros, "search");
+    }
     if state.latest_seq.load(Ordering::SeqCst) > seq {
         return Ok(reply(seq, Vec::new()));
     }

@@ -13,7 +13,7 @@ pub mod watch;
 
 pub use error::FilesError;
 pub use query::{FileHit, FindQuery, query};
-pub use scan::{Root, default_roots, scan};
+pub use scan::{Parallelism, Root, default_roots, scan};
 pub use store::{FileIndex, FileStore, StoreBuilder};
 pub use watch::{Overlay, WatchHandle};
 

@@ -10,6 +10,7 @@ pub mod ports;
 pub mod power;
 pub mod radios;
 pub mod recycle;
+pub mod thread;
 pub mod uia;
 
 pub use com::ComGuard;

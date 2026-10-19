@@ -3,6 +3,7 @@
 use crate::error::FilesError;
 use crate::skip::should_skip;
 use crate::store::{FileStore, NO_PARENT, StoreBuilder};
+pub use jwalk::Parallelism;
 use jwalk::WalkDirGeneric;
 use serde::{Deserialize, Serialize};
 use std::os::windows::fs::MetadataExt;
@@ -65,9 +66,10 @@ fn minutes(md: &std::fs::Metadata) -> u32 {
         .map_or(0, |d| u32::try_from(d.as_secs() / 60).unwrap_or(u32::MAX))
 }
 
-/// Scan `roots` into a store. `cancel` is checked per directory; `progress` gets the running entry count.
+/// Scan `roots` into a store using `parallelism`. `cancel` is checked per directory; `progress` gets the running entry count.
 pub fn scan(
     roots: &[Root],
+    parallelism: &Parallelism,
     cancel: &AtomicBool,
     progress: impl Fn(usize),
 ) -> Result<FileStore, FilesError> {
@@ -79,6 +81,7 @@ pub fn scan(
         let walk = WalkDirGeneric::<((), Option<Meta>)>::new(&root.path)
             .skip_hidden(false)
             .follow_links(false)
+            .parallelism(parallelism.clone())
             .process_read_dir(|_, _, _, children| {
                 children.retain_mut(|c| {
                     let Ok(e) = c else { return false };

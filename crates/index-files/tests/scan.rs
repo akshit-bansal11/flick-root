@@ -1,4 +1,4 @@
-use index_files::scan::{Root, scan};
+use index_files::scan::{Parallelism, Root, scan};
 use std::fs;
 use std::sync::atomic::AtomicBool;
 
@@ -30,7 +30,13 @@ fn skips_and_keeps() {
         path: p.to_path_buf(),
         label: "t".into(),
     }];
-    let s = scan(&roots, &AtomicBool::new(false), |_| {}).unwrap();
+    let s = scan(
+        &roots,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
     let mut names: Vec<String> = (0..s.len()).map(|i| s.name(i).to_string()).collect();
     names.remove(0); // root itself
     names.sort();
@@ -50,6 +56,31 @@ fn cancelled() {
         path: d.path().to_path_buf(),
         label: "t".into(),
     }];
-    let r = scan(&roots, &AtomicBool::new(true), |_| {});
+    let r = scan(
+        &roots,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(true),
+        |_| {},
+    );
     assert!(matches!(r, Err(index_files::FilesError::Cancelled)));
+}
+
+#[test]
+fn single_thread_pool_still_finds_files() {
+    let d = tempfile::tempdir().unwrap();
+    std::fs::create_dir(d.path().join("sub")).unwrap();
+    std::fs::write(d.path().join("sub").join("alpha.txt"), b"x").unwrap();
+    let roots = [Root {
+        id: 0,
+        path: d.path().to_path_buf(),
+        label: "t".into(),
+    }];
+    let s = scan(
+        &roots,
+        &Parallelism::RayonNewPool(1),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(s.len(), 3);
 }

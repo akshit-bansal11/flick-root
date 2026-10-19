@@ -1,4 +1,4 @@
-use index_files::scan::{Root, scan};
+use index_files::scan::{Parallelism, Root, scan};
 use index_files::{FileHit, FileIndex, FindQuery, Overlay, query};
 use std::fs;
 use std::path::Path;
@@ -38,7 +38,13 @@ fn names(hits: &[FileHit]) -> Vec<&str> {
 fn text_ext_date_filters() {
     let d = tempfile::tempdir().unwrap();
     let roots = setup(d.path());
-    let s = scan(&roots, &AtomicBool::new(false), |_| {}).unwrap();
+    let s = scan(
+        &roots,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
     let ov = Overlay::new();
     let h = query(&s, &ov, &q("budget xlsx"));
     assert_eq!(names(&h), ["budget_2024.xlsx"]);
@@ -74,7 +80,13 @@ fn text_ext_date_filters() {
 fn overlay_create_and_delete() {
     let d = tempfile::tempdir().unwrap();
     let roots = setup(d.path());
-    let s = scan(&roots, &AtomicBool::new(false), |_| {}).unwrap();
+    let s = scan(
+        &roots,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
     let ix = FileIndex::new();
     ix.replace(s);
     let w = FileIndex::watch(&roots).unwrap();

@@ -318,6 +318,32 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
     }
 }
 
+/// Two background-mode workers, built once, so a full-drive scan leaves CPU and disk to the UI.
+fn scan_parallelism() -> index_files::Parallelism {
+    static POOL: OnceLock<Option<Arc<rayon::ThreadPool>>> = OnceLock::new();
+    let pool = POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .thread_name(|i| format!("find-scan-{i}"))
+            .start_handler(|_| {
+                if let Err(err) = win::thread::enter_background_mode() {
+                    tracing::debug!(%err, "scan worker background mode unavailable");
+                }
+            })
+            .build()
+            .map(Arc::new)
+            .inspect_err(|err| tracing::warn!(%err, "scan pool failed; scanning serially"))
+            .ok()
+    });
+    match pool {
+        Some(pool) => index_files::Parallelism::RayonExistingPool {
+            pool: pool.clone(),
+            busy_timeout: None,
+        },
+        None => index_files::Parallelism::Serial,
+    }
+}
+
 /// Loads the snapshot, scans the roots and starts the watcher (Find on, or a reindex).
 pub(crate) async fn start_find(s: &Arc<AppState>) {
     let st = s.clone();
@@ -336,7 +362,17 @@ pub(crate) async fn start_find(s: &Arc<AppState>) {
             Err(err) => tracing::warn!(%err, "file snapshot unreadable"),
         }
         let roots = roots_for(&st.config.load());
-        let store = scan(&roots, &cancel, |_| {})?;
+        let started = Instant::now();
+        let store = {
+            let _bg = win::thread::BackgroundGuard::new();
+            scan(&roots, &scan_parallelism(), &cancel, |_| {})?
+        };
+        tracing::info!(
+            files = store.len(),
+            roots = roots.len(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "find scan finished"
+        );
         // stop_find cancels, then takes this lock: checking under it leaves no window.
         let mut watch = st.watch.lock();
         if !live() {
