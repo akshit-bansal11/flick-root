@@ -58,3 +58,4 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - Pre-release review NIT: web lib/markdown.ts:12 relative links to files not on the site (LICENSE, docs/adr/, followups.md) become broken site paths; point them at REPO_URL/blob/main/<path>.
 - Pre-release review NIT: apps/web/package.json @types/node ^20 while CI uses Node 24; bump to ^24.
 - T6.6 web: the landing page's live launcher demo (typing, Tab, prefixes, arrows, autoplay, reduced motion) was never exercised in a browser; pages are HTTP-verified only.
+- Laya/Kev: verify they accept the /v1/systemone body and model name '<id>-latest' (docs.typesafe.ai documents Jev only; Laya README not found).

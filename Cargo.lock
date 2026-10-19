@@ -1030,9 +1030,19 @@ checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 name = "decision"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "chrono",
+ "futures",
+ "providers",
+ "reqwest",
+ "secrecy",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "url",
+ "wiremock",
 ]
 
 [[package]]

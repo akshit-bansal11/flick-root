@@ -57,11 +57,72 @@ const FILLER: &[&str] = &[
 /// Words that introduce a location.
 const PREPS: &[&str] = &["from", "in", "on", "at", "of", "to", "into", "inside"];
 
-/// Extensions that are never opened from a natural-language request.
+/// Runnable or shell-handled extensions (PATHEXT plus ShellExecute-dangerous types). Used to
+/// label results; auto-open itself is gated by the allowlist in [`may_auto_open`].
 const EXECUTABLE: &[&str] = &[
-    "exe", "bat", "cmd", "ps1", "lnk", "msi", "vbs", "vbe", "com", "scr", "js", "jse", "wsf",
-    "wsh", "reg", "jar", "hta", "cpl", "msc", "dll",
+    "exe",
+    "bat",
+    "cmd",
+    "ps1",
+    "psm1",
+    "psc1",
+    "ps1xml",
+    "lnk",
+    "url",
+    "pif",
+    "msi",
+    "msp",
+    "mst",
+    "vbs",
+    "vbe",
+    "vb",
+    "com",
+    "scr",
+    "js",
+    "jse",
+    "wsf",
+    "wsh",
+    "ws",
+    "msh",
+    "reg",
+    "jar",
+    "hta",
+    "cpl",
+    "msc",
+    "dll",
+    "ocx",
+    "sys",
+    "drv",
+    "inf",
+    "chm",
+    "hlp",
+    "scf",
+    "application",
+    "appref-ms",
+    "gadget",
+    "xbap",
+    "appx",
+    "msix",
+    "appinstaller",
+    "settingcontent-ms",
+    "library-ms",
+    "search-ms",
+    "diagcab",
+    "job",
+    "website",
+    "iso",
+    "img",
+    "vhd",
+    "vhdx",
+    "xll",
+    "xlam",
+    "docm",
+    "xlsm",
+    "pptm",
 ];
+
+/// Plain document and media types: the only ones a natural-language request may open directly.
+const AUTO_OPEN: &[&[&str]] = &[IMG, SHEET, DOC, SLIDE, VIDEO, AUDIO, PDF, &["md"]];
 
 const IMG: &[&str] = &["jpg", "jpeg", "png", "webp", "heic", "gif", "bmp"];
 const SHEET: &[&str] = &["xlsx", "xls", "csv"];
@@ -179,8 +240,24 @@ pub fn is_natural(input: &str) -> bool {
 
 /// True for extensions (with or without leading dot, any case) that must never auto-open.
 pub fn is_executable(ext: &str) -> bool {
-    let e = ext.trim_start_matches('.').to_lowercase();
-    EXECUTABLE.contains(&e.as_str())
+    EXECUTABLE.contains(&norm_ext(ext).as_str())
+}
+
+/// True only for allowlisted document/media extensions; everything else goes to the choices list.
+pub fn may_auto_open(ext: &str) -> bool {
+    if ext.contains(':') {
+        return false; // an alternate data stream is never a plain document
+    }
+    let e = norm_ext(ext);
+    AUTO_OPEN.iter().any(|set| set.contains(&e.as_str()))
+}
+
+/// Lowercase, no leading dot, no trailing dots/spaces, no `:stream` suffix.
+fn norm_ext(ext: &str) -> String {
+    let e = ext.split(':').next().unwrap_or_default();
+    e.trim_end_matches(['.', ' '])
+        .trim_start_matches('.')
+        .to_lowercase()
 }
 
 fn root_alias(w: &str) -> Option<KnownRoot> {
@@ -652,6 +729,26 @@ mod tests {
         }
         for e in ["pdf", ".png", "txt", ""] {
             assert!(!is_executable(e), "{e}");
+        }
+        assert!(is_executable("EXE. "));
+        assert!(is_executable("exe:Zone.Identifier"));
+    }
+
+    #[test]
+    fn auto_open_allowlist() {
+        for e in ["pdf", ".PNG", "docx", "mp4", "md", "pdf. "] {
+            assert!(may_auto_open(e), "{e}");
+        }
+        for e in [
+            "exe",
+            "lnk",
+            "xlsm",
+            "zip",
+            "unknownext",
+            "",
+            "pdf:evil.exe",
+        ] {
+            assert!(!may_auto_open(e), "{e}");
         }
     }
 }
