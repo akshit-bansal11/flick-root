@@ -10,7 +10,7 @@ The first release covers the core launcher:
 - Command mode: fuzzy search of installed apps, including Store apps, with launch, run as admin and open location.
 - Find mode: fuzzy search of files and folders under the indexed roots, with open, open file location and copy path.
 - Query mode: streams an answer from the first enabled provider that responds, with Fast/Think and provider fallback.
-- Mode switching with Tab, Shift+Tab, and the `>`, `/` and `?` prefixes.
+- Modes chosen by the `>`, `!`, `/` and `?` prefixes (v0.1.0 also had Tab and Shift+Tab; removed in v0.2.0).
 - Feature toggles for frecency ranking, inline math and units, system commands, web shortcuts and the project launcher.
 - A Settings window and a first-run flow.
 - A tray icon with Open, Settings and Quit, single-instance behaviour, and a launch-at-startup toggle.

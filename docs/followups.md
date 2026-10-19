@@ -62,3 +62,9 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - nlfind: a named root that isn't indexed returns an empty list (fall back to unrestricted search?); engine chain stops at the first engine that answers; auto-open score threshold 80 is uncalibrated.
 - ports: confirm-token logic duplicated from syscmd (extract a shared helper); kill errors only reach console; killed row stays until next search; real port/sysinfo path not run live.
 - Spotify: verify live — full PKCE connect, NO_ACTIVE_DEVICE in error.reason, whether PUT /me/library needs more than user-library-modify; playlist <q> searches only the first 50 playlists.
+
+## v0.2.0
+
+- Device check: acrylic resize smoothness as the launcher height follows results. Fallback: Mica or a fixed-height window.
+- Program watcher: programs are scanned at startup only; no rescan on install.
+- Idle RAM with programs loaded (up to 50,000 entries) is not measured against the 120 MB budget.

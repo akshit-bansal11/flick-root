@@ -180,7 +180,7 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 
 | Command | Params | Returns | Errors | Screen |
 |---|---|---|---|---|
-| `search` | `{ seq, mode, text }` | `{ seq, items, group }` | `mode_disabled` | Launcher |
+| `search` | `{ seq, mode, text, scope? }` (`scope`: `all`, `apps` or `commands`; `!` sends `apps`, `>` sends `commands`) | `{ seq, items, group }` | `mode_disabled` | Launcher |
 | `launch` | `item_id, admin: bool` | `Outcome` | `not_found`, `launch_failed` | Launcher |
 | `reveal` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Enter) |
 | `copy_path` | `item_id` | `()` | `not_found` | Launcher (Ctrl+C, Find) |
@@ -192,7 +192,7 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `hide_launcher` | none | `()` | none | Launcher |
 | `report_shown` | `shown_id` | `()` | none | Launcher |
 | `get_settings` | none | `SettingsView` (no secrets) | none | Settings |
-| `set_general` | `patch` (hotkeys, theme, startup, window) | `SettingsView` | `invalid_value` | General |
+| `set_general` | `patch` (hotkeys, theme, startup, window, `scanPrograms`) | `SettingsView` | `invalid_value` | General |
 | `set_roots` | `roots?: Vec<String>, include_drives?: bool` | `SettingsView` | `invalid_path` | General |
 | `register_hotkey` | `which, accelerator` | `Registered` or `Conflict` | `invalid_accelerator` | General, first run |
 | `clear_history` | `scope: frecency or nl_cache or all` | `()` | none | General |
@@ -200,6 +200,11 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `set_feature_enabled` | `id, enabled` | `FeatureView` | `unknown_feature`, `start_failed` | Features |
 | `set_mode_enabled` | `mode, enabled` | `()` | `locked` (Command) | Features |
 | `set_feature_options` | `id, options: json` | `FeatureView` | `invalid_options` | Features |
+| `resize_launcher` | `height` (clamped) | `()` | `window_missing` | Launcher |
+| `list_thinking_modes` | none | `{ modes: Vec<{ id, provider_id, provider_label, model, local }>, selected? }` (every enabled provider x model, fallback order; stale or missing `selected` means the first) | none | Launcher (Ask) |
+| `set_thinking_mode` | `id` | `()` | see `providers.rs` | Launcher (Ask) |
+| `get_appearance` / `set_appearance` | none / `{ theme, glass, scheme }` | `AppearanceView` | `invalid_value` | Appearance |
+| `set_tutorial_done` | none | `()` | none | Launcher, General (replay) |
 | `list_providers` | none | `Vec<ProviderView>` | none | AI providers |
 | `probe_providers` | none | `Vec<ProbeResult>` | none | AI providers, first run |
 | `set_provider` | `id, patch` (enabled, base_url, model, effort) | `ProviderView` | `invalid_url`, `key_needed` | AI providers |
@@ -226,7 +231,7 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 
 | Event | Payload | Notes |
 |---|---|---|
-| `launcher://shown` | `{ shown_id, reason }` | UI resets, focuses, fades in. |
+| `launcher://shown` | `{ shown_id, reason, glass, appearance, tutorial }` | UI resets, focuses, fades in. `glass`: acrylic is on (false when Windows transparency effects are off). `appearance`: `{ theme, glass, scheme }`. `tutorial`: first run is done and the tutorial is not. |
 | `launcher://hidden` | `{}` | UI clears state. |
 | `index://progress` | `{ kind, scanned, done }` | App and file index status. |
 | `providers://status` | `{ id, state, model? }` | State: running, not_running, no_key, error. |
@@ -266,6 +271,15 @@ explain_hotkey = "Alt+Shift+Space"
 theme = "system"            # system | dark | light
 launch_at_startup = false
 first_run_done = false
+tutorial_done = false       # set when the tutorial is finished or skipped
+
+[appearance]
+theme = "glass"            # glass | frost | midnight | aurora | ember | solid
+glass = 62                  # tint opacity percent, 30 to 95
+scheme = "system"           # system | dark | light
+
+[apps]
+scan_programs = true        # scan fixed drives for programs shown under !
 
 [window]
 width_px = 700
@@ -281,12 +295,14 @@ extra_roots = []
 enabled = true              # on, but shows "Connect a model" until a provider is enabled
 effort = "fast"             # fast | think
 max_tokens = 1024
+thinking_mode = "ollama/llama3"  # optional; last chosen <provider>/<model>, omitted when unset
 
 [providers]
 order = ["ollama", "lmstudio", "llamacpp", "omniroute", "openrouter", "anthropic", "openai", "custom"]
 
 [providers.ollama]
 enabled = false
+models = []                 # extra model names; each becomes a thinking mode
 wire = "openai"
 base_url = "http://localhost:11434/v1"
 model = ""

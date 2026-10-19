@@ -14,7 +14,7 @@ Flick is a keyboard-first launcher for Windows. It needs a window that appears w
 - v0.0.1 pins Tauri `2.12.4` (`apps/desktop/src-tauri/Cargo.toml`) and React `19.3.1` (`apps/desktop/package.json`). The launcher window starts hidden.
 - The Rust package is named `desktop-shell`. The product name, Flick, lives in `tauri.conf.json` and `crates/launcher-core/src/brand.rs`.
 
-## Launcher placement (changed 2026-10-19)
+## Launcher placement, first revision (2026-10-19, superseded below)
 
 The user instructed this on 2026-10-19, in the v0.0.2/v0.0.3 review. It replaces the earlier decision (700 px wide, 28% from the top of the screen, solid material):
 
@@ -23,9 +23,20 @@ The user instructed this on 2026-10-19, in the v0.0.2/v0.0.3 review. It replaces
 - The window is transparent and covers the whole monitor, with no backdrop. A click outside the bar closes it.
 - The window is never resized per keystroke.
 
+## Launcher placement and material (changed 2026-10-19, v0.2.0)
+
+This replaces the full-monitor transparent window above, and with it the user's earlier "remove the bg" request (no backdrop).
+
+- The window is the panel: it is sized to the bar plus its results, and its height follows the results (`resize_launcher`). It is still centred on the monitor under the cursor.
+- The backdrop is Windows acrylic, with rounded corners, set from `window.rs` and `crates/win/src/dwm.rs`.
+- When Windows transparency effects are off, the panel is opaque.
+
+Reason: a transparent full-monitor window has no backdrop to blur, so the "remove the bg" look gave no depth or legibility over busy wallpapers. A panel-sized window can carry an acrylic material, and the OS draws the blur. Whether acrylic stays smooth while the window resizes is not yet checked on a device (see `docs/followups.md`).
+
 ## Alternatives
 
 - Pure-Rust UI with egui, iced or Slint. Rejected. Reaching the visual quality of the design config would be much slower.
+- Mica instead of acrylic, or a fixed-height window: kept as the fallback if acrylic resizing is not smooth.
 
 ## Consequences
 

@@ -68,26 +68,55 @@ const FEATURES: Feature[] = [
     since: "v0.1.0",
     doc: "quick-capture",
   },
+  {
+    title: "Programs on all drives",
+    line: "! also lists programs found on every fixed drive, below installed apps.",
+    example: "!setup",
+    since: "v0.2.0",
+    doc: "programs",
+  },
+  {
+    title: "Thinking modes",
+    line: "Pick the provider and model that answers first; Tab switches.",
+    example: "? then Tab",
+    since: "v0.2.0",
+    doc: "thinking-modes",
+  },
+  {
+    title: "Themes",
+    line: "Glass, Frost, Midnight, Aurora, Ember or Solid, with adjustable glass strength.",
+    example: "Settings, Appearance",
+    since: "v0.2.0",
+    doc: "appearance",
+  },
+  {
+    title: "Tutorial",
+    line: "A skippable tour on first open; replay it any time.",
+    example: "F1",
+    since: "v0.2.0",
+    doc: "tutorial",
+  },
 ];
 
 const MODES = [
   {
-    name: "Command",
+    name: "Commands",
     key: ">",
-    line: "Fuzzy search of installed apps, including Store, desktop and per-user apps.",
+    line: "System commands, math, units, web shortcuts, ports, media, capture.",
   },
+  { name: "Apps", key: "!", line: "Installed apps, plus programs found on every fixed drive." },
   { name: "Find", key: "/", line: "Fuzzy search of files and folders on every fixed drive." },
-  { name: "Query", key: "?", line: "Streams an answer from the provider you choose." },
+  { name: "Ask", key: "?", line: "Streams an answer from the provider and model you choose." },
 ];
 
 export function Features() {
   return (
     <section aria-labelledby="features">
-      <h2 className="mb-2 text-2xl font-semibold">Three modes, one bar</h2>
+      <h2 className="mb-2 text-2xl font-semibold">Four prefixes, one bar</h2>
       <p className="mb-4 text-muted">
-        Type the prefix first in an empty bar, or press Tab to cycle.
+        Type the prefix first in an empty bar. Plain text with no prefix searches nothing.
       </p>
-      <ul className="mb-12 grid gap-4 sm:grid-cols-3">
+      <ul className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {MODES.map((m) => (
           <li key={m.name} className="rounded-[var(--l-r)] border border-line bg-surface p-4">
             <h3 className="font-semibold">
