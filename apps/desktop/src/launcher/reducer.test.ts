@@ -138,14 +138,22 @@ describe("reducer", () => {
     expect(r.effects).toEqual([]);
   });
 
-  it("Ctrl+Shift+C copies the path in Find and flags Copied", () => {
+  it("Ctrl+Shift+C copies the path in Find; Copied shows only after the copy lands", () => {
     const r = reduce(withItems(inMode("find")), k("C", { ctrl: true, shift: true }));
-    expect(r.effects).toEqual([
-      { type: "copyPath", itemId: "i0" },
-      { type: "clearCopied", afterMs: COPIED_MS },
-    ]);
-    expect(r.state.copied).toBe(true);
-    expect(reduce(r.state, { type: "copiedDone" }).state.copied).toBe(false);
+    expect(r.effects).toEqual([{ type: "copyPath", itemId: "i0" }]);
+    expect(r.state.copied).toBe(false);
+    const done = reduce(r.state, { type: "copyDone", ok: true });
+    expect(done.effects).toEqual([{ type: "clearCopied", afterMs: COPIED_MS }]);
+    expect(done.state.copied).toBe(true);
+    expect(reduce(done.state, { type: "copiedDone" }).state.copied).toBe(false);
+  });
+
+  it("a failed copy flags Copy failed, not Copied, and clears it later", () => {
+    const r = reduce(inMode("find"), { type: "copyDone", ok: false });
+    expect(r.state.copied).toBe(false);
+    expect(r.state.copyFailed).toBe(true);
+    expect(r.effects).toEqual([{ type: "clearCopied", afterMs: COPIED_MS }]);
+    expect(reduce(r.state, { type: "copiedDone" }).state.copyFailed).toBe(false);
   });
 
   it("plain Ctrl+C is never taken: the input copies natively", () => {
@@ -368,12 +376,9 @@ describe("reducer", () => {
     expect(reduce(inMode("commands"), k("t", { ctrl: true })).state.query.effort).toBe("fast");
   });
 
-  it("Ctrl+P cycles thinking modes like Tab, in Query only", () => {
+  it("Ctrl+P is not a thinking-mode key (the browser prints on it)", () => {
     const s = inMode("query", { thinkingModes: { modes: tm, selected: "a/1" } });
-    expect(reduce(s, k("p", { ctrl: true })).effects).toEqual([
-      { type: "setThinkingMode", id: "b/2" },
-    ]);
-    expect(reduce(inMode("commands"), k("p", { ctrl: true })).effects).toEqual([]);
+    expect(reduce(s, k("p", { ctrl: true })).effects).toEqual([]);
   });
 
   it("ask events build the answer and finish", () => {
@@ -509,6 +514,15 @@ describe("query state flags", () => {
 
     it("edits text until an arrow moved the selection", () => {
       expect(reduce(procs(), k("Delete")).effects).toEqual([]);
+    });
+
+    it("Left, Right, Home and End disarm, so Delete edits text again", () => {
+      for (const key of ["ArrowLeft", "ArrowRight", "Home", "End"]) {
+        const armed = reduce(procs(), k("ArrowDown")).state;
+        const moved = reduce(armed, k(key)).state;
+        expect(moved.armed, key).toBe(false);
+        expect(reduce(moved, k("Delete")).effects, key).toEqual([]);
+      }
     });
 
     it("Backspace never kills, even after an arrow", () => {

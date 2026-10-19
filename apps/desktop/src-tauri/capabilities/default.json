@@ -14,6 +14,7 @@
     "allow-launch",
     "allow-reveal",
     "allow-copy-path",
+    "allow-copy-text",
     "allow-open-link",
     "allow-run-system-command",
     "allow-ask-stream",

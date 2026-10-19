@@ -77,7 +77,8 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // The tour owns Esc and its own keys while it is open.
-      if (touring) return;
+      // A field that handled the key (hotkey capture) owns it.
+      if (touring || e.defaultPrevented) return;
       const id = idFor("settings", fromEvent(e));
       if (!id) return;
       const target = e.target instanceof Element ? e.target : null;

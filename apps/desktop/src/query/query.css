@@ -67,7 +67,7 @@
   margin-left: 2px;
   vertical-align: text-bottom;
   background: var(--l-accent);
-  animation: caret 1s var(--l-ease-in-out) infinite;
+  animation: caret var(--l-dur-caret) var(--l-ease-in-out) infinite;
 }
 
 @keyframes caret {
@@ -109,4 +109,10 @@
   padding: var(--l-sp-3) var(--l-sp-6);
   cursor: pointer;
   transition: transform var(--l-dur-fast) var(--l-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-answer][aria-busy="true"] > :last-child::after {
+    animation: none;
+  }
 }

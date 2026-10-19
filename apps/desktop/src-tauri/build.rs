@@ -8,6 +8,7 @@ fn main() {
         "launch",
         "reveal",
         "copy_path",
+        "copy_text",
         "open_link",
         "run_system_command",
         "ask_stream",

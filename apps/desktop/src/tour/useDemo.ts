@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cancelsDefault } from "../launcher/keys";
 import { type Effect, type Event, initialState, reduce, type State } from "../launcher/reducer";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
 import { createDemoRunner, tourEventOf } from "./demo";
 import type { TourEvent } from "./steps";
 
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace", "Delete", "F1"]);
 const TOAST_MS = 1800;
 
 const fresh = (): State => reduce(initialState(), { type: "shown" }).state;
@@ -48,6 +48,9 @@ export function useDemo(onEvent: (e: TourEvent) => void) {
         const seen = tourEventOf(e);
         if (seen) onEventRef.current(seen);
         runner.r.run(e);
+        // The demo never touches the clipboard; its copies "land" at once.
+        if (e.type === "copyPath" || e.type === "copyText")
+          runner.host.dispatch({ type: "copyDone", ok: true });
       }
       return res.state !== prev || res.effects.length > 0;
     },
@@ -74,10 +77,9 @@ export function useDemo(onEvent: (e: TourEvent) => void) {
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      const mode = stateRef.current.mode;
       const handled = dispatch({ type: "key", key: fromEvent(e) });
-      if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey || e.altKey))) {
-        e.preventDefault();
-      }
+      if (cancelsDefault(e, mode, handled)) e.preventDefault();
     },
     [dispatch],
   );

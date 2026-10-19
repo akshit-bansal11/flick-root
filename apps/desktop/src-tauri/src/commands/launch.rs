@@ -226,6 +226,16 @@ pub async fn copy_path(
         .map_err(internal)
 }
 
+/// Copies text the user already sees (an answer or result value). Written with the history-exclusion
+/// formats, so Windows clipboard history and cloud sync skip it.
+#[tauri::command]
+pub async fn copy_text(text: String) -> Result<(), CommandError> {
+    tauri::async_runtime::spawn_blocking(move || win::clipboard::write_text(&text))
+        .await
+        .map_err(internal)?
+        .map_err(internal)
+}
+
 /// Opens an http(s) link in the default browser. Only called on user click.
 #[tauri::command]
 pub async fn open_link(url: String) -> Result<(), CommandError> {

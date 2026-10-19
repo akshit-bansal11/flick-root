@@ -10,6 +10,7 @@ import {
   RESERVED,
   type Scope,
   SHORTCUTS,
+  scopesOf,
 } from "./shortcuts";
 
 const key = (k: string, o: object = {}) => ({
@@ -22,7 +23,38 @@ const key = (k: string, o: object = {}) => ({
 
 describe("shortcut table", () => {
   it("has no reserved chord", () => {
-    for (const s of SHORTCUTS) expect(isReserved(s.keys), `${s.id} ${s.keys}`).toBe(false);
+    for (const s of SHORTCUTS) {
+      for (const scope of scopesOf(s)) {
+        expect(isReserved(s.keys, scope), `${s.id} ${s.keys} in ${scope}`).toBe(false);
+      }
+    }
+  });
+
+  it("reserves the WebView2 chords, and lets Settings keep Ctrl+W and Ctrl+Tab", () => {
+    for (const c of [
+      "Ctrl+F",
+      "Ctrl+R",
+      "F5",
+      "F12",
+      "Ctrl+0",
+      "Ctrl+=",
+      "Ctrl+-",
+      "Ctrl+P",
+      "Alt+Left",
+      "Alt+Space",
+    ]) {
+      expect(isReserved(c), c).toBe(true);
+    }
+    expect(isReserved("Ctrl+W")).toBe(true);
+    expect(isReserved("Ctrl+W", "launcher")).toBe(true);
+    expect(isReserved("Ctrl+W", "settings")).toBe(false);
+    expect(isReserved("Ctrl+Tab", "settings")).toBe(false);
+  });
+
+  it("reads Ctrl+digit and Ctrl+/ from the physical key (AZERTY)", () => {
+    expect(chordOf(key("&", { ctrl: true, code: "Digit1" }))).toBe("Ctrl+1");
+    expect(chordOf(key(":", { ctrl: true, code: "Slash" }))).toBe("Ctrl+/");
+    expect(chordOf(key("&", { code: "Digit1" }))).toBe("&");
   });
 
   it("reserved list covers the editing and Windows chords", () => {
@@ -76,8 +108,8 @@ describe("chordOf and matches", () => {
 });
 
 describe("tour scope", () => {
-  it("binds Alt+Right and Alt+Left, neither reserved, listed last in the sheet", () => {
-    expect(inScope("tour").map((s) => s.keys)).toEqual(["Alt+Right", "Alt+Left"]);
+  it("binds PageDown and PageUp, neither reserved, listed last in the sheet", () => {
+    expect(inScope("tour").map((s) => s.keys)).toEqual(["PageDown", "PageUp"]);
     expect(groups().at(-1)?.scope).toBe("tour");
   });
 });

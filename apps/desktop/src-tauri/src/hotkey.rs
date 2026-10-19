@@ -157,6 +157,9 @@ pub fn set_paused(app: &AppHandle, paused: bool) {
                 Ok(()) => tracing::info!(which, acc, "hotkey paused"),
                 Err(err) => tracing::warn!(%err, which, acc, "pausing hotkey failed"),
             }
+        } else if app.global_shortcut().is_registered(acc.as_str()) {
+            // Re-registered while paused (rebind, sync_explain) or never released: nothing to restore.
+            tracing::info!(which, acc, "hotkey already registered");
         } else if register(app, which, &acc).is_ok() {
             tracing::info!(which, acc, "hotkey resumed");
         }

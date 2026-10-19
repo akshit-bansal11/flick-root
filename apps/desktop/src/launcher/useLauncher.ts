@@ -3,9 +3,8 @@ import * as ipc from "../ipc";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
 import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
+import { cancelsDefault } from "./keys";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
-
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace", "Delete", "F1"]);
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
@@ -29,6 +28,12 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     function outcome(commandId: string, p: Promise<Outcome>) {
       p.then((o) => dispatch({ type: "outcome", commandId, outcome: o })).catch(warn);
     }
+    function copy(p: Promise<void>) {
+      p.then(() => dispatch({ type: "copyDone", ok: true })).catch((err: unknown) => {
+        warn(err);
+        dispatch({ type: "copyDone", ok: false });
+      });
+    }
     function run(e: Effect) {
       switch (e.type) {
         case "search":
@@ -50,10 +55,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           ipc.reveal(e.itemId).catch(warn);
           break;
         case "copyPath":
-          ipc.copyPath(e.itemId).catch(warn);
+          copy(ipc.copyPath(e.itemId));
           break;
         case "copyText":
-          ipc.copyText(e.text).catch(warn);
+          copy(ipc.copyText(e.text));
           break;
         case "clearCopied":
           window.clearTimeout(copiedTimer.current);
@@ -162,9 +167,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const mode = stateRef.current.mode;
       const handled = dispatch({ type: "key", key: fromEvent(e) });
-      if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey || e.altKey)))
-        e.preventDefault();
+      if (cancelsDefault(e, mode, handled)) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

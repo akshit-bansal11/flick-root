@@ -112,6 +112,36 @@ describe("SettingsApp", () => {
     expect(ipc.closeWindow).toHaveBeenCalledTimes(2);
   });
 
+  it("keys pressed while capturing a hotkey do not close Settings or change page", async () => {
+    await mount();
+    for (const o of [
+      { key: "Escape" },
+      { key: "w", ctrlKey: true },
+      { key: "Tab", ctrlKey: true },
+    ]) {
+      act(() => {
+        fireEvent.click(screen.getByText("Change"));
+      });
+      act(() => {
+        fireEvent.keyDown(screen.getByText(/Press keys/), o);
+      });
+    }
+    expect(ipc.closeWindow).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "General" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+  });
+
+  it("the window handler ignores a key already handled", async () => {
+    await mount();
+    const ev = new KeyboardEvent("keydown", { key: "Escape", cancelable: true, bubbles: true });
+    ev.preventDefault();
+    act(() => {
+      window.dispatchEvent(ev);
+    });
+    expect(ipc.closeWindow).not.toHaveBeenCalled();
+  });
+
   it("page keys do not steal Ctrl+Tab while typing in a text field", async () => {
     await mount();
     const input = document.body.appendChild(document.createElement("input"));

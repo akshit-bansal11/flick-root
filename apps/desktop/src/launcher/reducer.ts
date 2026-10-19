@@ -60,6 +60,8 @@ export interface State {
   sheet: boolean;
   /** True for ~1.2 s after a copy action, for the "Copied" confirmation. */
   copied: boolean;
+  /** True for the same window after a copy that failed, for "Copy failed". */
+  copyFailed: boolean;
   visible: boolean;
   attachment: Attachment | null;
   /** One muted line under the bar, for example "No text selected". */
@@ -78,6 +80,7 @@ export type Event =
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
+  | { type: "copyDone"; ok: boolean }
   | { type: "copiedDone" }
   | { type: "shown" }
   | { type: "hidden" };
@@ -188,6 +191,7 @@ export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]
   armed: false,
   sheet: false,
   copied: false,
+  copyFailed: false,
   visible: false,
   attachment: null,
   notice: null,
@@ -240,7 +244,7 @@ function textChange(s: State, text: string): Result {
   if (target && availableModes(s.enabledModes).includes(target)) {
     return switchMode(s, target, text.slice(1));
   }
-  if (s.mode === "none" || s.mode === "query") return out({ ...s, input: text });
+  if (s.mode === "none" || s.mode === "query") return out({ ...s, input: text, armed: false });
   return search(s, s.mode, text);
 }
 
@@ -348,9 +352,8 @@ function cycleThinking(s: State, delta: number): Result {
   );
 }
 
-/** Copy confirmation: shows "Copied" and asks the shell to clear it. */
-const copied = (s: State, copy: Effect): Result =>
-  out({ ...s, copied: true }, copy, { type: "clearCopied", afterMs: COPIED_MS });
+/** The copy itself; "Copied" shows only once the shell reports it landed (`copyDone`). */
+const copied = (s: State, copy: Effect): Result => out(s, copy);
 
 /** Text a Commands result copies (`payload.value` when it has a copy action), else null. */
 function resultValue(item: Item | undefined): string | null {
@@ -367,6 +370,8 @@ function goMode(s: State, mode: Entered): Result {
 
 function key(s: State, k: KeyInput): Result {
   const id = idFor(s.mode, k);
+  // Any key the table does not handle (Left, Right, Home, End...) ends "arrowed to a result".
+  if (!id) return s.armed ? out({ ...s, armed: false }) : out(s);
   if (s.sheet) {
     // The sheet covers the body: only its toggles and Esc act.
     return id === "sheet" || id === "sheetAlt" || id === "back"
@@ -391,7 +396,6 @@ function key(s: State, k: KeyInput): Result {
     case "admin":
       return openSelected(s, "admin");
     case "model":
-    case "modelAlt":
       return cycleThinking(s, 1);
     case "modelPrev":
       return cycleThinking(s, -1);
@@ -509,8 +513,18 @@ export function reduce(s: State, ev: Event): Result {
         : out(s);
     case "removeAttachment":
       return out({ ...s, attachment: null, notice: null });
+    case "copyDone":
+      return ev.ok
+        ? out(
+            { ...s, copied: true, copyFailed: false },
+            { type: "clearCopied", afterMs: COPIED_MS },
+          )
+        : out(
+            { ...s, copied: false, copyFailed: true },
+            { type: "clearCopied", afterMs: COPIED_MS },
+          );
     case "copiedDone":
-      return out({ ...s, copied: false });
+      return out({ ...s, copied: false, copyFailed: false });
     case "thinkingModes":
       return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
     case "enterMode":

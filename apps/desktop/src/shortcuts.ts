@@ -9,6 +9,8 @@ export interface KeyInput {
   shift: boolean;
   alt: boolean;
   meta?: boolean;
+  /** Physical key (KeyboardEvent.code); lets Ctrl+1-4 and Ctrl+/ work on layouts where those need Shift. */
+  code?: string;
 }
 
 export type Scope = LaunchMode | "launcher" | "settings" | "tour";
@@ -84,7 +86,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   { id: "model", keys: "Tab", label: "Next model", scope: "query", foot: "model" },
   { id: "modelPrev", keys: "Shift+Tab", label: "Previous model", scope: "query" },
-  { id: "modelAlt", keys: "Ctrl+P", label: "Next model", scope: "query" },
   { id: "effort", keys: "Ctrl+T", label: "Fast or Think", scope: "query", foot: "think" },
   {
     id: "removeAttachment",
@@ -109,8 +110,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "pagePrev", keys: "Ctrl+Shift+Tab", label: "Previous page", scope: "settings" },
   { id: "closeSettings", keys: "Esc", label: "Close Settings", scope: "settings" },
   { id: "closeSettingsW", keys: "Ctrl+W", label: "Close Settings", scope: "settings" },
-  { id: "tourNext", keys: "Alt+Right", label: "Next tour step", scope: "tour" },
-  { id: "tourBack", keys: "Alt+Left", label: "Previous tour step", scope: "tour" },
+  { id: "tourNext", keys: "PageDown", label: "Next tour step", scope: "tour" },
+  { id: "tourBack", keys: "PageUp", label: "Previous tour step", scope: "tour" },
 ];
 
 /** Chords text fields and Windows own. No table entry may use one. */
@@ -152,9 +153,39 @@ export const RESERVED: readonly string[] = [
   "Ctrl+Alt+Delete",
 ];
 
-/** True for a chord the launcher must never claim: listed above or any Win-key chord. */
-export const isReserved = (chord: string): boolean =>
-  RESERVED.includes(chord) || chord.split("+").includes("Win");
+/** WebView2 / browser chords: the launcher and tour claim none of them and cancel their default action. */
+export const BROWSER_CHORDS: readonly string[] = [
+  "Ctrl+F",
+  "Ctrl+R",
+  "Ctrl+Shift+R",
+  "F5",
+  "Ctrl+F5",
+  "Ctrl+Shift+I",
+  "F12",
+  "Ctrl++",
+  "Ctrl+Shift++",
+  "Ctrl+=",
+  "Ctrl+-",
+  "Ctrl+0",
+  "Shift+F10",
+  "Alt+Space",
+  "Alt+Left",
+  "Alt+Right",
+  "Ctrl+P",
+  "Ctrl+S",
+  "Ctrl+N",
+  "Ctrl+W",
+  "Ctrl+Tab",
+  "Ctrl+Shift+Tab",
+];
+
+/** Browser chords with their native meaning in the Settings window (close, next page). */
+const SETTINGS_OWN = ["Ctrl+W", "Ctrl+Tab", "Ctrl+Shift+Tab"];
+
+/** True for a chord a scope must never claim: listed above or any Win-key chord. */
+export const isReserved = (chord: string, scope?: Scope): boolean =>
+  !(scope === "settings" && SETTINGS_OWN.includes(chord)) &&
+  (RESERVED.includes(chord) || BROWSER_CHORDS.includes(chord) || chord.split("+").includes("Win"));
 
 const KEY_NAMES: Record<string, string> = {
   " ": "Space",
@@ -166,9 +197,18 @@ const KEY_NAMES: Record<string, string> = {
 };
 const KEY_ORIGINAL = Object.fromEntries(Object.entries(KEY_NAMES).map(([k, v]) => [v, k]));
 
+/** Key name; with Ctrl or Alt held, Digit1-4 and Slash come from the physical key (AZERTY needs Shift for digits). */
+function nameOf(k: KeyInput): string {
+  if (k.code && (k.ctrl || k.alt)) {
+    if (/^Digit[1-4]$/.test(k.code)) return k.code.slice(5);
+    if (k.code === "Slash") return "/";
+  }
+  return KEY_NAMES[k.key] ?? (k.key.length === 1 ? k.key.toUpperCase() : k.key);
+}
+
 /** Normalized chord for a key press. */
 export function chordOf(k: KeyInput): string {
-  const name = KEY_NAMES[k.key] ?? (k.key.length === 1 ? k.key.toUpperCase() : k.key);
+  const name = nameOf(k);
   return [k.ctrl && "Ctrl", k.alt && "Alt", k.shift && "Shift", k.meta && "Win", name]
     .filter(Boolean)
     .join("+");
@@ -193,19 +233,21 @@ export function parseChord(chord: string): KeyInput {
 /** KeyInput from a DOM keydown. */
 export const fromEvent = (e: {
   key: string;
+  code?: string;
   ctrlKey: boolean;
   shiftKey: boolean;
   altKey: boolean;
   metaKey: boolean;
 }): KeyInput => ({
   key: e.key,
+  code: e.code,
   ctrl: e.ctrlKey,
   shift: e.shiftKey,
   alt: e.altKey,
   meta: e.metaKey,
 });
 
-const scopesOf = (s: Shortcut): readonly Scope[] =>
+export const scopesOf = (s: Shortcut): readonly Scope[] =>
   typeof s.scope === "string" ? [s.scope] : s.scope;
 
 /** Entries declared for exactly this scope. */

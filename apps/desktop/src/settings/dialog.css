@@ -19,7 +19,7 @@
   font-family: var(--l-ui);
   font-size: var(--l-fs);
   line-height: var(--l-lh);
-  animation: key-dialog-in calc(120ms * var(--motion-scale)) var(--l-motion-ease);
+  animation: key-dialog-in var(--l-dur) var(--l-ease-out);
 }
 .key-dialog h2 {
   margin: 0;

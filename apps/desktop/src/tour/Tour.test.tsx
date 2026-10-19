@@ -56,13 +56,13 @@ describe("Tour", () => {
     expect(title()).toBe("! Apps and programs");
   });
 
-  it("walks with Next, Back and Alt+Arrow keys", async () => {
+  it("walks with Next, Back and PageDown/PageUp", async () => {
     await mount();
     click("Next");
     expect(title()).toBe("! Apps and programs");
-    fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
+    fireEvent.keyDown(window, { key: "PageDown" });
     expect(title()).toBe("> Commands");
-    fireEvent.keyDown(window, { key: "ArrowLeft", altKey: true });
+    fireEvent.keyDown(window, { key: "PageUp" });
     click("Back");
     expect(title()).toBe("Open the bar");
   });

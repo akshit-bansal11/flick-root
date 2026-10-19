@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isBrowserChord } from "../launcher/keys";
 import * as api from "../settings/api";
 import { fromEvent, matches, shortcut } from "../shortcuts";
 import type { ThemeId } from "../theme";
@@ -185,6 +186,7 @@ export function useTour(onDone: (completed: boolean) => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = fromEvent(e);
+      if (isBrowserChord(e)) e.preventDefault();
       if (matches(k, shortcut("tourNext").keys)) {
         e.preventDefault();
         next();

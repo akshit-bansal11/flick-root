@@ -33,8 +33,8 @@ export const reveal = (itemId: string) => invoke<void>("reveal", { itemId });
 
 export const copyPath = (itemId: string) => invoke<void>("copy_path", { itemId });
 
-/** Copies text the user already sees (an answer or result value); no network, WebView clipboard only. */
-export const copyText = (text: string) => navigator.clipboard.writeText(text);
+/** Copies text the user already sees (an answer or result value) through Rust; resolves once written. */
+export const copyText = (text: string) => invoke<void>("copy_text", { text });
 
 /** Closes the calling window (Settings). Needs core:window:allow-close in its capability. */
 export const closeWindow = () => getCurrentWindow().close();

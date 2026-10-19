@@ -162,10 +162,9 @@ body,
   cursor: pointer;
 }
 
+/* Background fades only on hover; a selection moved by the keyboard changes at once. */
 .hint-row {
-  transition:
-    background var(--l-dur-fast) var(--l-ease-out),
-    transform var(--l-dur-fast) var(--l-ease-out);
+  transition: transform var(--l-dur-fast) var(--l-ease-out);
 }
 
 .hint-row:active,
@@ -175,6 +174,9 @@ body,
 
 .hint-row:hover {
   background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
+  transition:
+    background var(--l-dur-fast) var(--l-ease-out),
+    transform var(--l-dur-fast) var(--l-ease-out);
 }
 
 .hint-row.sel {
@@ -232,37 +234,22 @@ body,
   min-width: 0;
 }
 
+/* Rows remount on every keystroke, so they start nearly opaque and never delay their content. */
 .row {
   z-index: 1;
-  transition: background var(--l-dur-fast) var(--l-ease-out);
-  animation: row-in var(--l-dur) var(--l-ease-out) backwards;
-}
-
-.row[data-i="1"] {
-  animation-delay: calc(var(--l-stagger) * 1);
-}
-.row[data-i="2"] {
-  animation-delay: calc(var(--l-stagger) * 2);
-}
-.row[data-i="3"] {
-  animation-delay: calc(var(--l-stagger) * 3);
-}
-.row[data-i="4"] {
-  animation-delay: calc(var(--l-stagger) * 4);
-}
-.row[data-i="5"] {
-  animation-delay: calc(var(--l-stagger) * 5);
+  animation: row-in var(--l-dur) var(--l-ease-out);
 }
 
 @keyframes row-in {
   from {
-    opacity: 0;
-    transform: translateY(3px);
+    opacity: 0.7;
+    transform: translateY(2px);
   }
 }
 
 .row:hover {
   background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
+  transition: background var(--l-dur-fast) var(--l-ease-out);
 }
 
 .row.sel {

@@ -10,6 +10,8 @@ interface Props {
   ctx?: Partial<Record<Condition, boolean>>;
   /** Shows the short "Copied" confirmation. */
   copied?: boolean;
+  /** Shows "Copy failed" instead. */
+  copyFailed?: boolean;
 }
 
 /** Footer hints per mode, straight from the shortcut table. */
@@ -25,8 +27,8 @@ export function footHints(mode: LaunchMode, ctx: Props["ctx"] = {}): string[] {
     .map((s) => `${capsText(s.id)} ${s.foot}`);
 }
 
-export function Footer({ mode, ctx, copied = false }: Props) {
-  const toast = useExit(copied ? "Copied" : null);
+export function Footer({ mode, ctx, copied = false, copyFailed = false }: Props) {
+  const toast = useExit(copyFailed ? "Copy failed" : copied ? "Copied" : null);
   return (
     <div className="foot">
       <span className="brand">

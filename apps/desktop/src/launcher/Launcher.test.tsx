@@ -198,6 +198,8 @@ describe("Launcher", () => {
         fireEvent.keyDown(window, { key: "C", ctrlKey: true, shiftKey: true });
       });
       expect(ipc.copyPath).toHaveBeenCalledWith("a");
+      expect(screen.queryByRole("status")).toBeNull();
+      await act(async () => {});
       expect(screen.getByRole("status").textContent).toBe("Copied");
       act(() => {
         vi.advanceTimersByTime(1300);
@@ -206,6 +208,18 @@ describe("Launcher", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("a failed copy shows Copy failed, never Copied", async () => {
+    vi.mocked(ipc.copyPath).mockRejectedValueOnce(new Error("clipboard busy"));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await mount();
+    await type("/");
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "C", ctrlKey: true, shiftKey: true });
+    });
+    expect(screen.getByRole("status").textContent).toBe("Copy failed");
+    err.mockRestore();
   });
 
   it("find footer advertises Ctrl Shift C, not Ctrl C", async () => {

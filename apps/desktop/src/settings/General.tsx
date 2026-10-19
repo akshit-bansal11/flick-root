@@ -66,6 +66,8 @@ export function General({ settings, onChange, onTour }: Props) {
 
   const onCapture = (e: KeyboardEvent) => {
     e.preventDefault();
+    // The window handler must not see these as Esc / Ctrl+W / Ctrl+Tab.
+    e.stopPropagation();
     if (e.key === "Escape") return setCapturing(false);
     const c = comboFromEvent(e);
     if (!c) return;

@@ -103,6 +103,7 @@ export function LauncherView({
       <Footer
         mode={state.mode}
         copied={state.copied}
+        copyFailed={state.copyFailed}
         ctx={{
           armedProcess: state.armed && selected?.kind === "process",
           adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,

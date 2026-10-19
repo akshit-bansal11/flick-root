@@ -50,7 +50,12 @@ pub fn strip_caption(hwnd: isize) -> Result<(), WinError> {
     let h = HWND(hwnd as *mut c_void);
     // SAFETY: plain style get/set on a window handle; a stale hwnd makes the calls fail, not misbehave.
     unsafe {
-        let style = GetWindowLongPtrW(h, GWL_STYLE) as u32;
+        let raw = GetWindowLongPtrW(h, GWL_STYLE);
+        let style = raw as u32;
+        // 0 means the call failed (stale hwnd): writing it back would wipe the style.
+        if raw == 0 || stripped_style(style) == style {
+            return Ok(());
+        }
         SetWindowLongPtrW(h, GWL_STYLE, stripped_style(style) as isize);
         SetWindowPos(
             h,
