@@ -101,6 +101,7 @@ pub fn run() {
             commands::integrations::set_integration,
             commands::integrations::connect_spotify,
             commands::integrations::disconnect_spotify,
+            commands::integrations::test_capture_target,
             commands::secrets::set_secret,
             commands::secrets::delete_secret,
             commands::secrets::test_secret,

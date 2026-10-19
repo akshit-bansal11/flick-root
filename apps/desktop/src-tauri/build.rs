@@ -30,6 +30,7 @@ fn main() {
         "set_integration",
         "connect_spotify",
         "disconnect_spotify",
+        "test_capture_target",
         "set_secret",
         "delete_secret",
         "test_secret",

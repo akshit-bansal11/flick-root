@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   About,
+  CaptureTest,
   ClearScope,
   EnginePatch,
   EngineProbe,
@@ -95,6 +96,10 @@ export const onSpotifyState = (cb: (p: SpotifyState) => void): Promise<UnlistenF
 /** Opens the browser and waits for sign-in; rejects with code auth_cancelled, port_busy or network. */
 export const connectSpotify = () => invoke<SpotifyState>("connect_spotify");
 export const disconnectSpotify = () => invoke<void>("disconnect_spotify");
+
+/** Checks one quick-capture target. A webhook target receives one test message. */
+export const testCaptureTarget = (targetId: string) =>
+  invoke<CaptureTest>("test_capture_target", { targetId });
 
 export const getIntegrations = () => invoke<IntegrationsView>("get_integrations");
 export const setIntegration = (target: IntegrationTarget, patch: IntegrationPatch) =>

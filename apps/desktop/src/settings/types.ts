@@ -199,6 +199,12 @@ export interface IntegrationsView {
   webhooks: WebhookView[];
 }
 
+/** Result of test_capture_target; failures reject with code not_configured or network. */
+export interface CaptureTest {
+  ok: boolean;
+  message: string;
+}
+
 /** Payload of connect_spotify and the spotify://state event. */
 export interface SpotifyState {
   connected: boolean;

@@ -12,6 +12,7 @@ index-files = { workspace = true }
 providers = { workspace = true }
 decision = { workspace = true }
 secrecy = { workspace = true }
+futures = { workspace = true }
 url = { workspace = true }
 tokio = { workspace = true, features = ["rt", "sync", "time", "macros", "net", "io-util"] }
 tokio-util = { workspace = true }

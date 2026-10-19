@@ -75,6 +75,34 @@ function KeyRow({
   );
 }
 
+/** Runs test_capture_target and shows the outcome next to the button. */
+function TestButton({ id, label, name }: { id: string; label: string; name: string }) {
+  const [res, setRes] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      setRes({ ok: true, text: (await api.testCaptureTarget(id)).message });
+    } catch (e) {
+      setRes({ ok: false, text: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="pv-head">
+      <button type="button" aria-label={`${label} ${name}`} disabled={busy} onClick={run}>
+        {label}
+      </button>
+      {res && (
+        <span className={res.ok ? "s-help" : "s-error"} role={res.ok ? "status" : "alert"}>
+          {res.text}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply }) {
   const [connected, setConnected] = useState(v.connected);
   const [name, setName] = useState<string | null>(null);
@@ -264,6 +292,7 @@ export function Integrations() {
             value={v.obsidian_daily_format}
             save={(x) => apply("obsidian", { dailyFormat: x })}
           />
+          {v.obsidian_vault && <TestButton id="obsidian" label="Test" name="Obsidian" />}
         </li>
         <li className="pv-row">
           <span className="pv-title">Markdown file</span>
@@ -273,6 +302,7 @@ export function Integrations() {
             save={(x) => apply("markdown", { file: x })}
             help="Notes are appended here. The file's folder must exist."
           />
+          {v.markdown_file && <TestButton id="markdown" label="Test" name="Markdown file" />}
         </li>
         <li className="pv-row">
           <span className="pv-title">Notion</span>
@@ -298,12 +328,15 @@ export function Integrations() {
             value={v.notion_database_id}
             save={(x) => apply("notion", { databaseId: x })}
           />
+          {v.notion_token_present && v.notion_database_id && (
+            <TestButton id="notion" label="Test" name="Notion" />
+          )}
         </li>
         <li className="pv-row">
           <span className="pv-title">Webhooks</span>
           <p className="s-help">
             The webhook URL is a secret, so it is stored like a key. Enter the host first, then add
-            the URL.
+            the URL. "Send test" posts one test message to it.
           </p>
           <ul>
             {v.webhooks.map((w) => (
@@ -332,6 +365,9 @@ export function Integrations() {
                 >
                   {w.url_present ? "Replace URL" : "Add URL"}
                 </button>
+                {w.url_present && w.enabled && (
+                  <TestButton id={`webhook.${w.name}`} label="Send test" name={w.name} />
+                )}
                 <button
                   type="button"
                   aria-label={`Remove webhook ${w.name}`}

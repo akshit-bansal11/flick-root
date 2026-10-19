@@ -192,7 +192,7 @@ pub async fn wait_callback(
 }
 
 /// Reads a body, giving up past `max` bytes.
-pub(super) async fn read_capped(mut r: reqwest::Response, max: usize) -> Option<Vec<u8>> {
+pub(crate) async fn read_capped(mut r: reqwest::Response, max: usize) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
     while let Some(c) = r.chunk().await.ok()? {
         if buf.len() + c.len() > max {

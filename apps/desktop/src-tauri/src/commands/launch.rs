@@ -130,6 +130,12 @@ pub async fn launch(
             blocking_com(move || ia::open_path(&p)).await?;
             Outcome::HideLauncher
         }
+        IdRef::Other if it.payload.get("open_settings").is_some() => {
+            // A feature row that points at a Settings section (for example "Set up quick capture").
+            let section = it.payload["open_settings"].as_str();
+            crate::tray::open_settings_window(&app, section).map_err(internal)?;
+            Outcome::HideLauncher
+        }
         IdRef::Other if copy_value(&it).is_some() => {
             let value = copy_value(&it).unwrap_or_default();
             app.clipboard().write_text(value).map_err(internal)?;

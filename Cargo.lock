@@ -1457,6 +1457,7 @@ dependencies = [
  "criterion",
  "decision",
  "fend-core",
+ "futures",
  "index-apps",
  "index-files",
  "launcher-core",

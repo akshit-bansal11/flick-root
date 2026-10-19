@@ -436,6 +436,32 @@ pub async fn disconnect_spotify(
     Ok(())
 }
 
+/// Result of `test_capture_target`.
+#[derive(Debug, Serialize)]
+pub struct CaptureTest {
+    /// Always true; failures are errors with code `not_configured` or `network`.
+    pub ok: bool,
+    /// What was checked.
+    pub message: String,
+}
+
+/// Checks one quick-capture target: files are checked without writing, Notion is read once,
+/// and a webhook gets one test POST (the user clicked Test). Ids: `obsidian`, `markdown`,
+/// `notion`, `webhook.<name>`.
+#[tauri::command]
+pub async fn test_capture_target(
+    state: State<'_, Arc<AppState>>,
+    target_id: String,
+) -> Result<CaptureTest, CommandError> {
+    let http = providers::http::authed_client()
+        .map_err(|e| CommandError::new("capture", e.to_string()))?;
+    let cfg = state.config.load_full();
+    let message = features::capture::test_target(&state.vault, &cfg, &http, &target_id)
+        .await
+        .map_err(|e| CommandError::new(e.code(), e.to_string()))?;
+    Ok(CaptureTest { ok: true, message })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

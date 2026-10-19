@@ -13,6 +13,7 @@ vi.mock("./api", () => ({
   deleteSecret: vi.fn(() => Promise.resolve()),
   connectSpotify: vi.fn(),
   disconnectSpotify: vi.fn(() => Promise.resolve()),
+  testCaptureTarget: vi.fn(),
   onSpotifyState: vi.fn(() => Promise.resolve(() => {})),
 }));
 
@@ -134,5 +135,34 @@ describe("Integrations", () => {
     expect(
       screen.getByText("Port 43919 is in use — close the app using it and retry"),
     ).toBeTruthy();
+  });
+
+  it("Test shows the result for a configured target and the error for a failing one", async () => {
+    vi.mocked(api.testCaptureTarget).mockResolvedValueOnce({ ok: true, message: "Writable" });
+    await mount({ ...view, markdown_file: "C:/n/inbox.md" });
+    expect(screen.queryByRole("button", { name: "Test Obsidian" })).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Test Markdown file" }));
+    });
+    expect(api.testCaptureTarget).toHaveBeenCalledWith("markdown");
+    expect(screen.getByRole("status").textContent).toBe("Writable");
+    vi.mocked(api.testCaptureTarget).mockRejectedValueOnce({
+      code: "not_configured",
+      message: "Add the webhook URL first",
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Test Markdown file" }));
+    });
+    expect(screen.getByRole("alert").textContent).toContain("Add the webhook URL first");
+  });
+
+  it("a webhook with a stored URL gets a Send test button", async () => {
+    vi.mocked(api.testCaptureTarget).mockResolvedValue({ ok: true, message: "Accepted" });
+    const hook = { name: "ci", enabled: true, host: "hooks.test", url_present: true };
+    await mount({ ...view, webhooks: [hook] });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send test ci" }));
+    });
+    expect(api.testCaptureTarget).toHaveBeenCalledWith("webhook.ci");
   });
 });

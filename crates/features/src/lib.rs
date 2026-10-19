@@ -1,5 +1,6 @@
 //! Feature trait, feature registry, settings schema and start/stop lifecycle. Every feature is a module behind this trait with a toggle; a stopped feature holds no tasks or clients.
 
+pub mod capture;
 pub mod ctx;
 pub mod error;
 pub mod explain;
@@ -29,11 +30,15 @@ use std::sync::Arc;
 
 /// All built-in features.
 pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
-    builtin_features_with(media::Media::default())
+    builtin_features_with(media::Media::default(), capture::Capture::default())
 }
 
-/// All built-in features, with a media feature that has the optional Spotify/YouTube APIs.
-pub fn builtin_features_with(media: media::Media) -> Vec<Arc<dyn Feature>> {
+/// All built-in features, with a media feature that has the optional Spotify/YouTube APIs and
+/// a capture feature that can read the secret vault.
+pub fn builtin_features_with(
+    media: media::Media,
+    capture: capture::Capture,
+) -> Vec<Arc<dyn Feature>> {
     vec![
         Arc::new(frecency::Frecency::default()),
         Arc::new(math::Math),
@@ -43,6 +48,7 @@ pub fn builtin_features_with(media: media::Media) -> Vec<Arc<dyn Feature>> {
         Arc::new(ports::Ports::default()),
         Arc::new(explain::Explain),
         Arc::new(media),
+        Arc::new(capture),
     ]
 }
 
@@ -51,11 +57,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtins_are_eight_unique_and_enabled() {
+    fn builtins_are_nine_unique_and_enabled() {
         let f = builtin_features();
         let ids: std::collections::HashSet<_> = f.iter().map(|x| x.id()).collect();
-        assert_eq!(f.len(), 8);
-        assert_eq!(ids.len(), 8);
+        assert_eq!(f.len(), 9);
+        assert_eq!(ids.len(), 9);
         assert!(f.iter().all(|x| x.default_enabled()));
         assert!(
             f.iter()

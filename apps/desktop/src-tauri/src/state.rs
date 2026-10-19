@@ -281,7 +281,10 @@ pub fn start(app: &AppHandle) {
     let state: Arc<AppState> = Arc::clone(&*app.state::<Arc<AppState>>());
     let s = state.clone();
     tauri::async_runtime::spawn(async move {
-        for f in builtin_features_with(Media::with_api(s.spotify.clone())) {
+        for f in builtin_features_with(
+            Media::with_api(s.spotify.clone()),
+            features::capture::Capture::new(s.vault.clone()),
+        ) {
             s.registry.register(f).await;
         }
         let host = Arc::new(crate::nlhost::ShellHost(Arc::downgrade(&s)));

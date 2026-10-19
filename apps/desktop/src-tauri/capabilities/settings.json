@@ -27,6 +27,7 @@
     "allow-set-integration",
     "allow-connect-spotify",
     "allow-disconnect-spotify",
+    "allow-test-capture-target",
     "allow-set-secret",
     "allow-delete-secret",
     "allow-test-secret",
