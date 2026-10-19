@@ -13,6 +13,8 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   const stateRef = useRef(state);
   const ask = useRef<{ token: number; id: string | null }>({ token: 0, id: null });
   const cancelled = useRef(new Set<number>());
+  const lastHeight = useRef(0);
+  const syncHeight = useRef((_force: boolean) => {});
 
   const dispatch = useCallback((ev: Event): boolean => {
     const prev = stateRef.current;
@@ -104,10 +106,14 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
         dispatch({ type: "shown", tutorial: p.tutorial });
         inputRef.current?.focus();
         requestAnimationFrame(() => {
+          syncHeight.current(true);
           ipc.reportShown(p.shownId).catch(warn);
         });
       }),
-      ipc.onHidden(() => dispatch({ type: "hidden" })),
+      ipc.onHidden(() => {
+        lastHeight.current = 0;
+        dispatch({ type: "hidden" });
+      }),
       ipc.onExplainCaptured((c) =>
         dispatch({
           type: "captured",
@@ -130,17 +136,17 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     };
   }, [dispatch, inputRef]);
 
-  // Window height follows the panel; only a changed whole-pixel height crosses IPC.
+  // Window height follows the panel; unless forced (after show), only a changed height crosses IPC.
   useEffect(() => {
     const el = panelRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    let last = 0;
-    const ro = new ResizeObserver(() => {
+    syncHeight.current = (force) => {
       const h = Math.round(el.getBoundingClientRect().height);
-      if (h === last || h === 0) return;
-      last = h;
+      if (h === 0 || (!force && h === lastHeight.current)) return;
+      lastHeight.current = h;
       ipc.resizeLauncher(h).catch(warn);
-    });
+    };
+    const ro = new ResizeObserver(() => syncHeight.current(false));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);

@@ -11,7 +11,7 @@ body,
 .launcher {
   position: relative;
   width: 100%;
-  max-height: min(var(--l-panel-max), 100vh);
+  max-height: var(--l-panel-max);
   display: flex;
   flex-direction: column;
   background: var(--l-glass-tint);
@@ -327,8 +327,11 @@ body,
   background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), transparent);
 }
 
-.action:focus-visible,
-.input:focus-visible {
+.action:focus-visible {
   outline: 2px solid var(--l-focus);
   outline-offset: 1px;
+}
+
+.input:focus-visible {
+  outline: none;
 }
