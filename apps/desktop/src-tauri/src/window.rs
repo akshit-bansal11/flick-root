@@ -292,7 +292,9 @@ mod tests {
 
     #[test]
     fn layout_never_above_work_area() {
-        assert_eq!(layout((0, 10, 800, 300), 1.0).1, 10);
+        let (_, y, _) = layout((0, 10, 800, 300), 1.0);
+        assert!(y >= 10, "panel top above the work area: {y}");
+        assert_eq!(y, 10 + (WORK_MARGIN / 2.0) as i32);
     }
 
     #[test]

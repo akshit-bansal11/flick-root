@@ -35,6 +35,16 @@ The shared 2-vCPU runner is slower than the laptop above, so compare rows within
 | Command match, 2,000 apps (top_k_8) | <= 2 ms | worst 0.22 ms ("co") | within |
 | Find match, 305k paths | <= 25 ms p95 | means 13.7–22.1 ms ("rep" with overlay slowest); p95 not reported by criterion | within on means, close on this runner |
 
+### v0.2.0 (GitHub `windows-latest` runner, bench.yml run 39274780839, commit db7710f)
+
+Programs found by the drive scan are matched in their own index, off the keystroke thread, with Find's budget. Criterion means.
+
+| Budget | Limit | Measured | Status |
+| --- | --- | --- | --- |
+| Command match, 2,000 apps ("!" apps part) | <= 2 ms | 0.08 ms ("code") | within |
+| Programs match, 50,000 programs (synthetic names) | <= 25 ms (Find budget) | 0.84–1.61 ms ("c" fastest, "inst 4" slowest) | within |
+| Command search, 2,000 apps, all features on | <= 2 ms | worst 0.22 ms; "co" 0.08 ms | within |
+
 ## How to reproduce
 
 - Benches run on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (bench.txt plus criterion estimates). Bench crates: launcher-core, index-files, features (frecency, math, syscmd, web, projects, command_all, nlfind, ports, media, explain, capture).
