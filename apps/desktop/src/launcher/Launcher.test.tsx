@@ -114,8 +114,21 @@ describe("Launcher", () => {
     await type(">");
     expect(screen.getByText("Apps")).toBeTruthy();
     expect(screen.getAllByText("App")).toHaveLength(2);
-    expect(screen.getByText("Ctrl Shift ↵ admin")).toBeTruthy();
+    expect(screen.queryByText("Ctrl Shift ↵ admin")).toBeNull();
     expect(screen.queryByText("Tab mode")).toBeNull();
+  });
+
+  it("commands footer shows the admin hint when the selected item has an admin action", async () => {
+    await mount();
+    vi.mocked(ipc.search).mockImplementation((req) =>
+      Promise.resolve({
+        seq: req.seq,
+        items: [{ ...item("a", "Alpha"), actions: [{ type: "admin" }] }],
+        group: null,
+      }),
+    );
+    await type(">");
+    expect(screen.getByText("Ctrl Shift ↵ admin")).toBeTruthy();
   });
 
   it("labels drive-scan programs", async () => {

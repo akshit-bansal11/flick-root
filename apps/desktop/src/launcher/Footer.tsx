@@ -9,8 +9,16 @@ const KEYS: Record<LaunchMode, string[]> = {
   query: ["↵ ask", "Tab model", "Ctrl T think"],
 };
 
-export function Footer({ mode, canKill = false }: { mode: LaunchMode; canKill?: boolean }) {
-  const keys = canKill ? ["⌫ kill", ...KEYS[mode]] : KEYS[mode];
+interface Props {
+  mode: LaunchMode;
+  canKill?: boolean;
+  /** Whether the selected item has an admin action (Commands mode shows the hint only then). */
+  canAdmin?: boolean;
+}
+
+export function Footer({ mode, canKill = false, canAdmin = false }: Props) {
+  const base = KEYS[mode].filter((k) => mode !== "commands" || canAdmin || !k.endsWith("admin"));
+  const keys = canKill ? ["⌫ kill", ...base] : base;
   return (
     <div className="foot">
       <span className="brand">

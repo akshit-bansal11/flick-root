@@ -13,6 +13,11 @@ use windows::Win32::System::Registry::{
     HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RegGetValueW,
 };
 use windows::Win32::UI::Controls::MARGINS;
+use windows::Win32::UI::WindowsAndMessaging::{
+    GWL_STYLE, GetWindowLongPtrW, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
+    WS_SYSMENU,
+};
 use windows::core::{PCWSTR, s, w};
 
 /// First Windows 11 build that understands `DWMWA_SYSTEMBACKDROP_TYPE`.
@@ -31,6 +36,32 @@ pub fn round_corners(hwnd: isize) -> Result<(), WinError> {
         )
     }
     .map_err(|e| WinError::os(e, "DwmSetWindowAttribute"))
+}
+
+/// `style` without the caption, system menu and min/max box bits.
+fn stripped_style(style: u32) -> u32 {
+    style & !(WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0)
+}
+
+/// Removes the caption buttons DWM draws once the frame is extended into the client area.
+/// Call before `set_acrylic`.
+pub fn strip_caption(hwnd: isize) -> Result<(), WinError> {
+    let h = HWND(hwnd as *mut c_void);
+    // SAFETY: plain style get/set on a window handle; a stale hwnd makes the calls fail, not misbehave.
+    unsafe {
+        let style = GetWindowLongPtrW(h, GWL_STYLE) as u32;
+        SetWindowLongPtrW(h, GWL_STYLE, stripped_style(style) as isize);
+        SetWindowPos(
+            h,
+            None,
+            0,
+            0,
+            0,
+            0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        )
+    }
+    .map_err(|e| WinError::os(e, "SetWindowPos"))
 }
 
 /// Whether the user allows transparency effects (Settings > Personalization > Colors). Missing value means yes.
@@ -218,6 +249,14 @@ mod tests {
         assert!(has_backdrop(26200));
         assert_eq!(parse_build("26200\0"), 26200);
         assert_eq!(parse_build("x"), 0);
+    }
+
+    #[test]
+    fn strip_clears_caption_bits_only() {
+        let keep = 0x1000_0000; // WS_VISIBLE
+        let all = keep | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0;
+        assert_eq!(stripped_style(all), keep);
+        assert_eq!(stripped_style(keep), keep);
     }
 
     #[test]

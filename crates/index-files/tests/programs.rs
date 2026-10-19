@@ -32,6 +32,7 @@ fn scan_filters_and_caches() {
         "Temp2/d.exe",
         "Start Menu/Programs/s.lnk",
         "hid/b.exe",
+        ".claude/shell-snapshots/snap.sh",
     ] {
         touch(&r.join(f));
     }

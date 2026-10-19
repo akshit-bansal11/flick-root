@@ -150,6 +150,17 @@ pub fn command_search_scoped(
     top_k_sorted(items, k)
 }
 
+/// Whether a program name is a solid match: it contains the query, or every query word starts a name word.
+/// Scattered fuzzy hits (letters spread across a long file name) fail both.
+fn solid_match(name: &str, query: &str) -> bool {
+    let (name, query) = (name.to_lowercase(), query.trim().to_lowercase());
+    name.contains(&query)
+        || query.split_whitespace().all(|q| {
+            name.split(|c: char| !c.is_alphanumeric())
+                .any(|w| w.starts_with(q))
+        })
+}
+
 /// Fuzzy matches of `text` over scanned programs, best `k`, scored below real apps. Empty text matches nothing.
 /// Budget is Find's 25 ms; call from a blocking thread.
 pub fn program_items(
@@ -170,6 +181,10 @@ pub fn program_items(
     hits.into_iter()
         .filter_map(|h| {
             let a = programs.get(h.idx)?;
+            // Weak hits (< half the best score, or scattered letters) are noise.
+            if (h.score as f32) < max * 0.5 || !solid_match(&a.name, text) {
+                return None;
+            }
             Some(app_item(
                 a,
                 h.idx,
@@ -288,6 +303,21 @@ mod tests {
         assert_eq!(run(SearchScope::All, "").len(), 1);
         assert!(run(SearchScope::Commands, "code").is_empty());
         assert_eq!(run(SearchScope::Apps, "code").len(), 2);
+    }
+
+    #[test]
+    fn scattered_program_hits_are_dropped() {
+        let progs = vec![
+            app("Spotify"),
+            app("snapshot-bash-1700000000000-i8kfky"),
+            app("Visual Studio Code"),
+        ];
+        let pi = idx_of(&progs);
+        let got = program_items(&progs, &pi, &mut FuzzyMatcher::new(), "spotify", 5);
+        let titles: Vec<_> = got.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles, ["Spotify"]);
+        assert!(solid_match("Visual Studio Code", "studio co"));
+        assert!(!solid_match("snapshot-bash-i8kfky", "spotify"));
     }
 
     #[test]

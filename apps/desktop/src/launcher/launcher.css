@@ -52,6 +52,19 @@ body,
   overflow-y: auto;
 }
 
+.launcher-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.launcher-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.launcher-body::-webkit-scrollbar-thumb {
+  border-radius: var(--l-r2);
+  background: var(--l-line);
+}
+
 .launcher.show {
   animation: launcher-in calc(100ms * var(--motion-scale)) var(--l-motion-ease);
 }

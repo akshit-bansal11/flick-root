@@ -26,6 +26,7 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
     title: "Welcome",
     body: "One bar, four modes. Each starts with a prefix character. This tour takes a minute and you can skip it any time.",
     keys: [">", "!", "/", "?"],
+    done: (v) => v.mode !== "none",
   },
   {
     id: "apps",

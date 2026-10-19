@@ -12,6 +12,22 @@ interface Props {
   onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
 }
 
+const ACTION_LABEL = {
+  primary: "Open",
+  admin: "Admin",
+  location: "Show",
+  copyPath: "Copy",
+  copyResult: "Copy",
+  kill: "Kill",
+  custom: "Run",
+} as const;
+
+/** Hint shown on the selected row: its primary (first) action. */
+export function primaryLabel(item: Item): string {
+  const first = item.actions[0];
+  return first ? ACTION_LABEL[first.type] : "Open";
+}
+
 export function ResultRow({ item, id, index, selected, query, onActivate }: Props) {
   return (
     <div
@@ -35,7 +51,7 @@ export function ResultRow({ item, id, index, selected, query, onActivate }: Prop
         <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>
       </span>
       <span className="row-meta" aria-hidden="true">
-        {selected ? "↵ Open" : rowKind(item)}
+        {selected ? `↵ ${primaryLabel(item)}` : rowKind(item)}
       </span>
     </div>
   );

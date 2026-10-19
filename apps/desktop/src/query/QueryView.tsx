@@ -32,7 +32,7 @@ export function QueryView(p: Props) {
       <div className="query-chips">
         {mode ? (
           <span className="query-chip" aria-live="polite">
-            {`${mode.providerLabel} · ${mode.model} · ${p.effort === "think" ? "Think" : "Fast"}${mode.local ? " · local" : ""}`}
+            {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
           </span>
         ) : (
           p.provider && <span className="query-chip">{p.provider}</span>

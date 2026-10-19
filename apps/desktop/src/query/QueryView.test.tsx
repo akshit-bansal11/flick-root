@@ -36,10 +36,10 @@ describe("QueryView", () => {
     ];
     const c = render({ modes, selectedMode: "b/m2" });
     const chip = c.querySelector(".query-chip");
-    expect(chip?.textContent).toBe("OpenAI · m2 · Fast");
+    expect(chip?.textContent).toBe("OpenAI · m2");
     expect(chip?.getAttribute("aria-live")).toBe("polite");
     act(() => root?.render(<QueryView {...base} modes={modes} selectedMode="a/m1" />));
-    expect(c.querySelector(".query-chip")?.textContent).toBe("Ollama · m1 · Fast · local");
+    expect(c.querySelector(".query-chip")?.textContent).toBe("Ollama · m1 · local");
   });
 
   it("appends streamed deltas in order", () => {

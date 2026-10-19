@@ -71,6 +71,9 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     #[cfg(windows)]
     match win.hwnd() {
         Ok(h) => {
+            if let Err(err) = win::dwm::strip_caption(h.0 as isize) {
+                tracing::warn!(%err, "caption strip failed");
+            }
             if let Err(err) = win::dwm::round_corners(h.0 as isize) {
                 tracing::warn!(%err, "rounded corners failed");
             }

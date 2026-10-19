@@ -31,6 +31,10 @@ describe("tutorial steps", () => {
     expect(prevStep(0)).toBe(0);
     expect(prevStep(3)).toBe(2);
   });
+  it("welcome advances as soon as any mode is entered", () => {
+    expect(autoAdvance(0, view())).toBe(0);
+    expect(autoAdvance(0, view({ mode: "query" }))).toBe(1);
+  });
   it("auto-advances only when the current step is done", () => {
     const apps = at("apps");
     expect(autoAdvance(apps, view({ mode: "run" }))).toBe(apps);

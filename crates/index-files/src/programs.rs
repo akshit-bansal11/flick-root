@@ -105,7 +105,8 @@ fn is_app_bundle(name: &OsStr) -> bool {
 
 fn skip_dir_name(name: &OsStr) -> bool {
     let n = name.to_string_lossy();
-    SKIP_DIRS.iter().any(|s| n.eq_ignore_ascii_case(s))
+    // Dot-directories are tool caches (.claude, .npm, .vscode, .gradle, .m2).
+    n.starts_with('.') || SKIP_DIRS.iter().any(|s| n.eq_ignore_ascii_case(s))
 }
 
 /// Walk `roots` and collect program files, sorted by path, deduplicated, capped at [`MAX_PROGRAMS`].

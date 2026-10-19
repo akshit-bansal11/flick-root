@@ -94,6 +94,7 @@ export function Launcher() {
       <Footer
         mode={state.mode}
         canKill={state.armed && state.items[state.selected]?.kind === "process"}
+        canAdmin={state.items[state.selected]?.actions.some((a) => a.type === "admin")}
       />
     </div>
   );

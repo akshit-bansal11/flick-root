@@ -390,6 +390,10 @@ pub fn start(app: &AppHandle) {
     let s = state.clone();
     tauri::async_runtime::spawn(async move {
         refresh_apps(&s).await;
+        // One walk at a time: the programs scan starts after the Find scan has finished.
+        if s.config.load().modes.find.enabled {
+            start_find(&s).await;
+        }
         scan_programs_task(&s).await;
         let mut tick = tokio::time::interval(APP_REFRESH);
         tick.tick().await; // first tick fires at once; the startup refresh above covered it
@@ -398,9 +402,6 @@ pub fn start(app: &AppHandle) {
             refresh_apps(&s).await;
         }
     });
-    if state.config.load().modes.find.enabled {
-        tauri::async_runtime::spawn(async move { start_find(&state).await });
-    }
 }
 
 pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
