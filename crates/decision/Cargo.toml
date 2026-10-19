@@ -6,3 +6,6 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+chrono = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
