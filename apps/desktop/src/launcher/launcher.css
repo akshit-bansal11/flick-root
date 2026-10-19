@@ -35,10 +35,11 @@ body,
   max-height: calc(50vh + var(--l-input) / 2 - 32px);
   display: flex;
   flex-direction: column;
-  background: var(--l-panel);
+  background: var(--l-surface);
   border: var(--l-border);
   border-radius: var(--l-r);
   overflow: hidden;
+  box-shadow: var(--l-highlight), var(--l-shadow-panel);
 }
 
 .launcher-body {
@@ -65,6 +66,14 @@ body,
   height: var(--l-input);
   padding: 0 var(--l-sp-8);
   min-width: 0;
+  color: var(--l-muted);
+}
+
+.input-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--l-accent-text);
 }
 
 .input {
@@ -74,7 +83,7 @@ body,
   border: 0;
   outline: 0;
   padding: 0;
-  font: 400 var(--l-fs-input) var(--l-ui);
+  font: 400 20px var(--l-ui);
   color: var(--l-text);
   caret-color: var(--l-accent);
   text-overflow: ellipsis;
@@ -86,9 +95,26 @@ body,
 
 .hint {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--l-sp-3);
   font: 500 var(--l-fs-meta) var(--l-mono);
-  color: var(--l-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--l-muted-strong);
   white-space: nowrap;
+}
+
+.kbd {
+  font: 500 10.5px var(--l-mono);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--l-muted-strong);
+  padding: 1px var(--l-sp-3);
+  border: var(--l-border);
+  border-bottom-width: 2px;
+  border-radius: var(--l-r2);
+  background: var(--l-bg);
 }
 
 .results {
@@ -103,23 +129,34 @@ body,
 }
 
 .row {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--l-sp-5);
+  gap: var(--l-sp-6);
   height: var(--l-row);
-  padding: 0 var(--l-sp-5);
-  border: 1px solid transparent;
+  padding: 0 var(--l-sp-6);
   border-radius: var(--l-r2);
   cursor: pointer;
   min-width: 0;
 }
 
 .row:hover {
-  background: var(--l-hover);
+  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), var(--l-surface));
 }
 
 .row.sel {
-  background: var(--l-sel);
+  background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), var(--l-surface));
+}
+
+.row.sel::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--l-sp-3);
+  bottom: var(--l-sp-3);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--l-accent);
 }
 
 .row-text {
@@ -127,7 +164,7 @@ body,
   min-width: 0;
   display: flex;
   align-items: baseline;
-  gap: var(--l-sp-5);
+  gap: var(--l-sp-6);
 }
 
 .row-title,
@@ -137,36 +174,38 @@ body,
   text-overflow: ellipsis;
 }
 
-.row-sub {
-  font-size: var(--l-fs-sub);
-  color: var(--l-muted);
-  min-width: 0;
+.row-title {
+  flex: none;
+  max-width: 70%;
+  font-size: 14.5px;
+  font-weight: 500;
 }
 
-.row-meta {
-  flex: none;
-  font: 500 var(--l-fs-meta) var(--l-mono);
-  color: var(--l-accent-text);
+.row-sub {
+  font-size: var(--l-fs-action);
+  color: var(--l-muted-strong);
+  min-width: 0;
 }
 
 .tile {
   flex: none;
-  width: var(--l-tile);
-  height: var(--l-tile);
-  border-radius: var(--l-r-tile);
+  width: var(--l-tile-lg);
+  height: var(--l-tile-lg);
+  border-radius: var(--l-r2);
+  object-fit: contain;
 }
 
 .tile-letter {
   display: grid;
   place-items: center;
-  font: 600 10.5px var(--l-ui);
+  font: 600 14px var(--l-ui);
   color: var(--l-tile-text);
   background: var(--l-tile-bg);
 }
 
 .actions {
   display: flex;
-  gap: var(--l-sp-4);
+  gap: var(--l-sp-6);
   align-items: center;
   height: var(--l-row);
   padding: 0 var(--l-sp-8);
@@ -175,18 +214,23 @@ body,
 
 .action {
   display: flex;
-  gap: var(--l-sp-3);
+  gap: var(--l-sp-4);
   align-items: center;
   font: 500 var(--l-fs-action) var(--l-ui);
   color: var(--l-text);
   background: none;
-  border: var(--l-border);
+  border: 0;
   border-radius: var(--l-r2);
-  padding: var(--l-sp-2) var(--l-sp-5);
+  padding: var(--l-sp-2) var(--l-sp-3);
   cursor: pointer;
 }
 
-.action-key {
-  font: 500 var(--l-fs-meta) var(--l-mono);
-  color: var(--l-muted);
+.action:hover {
+  background: color-mix(in srgb, var(--l-accent) var(--l-hover-mix), var(--l-surface));
+}
+
+.action:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--l-focus);
+  outline-offset: 1px;
 }

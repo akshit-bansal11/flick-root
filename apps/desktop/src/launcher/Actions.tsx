@@ -25,7 +25,7 @@ export function Actions({ onPress }: Props) {
           onClick={() => onPress(a.key.key, a.key.ctrl)}
         >
           {a.label}
-          <kbd className="action-key">{a.hint}</kbd>
+          <kbd className="kbd">{a.hint}</kbd>
         </button>
       ))}
     </div>

@@ -21,6 +21,18 @@ export function InputBar({ mode, value, hasItems, selected, onChange, inputRef }
   const { label, placeholder } = COPY[mode];
   return (
     <div className="inputbar">
+      <svg
+        className="input-icon"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
       <input
         ref={inputRef}
         className="input"

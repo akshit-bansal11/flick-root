@@ -27,7 +27,7 @@ export function ResultRow({ item, id, index, selected, onActivate }: Props) {
         <span className="row-title">{item.title}</span>
         <span className="row-sub">{item.subtitle}</span>
       </span>
-      {selected && <span className="row-meta">↵</span>}
+      {selected && <kbd className="kbd">↵</kbd>}
     </div>
   );
 }
