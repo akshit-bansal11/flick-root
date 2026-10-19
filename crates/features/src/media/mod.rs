@@ -3,9 +3,13 @@
 //!
 //! `query()` only parses text. The media session is read in `execute()`, so no task runs
 //! while the feature is on and the "Now playing" row reads the track when chosen.
+//!
+//! With Spotify connected (optional, [`spotify`]), extra rows appear; the cheap `connected`
+//! flag decides them and every API call happens in `execute()`.
 
 mod gsmtc;
 pub mod links;
+pub mod spotify;
 
 use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;
@@ -14,6 +18,7 @@ use crate::schema::SettingsSchema;
 use async_trait::async_trait;
 use gsmtc::{Backend, Gsmtc};
 use launcher_core::{Action, ActionKind, Input, Item, ItemId, ItemKind, Mode, Outcome};
+use spotify::{Named, Played, Spotify};
 use std::sync::Arc;
 use win::media::{MediaCmd, PlaybackState};
 
@@ -28,6 +33,14 @@ pub enum Ask {
     Spotify(String),
     /// `play <q> on youtube`.
     YouTube(String),
+    /// `queue <q>` (connected only).
+    Queue(String),
+    /// `like`: save the current track (connected only).
+    Like,
+    /// `devices` (connected only).
+    Devices,
+    /// `playlist <q>`: your own playlists (connected only).
+    Playlist(String),
 }
 
 /// Parses the query text. Pure; no I/O.
@@ -40,7 +53,20 @@ pub fn parse(text: &str) -> Option<Ask> {
         "previous" | "prev" => return Some(Ask::Cmd(MediaCmd::Previous)),
         "stop" => return Some(Ask::Cmd(MediaCmd::Stop)),
         "now playing" | "np" => return Some(Ask::NowPlaying),
+        "like" => return Some(Ask::Like),
+        "devices" => return Some(Ask::Devices),
         _ => {}
+    }
+    for (prefix, make) in [
+        ("queue ", Ask::Queue as fn(String) -> Ask),
+        ("playlist ", Ask::Playlist),
+    ] {
+        if t.get(..prefix.len())
+            .is_some_and(|h| h.eq_ignore_ascii_case(prefix))
+        {
+            let q = t[prefix.len()..].trim();
+            return (!q.is_empty()).then(|| make(q.to_owned()));
+        }
     }
     let head = t.get(..5)?;
     if !head.eq_ignore_ascii_case("play ") {
@@ -103,7 +129,19 @@ fn row(id: String, title: String, subtitle: &str, payload: serde_json::Value) ->
     }
 }
 
-fn items(ask: Ask) -> Vec<Item> {
+const PREMIUM: &str = "Spotify Premium";
+
+fn sp_row(
+    kind: &str,
+    key: &str,
+    title: String,
+    subtitle: &str,
+    payload: serde_json::Value,
+) -> Item {
+    row(format!("media:sp:{kind}:{key}"), title, subtitle, payload)
+}
+
+fn items(ask: Ask, connected: bool) -> Vec<Item> {
     match ask {
         Ask::Cmd(c) => {
             let title = match c {
@@ -127,17 +165,59 @@ fn items(ask: Ask) -> Vec<Item> {
             "Show the current track",
             serde_json::json!({ "now": true }),
         )],
-        Ask::Spotify(q) => vec![row(
-            format!("media:spotify:{q}"),
-            format!("Search Spotify for {q}"),
-            "Opens the Spotify app",
-            serde_json::json!({ "url": links::spotify(&q) }),
-        )],
+        Ask::Spotify(q) => {
+            let mut v = Vec::new();
+            if connected {
+                v.push(sp_row(
+                    "play",
+                    &q,
+                    format!("Play {q} on Spotify"),
+                    "Premium; opens the Spotify app instead without it",
+                    serde_json::json!({ "sp": "play", "q": q }),
+                ));
+            }
+            v.push(row(
+                format!("media:spotify:{q}"),
+                format!("Search Spotify for {q}"),
+                "Opens the Spotify app",
+                serde_json::json!({ "url": links::spotify(&q) }),
+            ));
+            v
+        }
         Ask::YouTube(q) => vec![row(
             format!("media:youtube:{q}"),
             format!("Search YouTube for {q}"),
             "Opens your browser",
-            serde_json::json!({ "url": links::youtube(&q) }),
+            serde_json::json!({ "url": links::youtube(&q), "yt": q }),
+        )],
+        _ if !connected => Vec::new(),
+        Ask::Queue(q) => vec![sp_row(
+            "queue",
+            &q,
+            format!("Queue {q} on Spotify"),
+            PREMIUM,
+            serde_json::json!({ "sp": "queue", "q": q }),
+        )],
+        Ask::Like => vec![sp_row(
+            "like",
+            "",
+            "Like current Spotify track".into(),
+            "Saves it to your library",
+            serde_json::json!({ "sp": "like" }),
+        )],
+        Ask::Devices => vec![sp_row(
+            "devices",
+            "",
+            "Spotify devices".into(),
+            "Pick one to move playback (Premium)",
+            serde_json::json!({ "sp": "devices" }),
+        )],
+        Ask::Playlist(q) => vec![sp_row(
+            "playlist",
+            &q,
+            format!("Find your playlist {q}"),
+            "Plays it on Spotify (Premium)",
+            serde_json::json!({ "sp": "playlists", "q": q }),
         )],
     }
 }
@@ -145,14 +225,96 @@ fn items(ask: Ask) -> Vec<Item> {
 /// The media feature.
 pub struct Media {
     backend: Arc<dyn Backend>,
+    api: Option<Arc<Spotify>>,
 }
 
 impl Default for Media {
     fn default() -> Self {
         Self {
             backend: Arc::new(Gsmtc),
+            api: None,
         }
     }
+}
+
+impl Media {
+    /// Media with the optional Spotify connection and YouTube key lookups.
+    pub fn with_api(api: Arc<Spotify>) -> Self {
+        Self {
+            api: Some(api),
+            ..Self::default()
+        }
+    }
+
+    fn connected(&self) -> bool {
+        self.api.as_ref().is_some_and(|a| a.is_connected())
+    }
+
+    async fn open(&self, url: &str) -> Result<(), FeatureError> {
+        let (b, url) = (self.backend.clone(), url.to_owned());
+        tokio::task::spawn_blocking(move || b.open(&url))
+            .await
+            .map_err(join_err)?
+            .map_err(|e| FeatureError::Other(format!("could not open link: {e}")))
+    }
+
+    async fn run_spotify(&self, item: &Item) -> Result<Outcome, FeatureError> {
+        let api = self
+            .api
+            .as_ref()
+            .ok_or_else(|| FeatureError::Other("Spotify is not connected".into()))?;
+        let p = &item.payload;
+        let arg = |k: &str| p.get(k).and_then(|v| v.as_str()).unwrap_or_default();
+        let fe = |e: spotify::SpotifyError| FeatureError::Other(e.to_string());
+        match arg("sp") {
+            "play" => match api.play_query(arg("q")).await.map_err(fe)? {
+                Played::Api => {}
+                Played::Fallback(uri) => self.open(&uri).await?,
+            },
+            "queue" => api.queue(arg("q")).await.map_err(fe)?,
+            "like" => api.like().await.map_err(fe)?,
+            "transfer" => api.transfer(arg("id")).await.map_err(fe)?,
+            "context" => api.play_context(arg("id")).await.map_err(fe)?,
+            "devices" => {
+                let d = api.devices().await.map_err(fe)?;
+                let empty = "No Spotify devices found - open Spotify on a device";
+                return list(d, "transfer", "Move playback here (Premium)", empty);
+            }
+            "playlists" => {
+                let d = api.playlists(arg("q")).await.map_err(fe)?;
+                let empty = "None of your first 50 playlists match";
+                return list(d, "context", "Play on Spotify (Premium)", empty);
+            }
+            _ => return Err(FeatureError::Other("unsupported action".into())),
+        }
+        Ok(Outcome::HideLauncher)
+    }
+
+    /// The video page for `q` when the YouTube API is on and works; `None` means use the search page.
+    async fn youtube_hit(&self, q: &str) -> Option<String> {
+        let api = self.api.as_ref()?;
+        let key = api.youtube_key().await?;
+        links::youtube_first(api.http(), links::YOUTUBE_API, &key, q).await
+    }
+}
+
+fn list(found: Vec<Named>, kind: &str, sub: &str, empty: &str) -> Result<Outcome, FeatureError> {
+    if found.is_empty() {
+        return Err(FeatureError::Other(empty.into()));
+    }
+    let items = found
+        .into_iter()
+        .map(|n| {
+            let title = if n.detail.is_empty() {
+                n.name.clone()
+            } else {
+                format!("{} ({})", n.name, n.detail)
+            };
+            let payload = serde_json::json!({ "sp": kind, "id": n.id });
+            sp_row(kind, &n.id, title, sub, payload)
+        })
+        .collect();
+    Ok(Outcome::ShowItems { items })
 }
 
 fn join_err(e: tokio::task::JoinError) -> FeatureError {
@@ -182,24 +344,32 @@ impl Feature for Media {
     fn settings_schema(&self) -> SettingsSchema {
         SettingsSchema::default()
     }
-    fn start(&self, _ctx: FeatureCtx) -> Result<(), FeatureError> {
+    fn start(&self, ctx: FeatureCtx) -> Result<(), FeatureError> {
+        if let Some(api) = &self.api {
+            let api = Arc::clone(api);
+            ctx.tasks.spawn(async move { api.init().await });
+        }
         Ok(())
     }
     fn stop(&self) {}
     fn query(&self, input: &Input) -> Vec<Item> {
-        parse(&input.text).map(items).unwrap_or_default()
+        let c = self.connected();
+        parse(&input.text).map(|a| items(a, c)).unwrap_or_default()
     }
     async fn execute(&self, item: &Item, action: Action) -> Result<Outcome, FeatureError> {
         if action.kind != ActionKind::Primary {
             return Err(FeatureError::Other("unsupported action".into()));
         }
+        if item.payload.get("sp").is_some() {
+            return self.run_spotify(item).await;
+        }
         let b = self.backend.clone();
         if let Some(url) = item.payload.get("url").and_then(|u| u.as_str()) {
-            let url = url.to_owned();
-            tokio::task::spawn_blocking(move || b.open(&url))
-                .await
-                .map_err(join_err)?
-                .map_err(|e| FeatureError::Other(format!("could not open link: {e}")))?;
+            let hit = match item.payload.get("yt").and_then(|q| q.as_str()) {
+                Some(q) => self.youtube_hit(q).await,
+                None => None,
+            };
+            self.open(hit.as_deref().unwrap_or(url)).await?;
             return Ok(Outcome::HideLauncher);
         }
         if let Some(cmd) = item
@@ -287,7 +457,13 @@ mod tests {
             session,
             ..Fake::default()
         });
-        (Media { backend: f.clone() }, f)
+        (
+            Media {
+                backend: f.clone(),
+                api: None,
+            },
+            f,
+        )
     }
 
     fn prim() -> Action {
@@ -326,6 +502,21 @@ mod tests {
     }
 
     #[test]
+    fn parse_spotify_asks() {
+        assert_eq!(parse("like"), Some(Ask::Like));
+        assert_eq!(parse("devices"), Some(Ask::Devices));
+        assert_eq!(parse("Queue  Song x"), Some(Ask::Queue("Song x".into())));
+        assert_eq!(parse("playlist gym"), Some(Ask::Playlist("gym".into())));
+        assert_eq!(parse("queue "), None);
+        // Disconnected: no rows for connected-only asks, no API play row.
+        assert!(items(Ask::Like, false).is_empty());
+        assert_eq!(items(Ask::Spotify("x".into()), false).len(), 1);
+        let on = items(Ask::Spotify("x".into()), true);
+        assert_eq!(on.len(), 2);
+        assert!(on[0].subtitle.contains("Premium"));
+    }
+
+    #[test]
     fn query_builds_link_rows() {
         let (m, _) = feat(true);
         let i = Input {
@@ -342,7 +533,7 @@ mod tests {
     #[tokio::test]
     async fn execute_control_and_no_session() {
         let (m, f) = feat(true);
-        let item = items(Ask::Cmd(MediaCmd::Next)).remove(0);
+        let item = items(Ask::Cmd(MediaCmd::Next), false).remove(0);
         assert_eq!(
             m.execute(&item, prim()).await.unwrap(),
             Outcome::HideLauncher
@@ -356,13 +547,13 @@ mod tests {
     #[tokio::test]
     async fn execute_link_and_now_playing() {
         let (m, f) = feat(true);
-        let item = items(Ask::YouTube("x y".into())).remove(0);
+        let item = items(Ask::YouTube("x y".into()), false).remove(0);
         m.execute(&item, prim()).await.unwrap();
         assert_eq!(
             *f.opened.lock(),
             vec!["https://www.youtube.com/results?search_query=x%20y"]
         );
-        let np = items(Ask::NowPlaying).remove(0);
+        let np = items(Ask::NowPlaying, false).remove(0);
         let Outcome::ShowItems { items } = m.execute(&np, prim()).await.unwrap() else {
             panic!("expected items");
         };

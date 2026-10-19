@@ -25,6 +25,8 @@
     "allow-set-engine",
     "allow-get-integrations",
     "allow-set-integration",
+    "allow-connect-spotify",
+    "allow-disconnect-spotify",
     "allow-set-secret",
     "allow-delete-secret",
     "allow-test-secret",

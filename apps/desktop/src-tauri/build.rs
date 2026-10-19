@@ -28,6 +28,8 @@ fn main() {
         "set_engine",
         "get_integrations",
         "set_integration",
+        "connect_spotify",
+        "disconnect_spotify",
         "set_secret",
         "delete_secret",
         "test_secret",

@@ -11,6 +11,9 @@ vi.mock("./api", () => ({
   setIntegration: vi.fn(),
   setSecret: vi.fn(() => Promise.resolve({})),
   deleteSecret: vi.fn(() => Promise.resolve()),
+  connectSpotify: vi.fn(),
+  disconnectSpotify: vi.fn(() => Promise.resolve()),
+  onSpotifyState: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 const view: IntegrationsView = {
@@ -28,8 +31,8 @@ const view: IntegrationsView = {
 
 let root: Root | undefined;
 let container: HTMLElement | undefined;
-async function mount() {
-  vi.mocked(api.getIntegrations).mockResolvedValue(view);
+async function mount(v: IntegrationsView = view) {
+  vi.mocked(api.getIntegrations).mockResolvedValue(v);
   vi.mocked(api.setIntegration).mockResolvedValue(view);
   container = document.createElement("div");
   document.body.append(container);
@@ -48,7 +51,8 @@ describe("Integrations", () => {
       expect(screen.getAllByText(t).length).toBeGreaterThan(0);
     }
     expect(screen.getByText("http://127.0.0.1:43919/callback")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /connect/i })).toBeNull();
+    const connect = screen.getByRole("button", { name: "Connect Spotify" }) as HTMLButtonElement;
+    expect(connect.disabled).toBe(true);
   });
 
   it("saving the Obsidian vault calls setIntegration", async () => {
@@ -106,5 +110,29 @@ describe("Integrations", () => {
       fireEvent.click(screen.getByRole("button", { name: "Remove webhook ci" }));
     });
     expect(api.setIntegration).toHaveBeenCalledWith("webhook", { name: "ci", remove: true });
+  });
+
+  it("connects Spotify once a Client ID is saved and shows the name", async () => {
+    vi.mocked(api.connectSpotify).mockResolvedValue({ connected: true, name: "Ada" });
+    await mount({ ...view, spotify: { ...view.spotify, client_id: "abc" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect Spotify" }));
+    });
+    expect(screen.getByText("Connected as Ada")).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Disconnect Spotify" }));
+    });
+    expect(api.disconnectSpotify).toHaveBeenCalled();
+  });
+
+  it("explains a busy port", async () => {
+    vi.mocked(api.connectSpotify).mockRejectedValue({ code: "port_busy", message: "x" });
+    await mount({ ...view, spotify: { ...view.spotify, client_id: "abc" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Connect Spotify" }));
+    });
+    expect(
+      screen.getByText("Port 43919 is in use — close the app using it and retry"),
+    ).toBeTruthy();
   });
 });

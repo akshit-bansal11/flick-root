@@ -8,7 +8,7 @@ use providers::secret::{SecretName, SecretVault};
 use serde::{Deserialize, Serialize};
 use std::path::{Component, Path};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 const NOTION_HOST: &str = "api.notion.com";
 const YOUTUBE_HOST: &str = "www.googleapis.com";
@@ -384,6 +384,56 @@ pub async fn set_integration(
         Ok(view(&s.vault, &s.config.load()))
     })
     .await
+}
+
+/// Result of `connect_spotify`.
+#[derive(Debug, Serialize)]
+pub struct SpotifyConnected {
+    /// Always true on success.
+    pub connected: bool,
+    /// Spotify display name.
+    pub name: String,
+}
+
+fn spotify_err(e: features::media::spotify::SpotifyError) -> CommandError {
+    CommandError::new(e.code(), e.to_string())
+}
+
+fn spotify_event(app: &AppHandle, connected: bool, name: Option<&str>) {
+    let payload = serde_json::json!({ "connected": connected, "name": name });
+    if let Err(err) = app.emit("spotify://state", payload) {
+        tracing::warn!(%err, "emit failed");
+    }
+}
+
+/// Signs in to Spotify with the user's own Client ID (PKCE, loopback redirect). Opens the
+/// browser, waits up to three minutes, stores the refresh token in Credential Manager.
+#[tauri::command]
+pub async fn connect_spotify(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<SpotifyConnected, CommandError> {
+    let open = |url: String| {
+        let _com = index_apps::com::ComGuard::new().map_err(|e| e.to_string())?;
+        index_apps::launch::open_path(Path::new(&url)).map_err(|e| format!("{e:#}"))
+    };
+    let name = state.spotify.connect(open).await.map_err(spotify_err)?;
+    spotify_event(&app, true, Some(&name));
+    Ok(SpotifyConnected {
+        connected: true,
+        name,
+    })
+}
+
+/// Deletes the stored Spotify refresh token and drops the in-memory access token.
+#[tauri::command]
+pub async fn disconnect_spotify(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), CommandError> {
+    state.spotify.disconnect().await.map_err(spotify_err)?;
+    spotify_event(&app, false, None);
+    Ok(())
 }
 
 #[cfg(test)]

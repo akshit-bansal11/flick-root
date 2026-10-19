@@ -339,6 +339,14 @@ impl SecretVault {
         self.take(&name).ok().flatten()
     }
 
+    /// Value of `integration.<id>@<host>` for the integration's own client only (Spotify
+    /// refresh token, YouTube key). Blocking: call via `spawn_blocking`. Never log it or
+    /// return it to the UI.
+    pub fn integration_secret(&self, id: &str, host: &str) -> Option<SecretString> {
+        let name = SecretName::parse(&format!("integration.{id}@{host}")).ok()?;
+        self.take(&name).ok().flatten()
+    }
+
     /// Crate-internal read for key sources; records the use in memory and persists it
     /// later, coalesced, on a background thread. Blocking: call via `spawn_blocking`.
     pub(crate) fn take(&self, name: &SecretName) -> Result<Option<SecretString>, VaultError> {

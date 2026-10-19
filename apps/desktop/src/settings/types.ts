@@ -199,6 +199,12 @@ export interface IntegrationsView {
   webhooks: WebhookView[];
 }
 
+/** Payload of connect_spotify and the spotify://state event. */
+export interface SpotifyState {
+  connected: boolean;
+  name: string | null;
+}
+
 export type IntegrationTarget =
   | "spotify"
   | "youtube"

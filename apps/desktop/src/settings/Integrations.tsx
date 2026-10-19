@@ -76,17 +76,54 @@ function KeyRow({
 }
 
 function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply }) {
+  const [connected, setConnected] = useState(v.connected);
+  const [name, setName] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => setConnected(v.connected), [v.connected]);
+  useEffect(() => {
+    const un = api.onSpotifyState((s) => {
+      setConnected(s.connected);
+      setName(s.name);
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, []);
+  const connect = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const s = await api.connectSpotify();
+      setConnected(s.connected);
+      setName(s.name);
+    } catch (e) {
+      setErr(
+        typeof e === "object" && e !== null && "code" in e && e.code === "port_busy"
+          ? `Port ${portOf(v.redirect_uri)} is in use — close the app using it and retry`
+          : errorText(e),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disconnect = () =>
+    api.disconnectSpotify().then(
+      () => setName(null),
+      (e) => setErr(errorText(e)),
+    );
   return (
     <li className="pv-row">
       <div className="pv-head">
         <span className="pv-title">Spotify</span>
-        <span className="pv-stat" data-ok={v.connected}>
-          {v.connected ? "connected" : "not connected"}
+        <span className="pv-stat" data-ok={connected}>
+          {connected ? (name ? `Connected as ${name}` : "connected") : "not connected"}
         </span>
       </div>
       <p className="s-help">
         Works without connecting: "play X on spotify" opens the Spotify app. Connecting is optional
-        and unlocks more Spotify features, using your own Spotify developer app.
+        and unlocks more Spotify features, using your own Spotify developer app. Playing, queueing
+        and moving playback need Spotify Premium.
       </p>
       <ol className="s-help">
         <li>Open the Spotify developer dashboard and create an app.</li>
@@ -100,8 +137,28 @@ function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply })
         value={v.client_id}
         save={(x) => apply("spotify", { clientId: x })}
       />
+      <div className="pv-head">
+        {connected ? (
+          <button type="button" onClick={disconnect}>
+            Disconnect Spotify
+          </button>
+        ) : (
+          <button type="button" disabled={!v.client_id || busy} onClick={connect}>
+            {busy ? "Waiting for the browser…" : "Connect Spotify"}
+          </button>
+        )}
+      </div>
+      {err && (
+        <p className="s-error" role="alert">
+          {err}
+        </p>
+      )}
     </li>
   );
+}
+
+function portOf(uri: string): string {
+  return new URL(uri).port;
 }
 
 /** Settings page for integrations. Every one is optional and uses your own credentials. */

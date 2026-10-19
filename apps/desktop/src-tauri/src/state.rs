@@ -4,7 +4,8 @@ use crate::icons::Icons;
 use crate::meta_store::JsonMeta;
 use anyhow::Context;
 use arc_swap::ArcSwap;
-use features::{EventSink, FeatureCtx, Registry, TaskScope, builtin_features};
+use features::media::{Media, spotify::Spotify};
+use features::{EventSink, FeatureCtx, Registry, TaskScope, builtin_features_with};
 use index_apps::{AppEntry, AppIndex, cache};
 use index_files::drives;
 use index_files::{FileIndex, Overlay, Root, WatchHandle, default_roots, scan, snapshot};
@@ -90,6 +91,8 @@ pub struct AppState {
     pub vault: Arc<SecretVault>,
     /// Cancels the running Find scan (on Find off, a new run, or exit).
     pub find_run: FindRun,
+    /// Optional Spotify connection (also feeds the media feature).
+    pub spotify: Arc<Spotify>,
     /// Feature registry.
     pub registry: Arc<Registry>,
     /// Handles given to features.
@@ -231,6 +234,8 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         Arc::new(JsonMeta::open(data.join("secret_meta.json"))),
     ));
     let keys: Arc<dyn KeySource> = Arc::new(VaultKeys(vault.clone()));
+    let spotify =
+        Arc::new(Spotify::new(vault.clone(), config.clone()).context("building spotify client")?);
     let hub = ProviderHub::from_config(&config.load().providers, &keys);
     let ctx = FeatureCtx {
         config: config.clone(),
@@ -252,6 +257,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         overlay: ArcSwap::from_pointee(Overlay::new()),
         watch: Mutex::new(None),
         vault,
+        spotify,
         find_run: FindRun::default(),
         registry: Arc::new(Registry::new()),
         ctx,
@@ -274,7 +280,7 @@ pub fn start(app: &AppHandle) {
     let state: Arc<AppState> = Arc::clone(&*app.state::<Arc<AppState>>());
     let s = state.clone();
     tauri::async_runtime::spawn(async move {
-        for f in builtin_features() {
+        for f in builtin_features_with(Media::with_api(s.spotify.clone())) {
             s.registry.register(f).await;
         }
         let host = Arc::new(crate::nlhost::ShellHost(Arc::downgrade(&s)));

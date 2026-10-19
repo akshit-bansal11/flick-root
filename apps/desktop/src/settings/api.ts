@@ -22,6 +22,7 @@ import type {
   SecretInfo,
   SettingsChanged,
   SettingsView,
+  SpotifyState,
   TestResult,
 } from "./types";
 
@@ -87,6 +88,13 @@ export const onFeaturesChanged = (cb: (p: FeatureChanged) => void): Promise<Unli
   listen<FeatureChanged>(FEATURES_CHANGED, (e) => cb(e.payload));
 export const onSettingsChanged = (cb: (p: SettingsChanged) => void): Promise<UnlistenFn> =>
   listen<SettingsChanged>(SETTINGS_CHANGED, (e) => cb(e.payload));
+
+export const SPOTIFY_STATE = "spotify://state";
+export const onSpotifyState = (cb: (p: SpotifyState) => void): Promise<UnlistenFn> =>
+  listen<SpotifyState>(SPOTIFY_STATE, (e) => cb(e.payload));
+/** Opens the browser and waits for sign-in; rejects with code auth_cancelled, port_busy or network. */
+export const connectSpotify = () => invoke<SpotifyState>("connect_spotify");
+export const disconnectSpotify = () => invoke<void>("disconnect_spotify");
 
 export const getIntegrations = () => invoke<IntegrationsView>("get_integrations");
 export const setIntegration = (target: IntegrationTarget, patch: IntegrationPatch) =>

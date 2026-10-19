@@ -27,6 +27,11 @@ use std::sync::Arc;
 
 /// All built-in features.
 pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
+    builtin_features_with(media::Media::default())
+}
+
+/// All built-in features, with a media feature that has the optional Spotify/YouTube APIs.
+pub fn builtin_features_with(media: media::Media) -> Vec<Arc<dyn Feature>> {
     vec![
         Arc::new(frecency::Frecency::default()),
         Arc::new(math::Math),
@@ -34,7 +39,7 @@ pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
         Arc::new(web::Web),
         Arc::new(projects::Projects::default()),
         Arc::new(ports::Ports::default()),
-        Arc::new(media::Media::default()),
+        Arc::new(media),
     ]
 }
 
