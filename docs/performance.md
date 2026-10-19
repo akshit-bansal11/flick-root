@@ -20,9 +20,24 @@ Budgets are from KICKOFF section 4. All rows: date 2026-10-19, dev machine, Wind
 | Cold start to tray ready | <= 600 ms | 1,435 ms | `scripts/measure.ps1` | release | over (run included the first-run settings window; under investigation) |
 | Keystroke to paint | not yet measured | n/a | n/a | n/a | not yet measured |
 
+### v0.1.0 (GitHub `windows-latest` runner, bench.yml run 39209805426, commit c0f5d53)
+
+The shared 2-vCPU runner is slower than the laptop above, so compare rows within this table only. Values are criterion means (the middle of the printed interval), not p95.
+
+| Budget | Limit | Measured | Status |
+| --- | --- | --- | --- |
+| Feature query(): nlfind | <= 0.5 ms | 0.82 us ("pdf from yesterday"), 0.15 us non-natural | within |
+| Feature query(): ports | <= 0.5 ms | 0.75 us ("port 3000"), 0.58 us ("proc chrome") | within |
+| Feature query(): media | <= 0.5 ms | 0.79 us ("play lofi on spotify") | within |
+| Feature query(): capture | <= 0.5 ms | 2.7 us ("log 250 lunch #food"), 0.63 us blocked secret | within |
+| Explain secret check, 2,000 chars (not a query()) | n/a | 13.6 us plain, 0.43 us secret found | n/a |
+| Command search, 2,000 apps, all features on | <= 2 ms | worst 0.27 ms ("2.5 kg to lb"); "port 3000" 0.09 ms, "log 250 lunch #food" 0.06 ms | within |
+| Command match, 2,000 apps (top_k_8) | <= 2 ms | worst 0.22 ms ("co") | within |
+| Find match, 305k paths | <= 25 ms p95 | means 13.7–22.1 ms ("rep" with overlay slowest); p95 not reported by criterion | within on means, close on this runner |
+
 ## How to reproduce
 
-- Benches: `cargo bench -p launcher-core`, `cargo bench -p index-files`, `cargo bench -p features` (frecency, math, syscmd, web, projects, command_all).
+- Benches run on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (bench.txt plus criterion estimates). Bench crates: launcher-core, index-files, features (frecency, math, syscmd, web, projects, command_all, nlfind, ports, media, explain, capture).
 - Release exe: `pnpm --filter desktop tauri build --no-bundle` (embeds the built UI), output `target/release/desktop-shell.exe`.
 - Live: `pwsh -File scripts/measure.ps1 -Exe target/release/desktop-shell.exe -Toggles 50`. Complete first run first, otherwise the settings window is open at startup and RAM and toggle numbers are not comparable. Do not run it while the app is already running. Exit codes: 0 pass, 1 over budget, 2 inconclusive (a value missing or not comparable).
 
