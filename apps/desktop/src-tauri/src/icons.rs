@@ -34,6 +34,26 @@ impl Icons {
         self.memo.lock().get(&(entry.id.clone(), size)).cloned()
     }
 
+    /// Extracts (if not on disk) and memoises icons for `entries`. Blocking; for the few shown rows only.
+    pub fn extract_and_memo(&self, entries: &[AppEntry], size: u32) {
+        let Ok(_com) = index_apps::com::ComGuard::new() else {
+            return;
+        };
+        for e in entries {
+            if let Err(err) = self.cache.ensure(e) {
+                tracing::debug!(%err, app = %e.name, "icon extraction failed");
+                continue;
+            }
+            let Some(path) = self.cache.icon_path(e, size) else {
+                continue;
+            };
+            if let Ok(bytes) = std::fs::read(path) {
+                let url = format!("data:image/png;base64,{}", STANDARD.encode(bytes));
+                self.memo.lock().insert((e.id.clone(), size), url);
+            }
+        }
+    }
+
     /// Reads the cached icons of `entries` from disk and replaces the memo.
     /// Blocking: call from a blocking thread.
     pub fn warm(&self, entries: &[AppEntry], size: u32) {

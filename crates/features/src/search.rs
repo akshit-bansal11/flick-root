@@ -7,17 +7,55 @@ use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
 use launcher_core::{ActionKind, Input, Item, ItemId, ItemKind};
 use std::cmp::Ordering;
 
-fn app_item(a: &AppEntry, score: f32) -> Item {
+/// Which sources a Command-mode search draws from.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchScope {
+    /// Apps, programs and feature items.
+    #[default]
+    All,
+    /// Apps and programs only.
+    Apps,
+    /// Feature items only.
+    Commands,
+}
+
+/// Program rows rank below real apps by this factor.
+const PROGRAM_FACTOR: f32 = 0.75;
+/// Program extensions that can run elevated.
+const ADMIN_EXTS: &[&str] = &["exe", "msi"];
+
+fn app_item(a: &AppEntry, score: f32, program: bool) -> Item {
+    let mut actions = vec![ActionKind::Primary, ActionKind::Location];
+    let mut payload = serde_json::json!({ "appId": a.id, "parsingName": a.parsing_name });
+    let mut subtitle = String::new();
+    let mut admin = true;
+    if program {
+        let path = std::path::Path::new(&a.parsing_name);
+        subtitle = path
+            .parent()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        admin = ADMIN_EXTS.contains(&ext.as_str());
+        payload["program"] = serde_json::json!(true);
+    }
+    if admin {
+        actions.insert(1, ActionKind::Admin);
+    }
     Item {
         id: ItemId(format!("app:{}", a.parsing_name)),
         kind: ItemKind::App,
         title: a.name.clone(),
-        subtitle: String::new(),
+        subtitle,
         icon: None,
         score,
         source: "apps".into(),
-        actions: vec![ActionKind::Primary, ActionKind::Admin, ActionKind::Location],
-        payload: serde_json::json!({ "appId": a.id, "parsingName": a.parsing_name }),
+        actions,
+        payload,
     }
 }
 
@@ -29,7 +67,7 @@ fn by_score(a: &Item, b: &Item) -> Ordering {
         .then_with(|| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
 }
 
-/// Command-mode results: apps (fuzzy, or most-used when `input.text` is empty) plus feature items, ranked with feature boosts, at most `k`.
+/// Command-mode results over all sources; see [`command_search_scoped`].
 pub fn command_search(
     apps: &[AppEntry],
     app_index: &MatchIndex,
@@ -38,30 +76,65 @@ pub fn command_search(
     input: &Input,
     k: usize,
 ) -> Vec<Item> {
-    let mut items: Vec<Item> = if input.text.is_empty() {
-        apps.iter().map(|a| app_item(a, 0.0)).collect()
-    } else {
-        matcher
-            .top_k(&input.text, app_index, k)
-            .into_iter()
-            .filter_map(|h| apps.get(h.idx).map(|a| app_item(a, h.score as f32)))
-            .collect()
-    };
-    // Nucleo scores are unbounded; feature items score 0..1. Squash apps into 0..=APP_CEIL so an
-    // exact feature keyword match (1.0) outranks a fuzzy app hit, while apps still order among themselves.
-    // ponytail: relative-to-top squash, a fixed calibration if apps ever need absolute confidence.
-    const APP_CEIL: f32 = 0.9;
-    let app_max = items.iter().map(|i| i.score).fold(0.0_f32, f32::max);
-    for it in &mut items {
-        it.score = if app_max > 0.0 {
-            APP_CEIL * it.score / app_max
+    command_search_scoped(
+        apps,
+        apps.len(),
+        SearchScope::All,
+        app_index,
+        matcher,
+        registry,
+        input,
+        k,
+    )
+}
+
+/// Command-mode results: apps (fuzzy, or most-used when `input.text` is empty) plus feature items, ranked with feature boosts, at most `k`.
+/// `apps[programs_from..]` are scanned programs: they rank below real apps and are never listed for empty input.
+#[allow(clippy::too_many_arguments)]
+pub fn command_search_scoped(
+    apps: &[AppEntry],
+    programs_from: usize,
+    scope: SearchScope,
+    app_index: &MatchIndex,
+    matcher: &mut FuzzyMatcher,
+    registry: &Registry,
+    input: &Input,
+    k: usize,
+) -> Vec<Item> {
+    let mut items: Vec<Item> = Vec::new();
+    if scope != SearchScope::Commands {
+        if input.text.is_empty() {
+            items.extend(
+                apps.iter()
+                    .take(programs_from)
+                    .map(|a| app_item(a, 0.0, false)),
+            );
         } else {
-            0.0
-        };
+            // Extra hits so programs cannot crowd real apps out of the top k.
+            let hits = matcher.top_k(&input.text, app_index, k.saturating_mul(4).max(k));
+            let max = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
+            // Nucleo scores are unbounded; feature items score 0..1. Squash apps into 0..=APP_CEIL so an
+            // exact feature keyword match (1.0) outranks a fuzzy app hit, while apps still order among themselves.
+            // ponytail: relative-to-top squash, a fixed calibration if apps ever need absolute confidence.
+            const APP_CEIL: f32 = 0.9;
+            items.extend(hits.into_iter().filter_map(|h| {
+                let a = apps.get(h.idx)?;
+                let program = h.idx >= programs_from;
+                let f = if program { PROGRAM_FACTOR } else { 1.0 };
+                let score = if max > 0.0 {
+                    APP_CEIL * f * h.score as f32 / max
+                } else {
+                    0.0
+                };
+                Some(app_item(a, score, program))
+            }));
+        }
     }
-    items.extend(registry.query_all(input));
-    for it in &mut items {
-        it.score += registry.rank_boost_all(input, it);
+    if scope != SearchScope::Apps {
+        items.extend(registry.query_all(input));
+        for it in &mut items {
+            it.score += registry.rank_boost_all(input, it);
+        }
     }
     if k > 0 && items.len() > k {
         items.select_nth_unstable_by(k - 1, by_score);
@@ -140,6 +213,39 @@ mod tests {
         assert_eq!(got[0].id.0, "app:p.Code");
         let all = command_search(&apps, &idx, &mut m, &r, &input(""), 2);
         assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn programs_rank_below_apps_and_scope_filters() {
+        let apps = vec![app("Code"), app("Code Helper")];
+        let names: Vec<_> = apps.iter().map(|a| a.name.as_str()).collect();
+        let idx = MatchIndex::new(&names);
+        let mut m = FuzzyMatcher::new();
+        let r = Registry::new();
+        let mut run = |from, scope, text| {
+            command_search_scoped(&apps, from, scope, &idx, &mut m, &r, &input(text), 5)
+        };
+        // Both match "code"; the program must not outrank the real app.
+        let got = run(1, SearchScope::All, "code");
+        assert_eq!(got[0].title, "Code");
+        assert_eq!(got[1].payload["program"], true);
+        assert!(got[1].score < got[0].score);
+        // Empty input lists real apps only.
+        assert_eq!(run(1, SearchScope::All, "").len(), 1);
+        // Commands scope has no app rows; apps scope keeps them.
+        assert!(run(1, SearchScope::Commands, "code").is_empty());
+        assert_eq!(run(1, SearchScope::Apps, "code").len(), 2);
+    }
+
+    #[test]
+    fn program_rows_show_folder_and_gate_admin() {
+        let mut p = app("setup");
+        p.parsing_name = r"C:\dl\setup.apk".into();
+        let it = app_item(&p, 0.5, true);
+        assert_eq!(it.subtitle, r"C:\dl");
+        assert!(!it.actions.contains(&ActionKind::Admin));
+        p.parsing_name = r"C:\dl\setup.EXE".into();
+        assert!(app_item(&p, 0.5, true).actions.contains(&ActionKind::Admin));
     }
 
     async fn live_registry() -> Registry {

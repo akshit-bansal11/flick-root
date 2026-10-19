@@ -31,6 +31,24 @@ pub struct Config {
     pub features: BTreeMap<String, toml::Table>,
     /// Third-party integrations (no secrets).
     pub integrations: Integrations,
+    /// Installed-app and program search.
+    pub apps: AppsConfig,
+}
+
+/// `[apps]`
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AppsConfig {
+    /// Scan every fixed drive for exe, msi, apk and other launchable files.
+    pub scan_programs: bool,
+}
+
+impl Default for AppsConfig {
+    fn default() -> Self {
+        Self {
+            scan_programs: true,
+        }
+    }
 }
 
 /// `[general]`
@@ -486,6 +504,7 @@ impl Default for Config {
             general: General::default(),
             window: Window::default(),
             modes: Modes::default(),
+            apps: AppsConfig::default(),
             providers: Providers::default(),
             decision: Decision::default(),
             features: default_features(),
@@ -647,6 +666,24 @@ mod find_drive_tests {
         assert!(c.modes.find.include_drives);
         let off: Config = toml::from_str("[modes.find]\ninclude_drives = false\n").unwrap();
         assert!(!off.modes.find.include_drives);
+    }
+
+    #[test]
+    fn old_config_defaults_scan_programs() {
+        let c: Config = toml::from_str(
+            "[general]
+theme = \"light\"
+",
+        )
+        .unwrap();
+        assert!(c.apps.scan_programs);
+        let off: Config = toml::from_str(
+            "[apps]
+scan_programs = false
+",
+        )
+        .unwrap();
+        assert!(!off.apps.scan_programs);
     }
 
     #[test]

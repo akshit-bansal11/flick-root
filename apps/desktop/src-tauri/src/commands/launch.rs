@@ -59,9 +59,11 @@ fn item(state: &AppState, id: &str) -> Result<Item, CommandError> {
 }
 
 fn app_entry(state: &AppState, parsing: &str) -> Result<index_apps::AppEntry, CommandError> {
+    // app_match holds real apps and scanned programs.
     state
-        .apps
-        .entries()
+        .app_match
+        .load()
+        .entries
         .iter()
         .find(|a| a.parsing_name == parsing)
         .cloned()
@@ -101,6 +103,17 @@ fn copy_value(it: &Item) -> Option<String> {
     it.payload.get("value")?.as_str().map(str::to_owned)
 }
 
+/// Scanned programs (absolute-path entries) run elevated only when they are exe or msi.
+fn can_run_as_admin(e: &index_apps::AppEntry) -> bool {
+    let p = Path::new(&e.parsing_name);
+    if !p.is_absolute() {
+        return true; // Start-menu and packaged apps keep their existing behaviour.
+    }
+    p.extension()
+        .and_then(|x| x.to_str())
+        .is_some_and(|x| x.eq_ignore_ascii_case("exe") || x.eq_ignore_ascii_case("msi"))
+}
+
 /// Launches or opens a result and hides the launcher when appropriate.
 #[tauri::command]
 pub async fn launch(
@@ -114,6 +127,12 @@ pub async fn launch(
     let outcome = match parse_id(&item_id) {
         IdRef::App(parsing) => {
             let entry = app_entry(&state, parsing)?;
+            if admin && !can_run_as_admin(&entry) {
+                return Err(CommandError::new(
+                    "unsupported",
+                    "only .exe and .msi files can run as administrator",
+                ));
+            }
             let how = if admin {
                 ia::LaunchKind::Admin
             } else {
@@ -233,6 +252,21 @@ mod tests {
         ] {
             assert_eq!(check_link(bad).unwrap_err().code, "invalid_url", "{bad}");
         }
+    }
+
+    #[test]
+    fn admin_only_for_exe_and_msi_paths() {
+        let e = |p: &str| index_apps::AppEntry {
+            id: "i".into(),
+            name: "n".into(),
+            parsing_name: p.into(),
+            target: None,
+            is_packaged: false,
+        };
+        assert!(can_run_as_admin(&e(r"C:\a\x.EXE")));
+        assert!(can_run_as_admin(&e(r"C:\a\x.msi")));
+        assert!(!can_run_as_admin(&e(r"C:\a\x.apk")));
+        assert!(can_run_as_admin(&e("Microsoft.Edge_8wekyb3d8bbwe!App")));
     }
 
     #[test]

@@ -8,7 +8,10 @@ use features::media::{Media, spotify::Spotify};
 use features::{EventSink, FeatureCtx, Registry, TaskScope, builtin_features_with};
 use index_apps::{AppEntry, AppIndex, cache};
 use index_files::drives;
-use index_files::{FileIndex, Overlay, Root, WatchHandle, default_roots, scan, snapshot};
+use index_files::programs::{load_programs, save_programs};
+use index_files::{
+    FileIndex, Overlay, ProgramFile, Root, WatchHandle, default_roots, scan, snapshot,
+};
 use launcher_core::config::{Config, config_path, local_data_dir};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
 use launcher_core::store::Store;
@@ -46,6 +49,8 @@ pub fn phase(name: &str) {
 pub struct AppMatch {
     /// Entries, same order as the index.
     pub entries: Arc<Vec<AppEntry>>,
+    /// Entries before this index are real apps; the rest are scanned programs.
+    pub programs_from: usize,
     /// Fuzzy index over entry names.
     pub index: MatchIndex,
 }
@@ -77,6 +82,8 @@ pub struct AppState {
     pub store: Arc<Store>,
     /// Installed apps.
     pub apps: Arc<AppIndex>,
+    /// Scanned programs, merged into `app_match` after the real apps.
+    pub programs: ArcSwap<Vec<ProgramFile>>,
     /// Apps plus fuzzy index.
     pub app_match: ArcSwap<AppMatch>,
     /// Reused matcher scratch.
@@ -122,11 +129,55 @@ impl EventSink for TauriSink {
     }
 }
 
-/// Builds the fuzzy index for `entries`.
-pub fn build_match(entries: Arc<Vec<AppEntry>>) -> AppMatch {
+/// Builds the fuzzy index for `entries`; the first `programs_from` are real apps.
+pub fn build_match(entries: Arc<Vec<AppEntry>>, programs_from: usize) -> AppMatch {
     let names: Vec<&str> = entries.iter().map(|a| a.name.as_str()).collect();
     let index = MatchIndex::new(&names);
-    AppMatch { entries, index }
+    AppMatch {
+        entries,
+        programs_from,
+        index,
+    }
+}
+
+fn program_id(lower_path: &str) -> String {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    // DefaultHasher::new() has fixed keys, so ids are stable across runs.
+    let mut h = DefaultHasher::new();
+    lower_path.hash(&mut h);
+    format!("{:016x}", h.finish())
+}
+
+/// Real apps first, then programs as [`AppEntry`]s, minus any whose path an app already launches.
+/// Returns the entries and the number of real apps.
+pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> (Vec<AppEntry>, usize) {
+    let mut seen: std::collections::HashSet<String> = apps
+        .iter()
+        .flat_map(|a| {
+            let t = a
+                .target
+                .as_ref()
+                .map(|t| t.to_string_lossy().to_lowercase());
+            [Some(a.parsing_name.to_lowercase()), t]
+        })
+        .flatten()
+        .collect();
+    let mut out = apps.to_vec();
+    for p in programs {
+        let path = p.path.to_string_lossy().into_owned();
+        let lower = path.to_lowercase();
+        if !seen.insert(lower.clone()) {
+            continue;
+        }
+        out.push(AppEntry {
+            id: program_id(&lower),
+            name: p.name.clone(),
+            parsing_name: path,
+            target: Some(p.path.clone()),
+            is_packaged: false,
+        });
+    }
+    (out, apps.len())
 }
 
 impl AppState {
@@ -153,8 +204,13 @@ impl AppState {
     }
 
     fn rebuild_match(&self) {
+        let (entries, from) = merge_programs(&self.apps.entries(), &self.programs.load());
         self.app_match
-            .store(Arc::new(build_match(self.apps.entries())));
+            .store(Arc::new(build_match(Arc::new(entries), from)));
+    }
+
+    fn programs_path(&self) -> PathBuf {
+        self.cache_dir.join("programs.idx")
     }
 
     fn snapshot_path(&self) -> PathBuf {
@@ -257,7 +313,11 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         config,
         store,
-        app_match: ArcSwap::from_pointee(build_match(apps.entries())),
+        app_match: ArcSwap::from_pointee({
+            let from = apps.entries().len();
+            build_match(apps.entries(), from)
+        }),
+        programs: ArcSwap::from_pointee(Vec::new()),
         apps,
         matcher: Mutex::new(FuzzyMatcher::new()),
         files: Arc::new(FileIndex::new()),
@@ -306,7 +366,10 @@ pub fn start(app: &AppHandle) {
     });
     let s = state.clone();
     tauri::async_runtime::spawn(async move {
+        refresh_apps(&s).await;
+        scan_programs_task(&s).await;
         let mut tick = tokio::time::interval(APP_REFRESH);
+        tick.tick().await; // first tick fires at once; the startup refresh above covered it
         loop {
             tick.tick().await;
             refresh_apps(&s).await;
@@ -339,6 +402,50 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
         Ok(Ok(stats)) => tracing::info!(kept = stats.kept, "apps refreshed"),
         Ok(Err(err)) => tracing::warn!(%err, "app refresh failed"),
         Err(err) => tracing::warn!(%err, "app refresh task failed"),
+    }
+}
+
+/// Loads the programs cache, rescans every fixed drive (system drive included), saves and merges.
+/// Off when `apps.scan_programs` is false.
+pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
+    if !s.config.load().apps.scan_programs {
+        return;
+    }
+    let st = s.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let started = Instant::now();
+        match load_programs(&st.programs_path()) {
+            Ok(Some(list)) => {
+                st.programs.store(Arc::new(list));
+                st.rebuild_match();
+            }
+            Ok(None) => {}
+            Err(err) => tracing::warn!(%err, "programs cache unreadable"),
+        }
+        let roots: Vec<PathBuf> = drives::present_drives()
+            .into_iter()
+            .map(|d| PathBuf::from(format!("{d}:\\")))
+            .filter(|r| win::drives::is_fixed_drive(r))
+            .collect();
+        // ponytail: never cancelled; the scan is short and bounded by MAX_PROGRAMS.
+        let never = AtomicBool::new(false);
+        let list = {
+            let _bg = win::thread::BackgroundGuard::new();
+            index_files::scan_programs(&roots, &scan_parallelism(), &never)?
+        };
+        if let Err(err) = save_programs(&st.programs_path(), &list) {
+            tracing::warn!(%err, "saving programs cache failed");
+        }
+        let count = list.len();
+        st.programs.store(Arc::new(list));
+        st.rebuild_match();
+        Ok::<_, index_files::FilesError>((count, started.elapsed().as_millis() as u64))
+    })
+    .await;
+    match res {
+        Ok(Ok((count, ms))) => tracing::info!(count, ms, "programs scanned"),
+        Ok(Err(err)) => tracing::warn!(%err, "programs scan failed"),
+        Err(err) => tracing::warn!(%err, "programs scan task failed"),
     }
 }
 
@@ -444,6 +551,40 @@ pub fn shutdown(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn entry(name: &str, parsing: &str, target: Option<&str>) -> AppEntry {
+        AppEntry {
+            id: name.into(),
+            name: name.into(),
+            parsing_name: parsing.into(),
+            target: target.map(PathBuf::from),
+            is_packaged: false,
+        }
+    }
+
+    fn prog(path: &str) -> ProgramFile {
+        ProgramFile::from_path(Path::new(path)).unwrap()
+    }
+
+    #[test]
+    fn merge_keeps_apps_first_and_drops_duplicates() {
+        let apps = vec![
+            entry("A", "shell.A", Some(r"C:\x\a.exe")),
+            entry("B", r"C:\x\b.lnk", None),
+        ];
+        let progs = vec![
+            prog(r"C:\X\A.EXE"),
+            prog(r"C:\x\b.lnk"),
+            prog(r"C:\x\c.msi"),
+            prog(r"C:\x\c.msi"),
+        ];
+        let (out, from) = merge_programs(&apps, &progs);
+        assert_eq!(from, 2);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out[2].name, "c");
+        assert_eq!(out[2].parsing_name, r"C:\x\c.msi");
+        assert_eq!(out[2].target.as_deref(), Some(Path::new(r"C:\x\c.msi")));
+    }
 
     #[test]
     fn begin_cancels_previous_run() {

@@ -1,6 +1,7 @@
 //! The `search` command.
 use crate::error::CommandError;
 use crate::state::AppState;
+use features::search::{SearchScope, command_search_scoped};
 use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
 use std::sync::Arc;
@@ -38,6 +39,7 @@ pub async fn search(
     seq: u64,
     mode: Mode,
     text: String,
+    scope: Option<SearchScope>,
 ) -> Result<SearchResponse, CommandError> {
     let started = Instant::now();
     state.latest_seq.fetch_max(seq, Ordering::SeqCst);
@@ -49,7 +51,7 @@ pub async fn search(
     };
     let items = match mode {
         Mode::Query => Vec::new(),
-        Mode::Command => command(&state, &input),
+        Mode::Command => command(&state, &input, scope.unwrap_or_default()),
         Mode::Find => {
             if !state.config.load().modes.find.enabled {
                 return Err(CommandError::new("mode_disabled", "Find mode is off"));
@@ -83,26 +85,36 @@ pub async fn search(
     Ok(reply(seq, items))
 }
 
-fn command(state: &AppState, input: &Input) -> Vec<Item> {
+fn command(state: &Arc<AppState>, input: &Input, scope: SearchScope) -> Vec<Item> {
     let am = state.app_match.load();
-    let mut items = features::command_search(
+    let mut items = command_search_scoped(
         &am.entries,
+        am.programs_from,
+        scope,
         &am.index,
         &mut state.matcher.lock(),
         &state.registry,
         input,
         K,
     );
+    let mut missing = Vec::new();
     for it in items.iter_mut().filter(|i| i.source == "apps") {
         let entry = it
             .payload
             .get("appId")
             .and_then(|v| v.as_str())
             .and_then(|id| am.entries.iter().find(|a| a.id == id));
-        if let Some(url) = entry.and_then(|e| crate::icons::icon_data_url(&state.icons, e, ICON_PX))
-        {
+        let Some(entry) = entry else { continue };
+        if let Some(url) = crate::icons::icon_data_url(&state.icons, entry, ICON_PX) {
             it.icon = Some(IconRef::DataUrl(url));
+        } else if it.payload.get("program").is_some() {
+            missing.push(entry.clone());
         }
+    }
+    if !missing.is_empty() {
+        // Only the K shown program rows are extracted, off the keystroke path; shown on the next search.
+        let st = state.clone();
+        tauri::async_runtime::spawn_blocking(move || st.icons.extract_and_memo(&missing, ICON_PX));
     }
     items
 }
