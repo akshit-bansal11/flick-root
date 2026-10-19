@@ -61,3 +61,31 @@ fn cancel_returns_cancelled() {
     let r = scan_programs(&[d.path().to_path_buf()], &Parallelism::Serial, &cancel);
     assert!(matches!(r, Err(FilesError::Cancelled)));
 }
+
+#[test]
+fn extra_types_and_app_bundle() {
+    let d = tempfile::tempdir().unwrap();
+    let r = d.path();
+    for f in [
+        "a.appinstaller",
+        "b.AppImage",
+        "c.deb",
+        "d.sh",
+        "e.pkg",
+        "f.dmg",
+        "Foo.app/Contents/MacOS/foo",
+        "Foo.app/Contents/inner.exe",
+    ] {
+        touch(&r.join(f));
+    }
+    let cancel = AtomicBool::new(false);
+    let got = scan_programs(&[r.to_path_buf()], &Parallelism::Serial, &cancel).unwrap();
+    let names: Vec<_> = got.iter().map(|p| p.name.as_str()).collect();
+    assert_eq!(names, ["a", "b", "c", "d", "e", "f", "Foo"]);
+    let foo = got.iter().find(|p| p.name == "Foo").unwrap();
+    assert_eq!(foo.ext, "app");
+    assert_eq!(got.iter().find(|p| p.name == "b").unwrap().ext, "appimage");
+    let cache = r.join("programs.cache");
+    save_programs(&cache, &got).unwrap();
+    assert_eq!(load_programs(&cache).unwrap(), Some(got));
+}

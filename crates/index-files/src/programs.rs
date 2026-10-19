@@ -30,6 +30,18 @@ pub const PROGRAM_EXTS: &[&str] = &[
     "url",
     "appref-ms",
     "jar",
+    "appinstaller",
+    "app",
+    "pkg",
+    "dmg",
+    "appimage",
+    "deb",
+    "rpm",
+    "flatpak",
+    "flatpakref",
+    "snap",
+    "run",
+    "sh",
 ];
 
 /// Hard cap on returned programs; the walk stops when reached.
@@ -84,6 +96,12 @@ impl ProgramFile {
     }
 }
 
+fn is_app_bundle(name: &OsStr) -> bool {
+    Path::new(name)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("app"))
+}
+
 fn skip_dir_name(name: &OsStr) -> bool {
     let n = name.to_string_lossy();
     SKIP_DIRS.iter().any(|s| n.eq_ignore_ascii_case(s))
@@ -105,6 +123,12 @@ pub fn scan_programs(
             .parallelism(parallelism.clone())
             .process_read_dir(|_, _, _, children| {
                 // The walk root is never in `children`, so it is never skipped.
+                // A `.app` directory is a macOS bundle: listed, never descended into.
+                for c in children.iter_mut().flatten() {
+                    if c.file_type.is_dir() && is_app_bundle(&c.file_name) {
+                        c.read_children = None;
+                    }
+                }
                 children.retain(|c| {
                     let Ok(e) = c else { return false };
                     let system = e
@@ -112,7 +136,7 @@ pub fn scan_programs(
                         .ok()
                         .is_some_and(|m| m.file_attributes() & ATTR_SYSTEM != 0);
                     if e.file_type.is_dir() {
-                        !system && !skip_dir_name(&e.file_name)
+                        !system && (is_app_bundle(&e.file_name) || !skip_dir_name(&e.file_name))
                     } else {
                         !system
                     }
@@ -123,7 +147,7 @@ pub fn scan_programs(
                 return Err(FilesError::Cancelled); // dropping `walk` stops the workers
             }
             let Ok(e) = item else { continue };
-            if !e.file_type.is_file() {
+            if !(e.file_type.is_file() || e.file_type.is_dir() && is_app_bundle(&e.file_name)) {
                 continue;
             }
             let Some(p) = ProgramFile::from_path(&e.path()) else {
