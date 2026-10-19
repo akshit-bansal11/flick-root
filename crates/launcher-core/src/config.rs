@@ -53,10 +53,6 @@ pub struct General {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Window {
-    /// Window width in pixels.
-    pub width_px: u32,
-    /// Distance from the top as a percent of screen height.
-    pub top_percent: u32,
     /// Maximum visible results.
     pub max_results: u32,
 }
@@ -236,11 +232,7 @@ impl Default for General {
 
 impl Default for Window {
     fn default() -> Self {
-        Self {
-            width_px: 700,
-            top_percent: 28,
-            max_results: 5,
-        }
+        Self { max_results: 5 }
     }
 }
 
@@ -610,5 +602,16 @@ mod find_drive_tests {
         assert!(c.modes.find.include_drives);
         let off: Config = toml::from_str("[modes.find]\ninclude_drives = false\n").unwrap();
         assert!(!off.modes.find.include_drives);
+    }
+
+    #[test]
+    fn old_window_keys_are_ignored() {
+        let old = "[window]
+width_px = 700
+top_percent = 28
+max_results = 7
+";
+        let c: Config = toml::from_str(old).unwrap();
+        assert_eq!(c.window.max_results, 7);
     }
 }

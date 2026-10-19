@@ -21,9 +21,9 @@
         "width": 700,
         "height": 64,
         "resizable": false,
-        "transparent": false,
+        "transparent": true,
         "focus": false,
-        "shadow": true,
+        "shadow": false,
         "center": false
       }
     ],

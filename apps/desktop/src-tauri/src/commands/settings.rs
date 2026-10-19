@@ -4,15 +4,12 @@ use crate::autostart;
 use crate::error::CommandError;
 use crate::hotkey;
 use crate::state::{self, AppState};
-use crate::window;
 use launcher_core::brand::APP_NAME;
 use launcher_core::store::ClearScope;
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager, PhysicalSize, State};
-
-const MIN_HEIGHT: u32 = 64;
+use tauri::{AppHandle, Emitter, State};
 
 /// Settings the UI shows. No secret is ever included.
 #[derive(Serialize)]
@@ -259,41 +256,17 @@ pub async fn get_about(app: AppHandle) -> Result<About, CommandError> {
     })
 }
 
-/// Clamps a requested logical height to `[MIN_HEIGHT, 60% of monitor height]`.
-fn clamp_height(req: u32, monitor_logical_h: u32) -> u32 {
-    let max = (monitor_logical_h * 6 / 10).max(MIN_HEIGHT);
-    req.clamp(MIN_HEIGHT, max)
-}
-
-/// Resizes the launcher height, keeping its width.
+/// No-op: the launcher window now spans its monitor and never resizes. Kept until the UI stops
+/// calling it (F6.3), then removed with its manifest entry.
 #[tauri::command]
-pub async fn resize_launcher(app: AppHandle, height_px: u32) -> Result<(), CommandError> {
-    let win = app
-        .get_webview_window(window::LABEL)
-        .ok_or_else(|| CommandError::new("internal", "launcher window missing"))?;
-    let internal = |e: tauri::Error| CommandError::new("internal", e.to_string());
-    let scale = win.scale_factor().map_err(internal)?;
-    let mon_h = win.current_monitor().map_err(internal)?.map_or(1080, |m| {
-        (f64::from(m.size().height) / scale).max(0.0) as u32
-    });
-    let h = clamp_height(height_px, mon_h);
-    let width = win.outer_size().map_err(internal)?.width;
-    let phys = (f64::from(h) * scale).round().max(0.0) as u32;
-    win.set_size(PhysicalSize::new(width, phys))
-        .map_err(internal)
+pub async fn resize_launcher(height_px: u32) -> Result<(), CommandError> {
+    let _ = height_px;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn clamp_bounds() {
-        assert_eq!(clamp_height(10, 1000), 64);
-        assert_eq!(clamp_height(300, 1000), 300);
-        assert_eq!(clamp_height(900, 1000), 600);
-        assert_eq!(clamp_height(500, 50), 64);
-    }
 
     #[test]
     fn scopes() {
