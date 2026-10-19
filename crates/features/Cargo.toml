@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[lib]
+# criterion owns `cargo bench`; libtest would reject its flags.
+bench = false
+
 [dependencies]
 launcher-core = { workspace = true }
 index-apps = { workspace = true }
