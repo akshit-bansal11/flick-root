@@ -162,11 +162,10 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
         .config
         .load();
     let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
-    let tutorial = config.general.first_run_done && !config.general.tutorial_done;
     emit(
         app,
         "launcher://shown",
-        json!({ "shownId": shown_id, "reason": reason, "glass": glass, "appearance": appearance, "tutorial": tutorial }),
+        json!({ "shownId": shown_id, "reason": reason, "glass": glass, "appearance": appearance }),
     );
 }
 

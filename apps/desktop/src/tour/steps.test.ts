@@ -7,7 +7,7 @@ import {
   splitExample,
   TUTORIAL_STEPS,
   type TutorialView,
-} from "./tutorialSteps";
+} from "./steps";
 
 const view = (v: Partial<TutorialView> = {}): TutorialView => ({
   mode: "none",

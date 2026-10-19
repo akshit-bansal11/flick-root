@@ -7,7 +7,6 @@ import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
 import { HINTS_ID, hintId, LISTBOX_ID, optionId, PrefixHints, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION } from "./reducer";
-import { Tutorial } from "./Tutorial";
 import { useLauncher } from "./useLauncher";
 
 export function Launcher() {
@@ -23,7 +22,6 @@ export function Launcher() {
     openSettings,
     openLink,
     panelRef,
-    tutorial,
   } = useLauncher(inputRef);
 
   const q = state.query;
@@ -43,15 +41,6 @@ export function Launcher() {
         onChange={setText}
         inputRef={inputRef}
       />
-      {state.tutorial.open && (
-        <Tutorial
-          step={state.tutorial.step}
-          onNext={tutorial.next}
-          onBack={tutorial.back}
-          onSkip={tutorial.skip}
-          onExample={tutorial.example}
-        />
-      )}
       <div className="launcher-body">
         {state.mode === "query" && state.attachment && (
           <Attachment attachment={state.attachment} onRemove={removeAttachment} />

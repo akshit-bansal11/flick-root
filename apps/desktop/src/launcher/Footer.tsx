@@ -2,7 +2,7 @@ import { APP_DISPLAY_NAME } from "../brand";
 import type { LaunchMode } from "../types";
 
 const KEYS: Record<LaunchMode, string[]> = {
-  none: ["> commands", "! apps", "/ find", "? ask", "F1 tutorial"],
+  none: ["> commands", "! apps", "/ find", "? ask"],
   commands: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
   run: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
   find: ["↵ open", "Ctrl ↵ location", "Ctrl C copy path"],

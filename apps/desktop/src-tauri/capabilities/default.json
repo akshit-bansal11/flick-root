@@ -22,7 +22,6 @@
     "allow-set-thinking-mode",
     "allow-get-first-run",
     "allow-complete-first-run",
-    "allow-set-tutorial-done",
     "allow-probe-providers"
   ]
 }

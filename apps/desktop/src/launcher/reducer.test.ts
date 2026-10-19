@@ -9,7 +9,6 @@ import {
   reduce,
   type State,
 } from "./reducer";
-import { TUTORIAL_STEPS } from "./tutorialSteps";
 
 const item = (id: string): Item => ({
   id,
@@ -550,68 +549,6 @@ describe("thinking modes", () => {
     });
     const r = reduce(initialState(), { type: "thinkingModes", modes: tm, selected: "c/3" });
     expect(r.state.thinkingModes.selected).toBe("c/3");
-  });
-});
-
-describe("tutorial", () => {
-  const open = (step = 0): State => ({ ...initialState(), tutorial: { open: true, step } });
-  const press = (s: State, key: string, ctrl = false) =>
-    reduce(s, { type: "key", key: { key, ctrl, shift: false, alt: false } });
-
-  it("opens from the shown payload and from F1, without persisting", () => {
-    expect(reduce(initialState(), { type: "shown", tutorial: true }).state.tutorial.open).toBe(
-      true,
-    );
-    expect(reduce(initialState(), { type: "shown" }).state.tutorial.open).toBe(false);
-    const r = press(initialState(), "F1");
-    expect(r.state.tutorial).toEqual({ open: true, step: 0 });
-    expect(r.effects).toEqual([]);
-  });
-  it("Esc ends it instead of hiding, and persists done", () => {
-    const r = press(open(2), "Escape");
-    expect(r.state.tutorial.open).toBe(false);
-    expect(r.effects).toEqual([{ type: "tutorialDone", done: true }]);
-  });
-  it("Ctrl+Right/Left and the events move; Next on the last step finishes", () => {
-    expect(press(open(1), "ArrowRight", true).state.tutorial.step).toBe(2);
-    expect(press(open(1), "ArrowLeft", true).state.tutorial.step).toBe(0);
-    expect(reduce(open(1), { type: "tutorialBack" }).state.tutorial.step).toBe(0);
-    const last = reduce(open(TUTORIAL_STEPS.length - 1), { type: "tutorialNext" });
-    expect(last.state.tutorial.open).toBe(false);
-    expect(last.effects).toEqual([{ type: "tutorialDone", done: true }]);
-  });
-  it("an example chip enters the mode and types the rest; the step auto-advances", () => {
-    const apps = TUTORIAL_STEPS.findIndex((s) => s.id === "apps");
-    const r = reduce(open(apps), { type: "tutorialExample", text: "! notepad" });
-    expect(r.state.mode).toBe("run");
-    expect(r.state.input).toBe("notepad");
-    expect(r.state.tutorial.step).toBe(apps + 1);
-  });
-  it("auto-advances when results make the commands step done", () => {
-    const cmd = TUTORIAL_STEPS.findIndex((s) => s.id === "commands");
-    const typed = reduce(open(cmd), { type: "tutorialExample", text: "> 2+2" });
-    expect(typed.state.tutorial.step).toBe(cmd);
-    const done = reduce(typed.state, { type: "results", seq: typed.state.seq, items: [item("a")] });
-    expect(done.state.tutorial.step).toBe(cmd + 1);
-  });
-  it("Alt+T types the step's example", () => {
-    const apps = TUTORIAL_STEPS.findIndex((s) => s.id === "apps");
-    const r = reduce(open(apps), {
-      type: "key",
-      key: { key: "t", ctrl: false, shift: false, alt: true },
-    });
-    expect(r.state.mode).toBe("run");
-    expect(r.state.input).toBe("notepad");
-  });
-  it("keeps the step across hide and show until finished", () => {
-    const hidden = reduce(open(3), { type: "hidden" }).state;
-    expect(hidden.tutorial).toEqual({ open: true, step: 3 });
-    expect(reduce(hidden, { type: "shown", tutorial: true }).state.tutorial.step).toBe(3);
-    const done = reduce(hidden, { type: "tutorialEnd" }).state;
-    expect(reduce(done, { type: "shown" }).state.tutorial.open).toBe(false);
-  });
-  it("typing still works while open", () => {
-    expect(reduce(open(), { type: "text", text: ">" }).state.mode).toBe("commands");
   });
 });
 
