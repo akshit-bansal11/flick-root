@@ -66,22 +66,72 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+const type = (text: string) =>
+  act(async () => {
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: text } });
+  });
+
 describe("Launcher", () => {
-  it("renders the command placeholder and results as options", async () => {
+  it("starts in none mode with four prefix hint rows and no search", async () => {
     await mount();
-    expect(screen.getByPlaceholderText("Open an app or run a command")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Type > ! / or ? to start")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /^(>|!|\/|\?)/ })).toHaveLength(4);
+    expect(screen.getByText("> commands")).toBeTruthy();
+    expect(ipc.search).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("mode-chip")).toBeNull();
+  });
+
+  it("plain text keeps the hints and shows a muted line", async () => {
+    await mount();
+    await type("abc");
+    expect(screen.getByText("Start with > ! / or ? to search")).toBeTruthy();
+    expect(ipc.search).not.toHaveBeenCalled();
+  });
+
+  it("typing a prefix shows a chip, the placeholder and searches with scope", async () => {
+    await mount();
+    await type("!");
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Apps");
+    expect(screen.getByRole("combobox").getAttribute("aria-label")).toBe("Apps search");
+    expect(screen.getByPlaceholderText("Open an app or program")).toBeTruthy();
+    expect(ipc.search).toHaveBeenCalledWith({ seq: 1, mode: "command", text: "", scope: "apps" });
     expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 
-  it("shows a group label, subtitle and footer", async () => {
+  it("clicking a hint row enters its mode", async () => {
     await mount();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /Find/ }));
+    });
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Find");
+  });
+
+  it("shows group label, subtitle and mode footer", async () => {
+    await mount();
+    await type(">");
     expect(screen.getByText("Apps")).toBeTruthy();
     expect(screen.getAllByText("App")).toHaveLength(2);
-    expect(screen.getByText("Tab mode")).toBeTruthy();
+    expect(screen.getByText("Ctrl Shift ↵ admin")).toBeTruthy();
+    expect(screen.queryByText("Tab mode")).toBeNull();
+  });
+
+  it("labels drive-scan programs", async () => {
+    await mount();
+    vi.mocked(ipc.search).mockImplementation((req) =>
+      Promise.resolve({
+        seq: req.seq,
+        items: [{ ...item("p", "Prog"), payload: { program: true }, subtitle: "D:/tools" }],
+        group: null,
+      }),
+    );
+    await type("!");
+    expect(screen.getByText("Programs")).toBeTruthy();
+    expect(screen.getByText("D:/tools")).toBeTruthy();
   });
 
   it("ArrowDown moves aria-activedescendant", async () => {
     await mount();
+    await type(">");
     const input = screen.getByRole("combobox");
     expect(input.getAttribute("aria-activedescendant")).toBe("launcher-opt-0");
     act(() => {
@@ -90,14 +140,22 @@ describe("Launcher", () => {
     expect(input.getAttribute("aria-activedescendant")).toBe("launcher-opt-1");
   });
 
-  it("Tab changes the mode hint and placeholder", async () => {
+  it("Tab does not change the mode", async () => {
     await mount();
-    expect(screen.getByTestId("mode-hint").textContent).toContain("Command");
+    await type(">");
     act(() => {
       fireEvent.keyDown(window, { key: "Tab" });
     });
-    expect(screen.getByTestId("mode-hint").textContent).toContain("Find");
-    expect(screen.getByPlaceholderText("Find a file or folder")).toBeTruthy();
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Commands");
+  });
+
+  it("Backspace on an empty input leaves the mode", async () => {
+    await mount();
+    await type(">");
+    act(() => {
+      fireEvent.keyDown(window, { key: "Backspace" });
+    });
+    expect(screen.queryByTestId("mode-chip")).toBeNull();
   });
 
   it("Escape on empty input hides the launcher", async () => {

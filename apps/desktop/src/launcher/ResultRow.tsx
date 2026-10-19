@@ -1,6 +1,6 @@
 import type { Item } from "../types";
 import { highlight } from "./highlight";
-import { kindName } from "./kinds";
+import { kindName, rowKind } from "./kinds";
 import { Tile } from "./Tile";
 
 interface Props {
@@ -35,7 +35,7 @@ export function ResultRow({ item, id, index, selected, query, onActivate }: Prop
         <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>
       </span>
       <span className="row-meta" aria-hidden="true">
-        {selected ? "↵ Open" : item.kind}
+        {selected ? "↵ Open" : rowKind(item)}
       </span>
     </div>
   );

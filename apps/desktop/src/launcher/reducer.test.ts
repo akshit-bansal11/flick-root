@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Item, Mode } from "../types";
+import type { Item, LaunchMode } from "../types";
 import {
   type Attachment,
   type Event,
   initialState,
   type KeyInput,
+  MODES,
   reduce,
   type State,
 } from "./reducer";
@@ -28,7 +29,7 @@ const withItems = (s: State, n = 3): State => ({
   ...s,
   items: Array.from({ length: n }, (_, i) => item(`i${i}`)),
 });
-const inMode = (mode: Mode, extra: Partial<State> = {}): State => ({
+const inMode = (mode: LaunchMode, extra: Partial<State> = {}): State => ({
   ...initialState(),
   mode,
   ...extra,
@@ -38,17 +39,36 @@ const streaming = (extra: Partial<State> = {}): State =>
   inMode("query", { query: { ...initialState().query, status: "streaming" }, ...extra });
 
 describe("reducer", () => {
-  it("empty command input on shown searches most-used", () => {
-    const r = reduce(initialState(), { type: "shown" });
-    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: "command", text: "" }]);
-    expect(r.state.visible).toBe(true);
+  it("shown resets to none mode, empty input, and does not search", () => {
+    const r = reduce(inMode("find", { input: "x" }), { type: "shown" });
+    expect(r.effects).toEqual([]);
+    expect(r.state).toMatchObject({ mode: "none", input: "", items: [], visible: true });
   });
 
-  it("text change searches with incremented seq", () => {
-    const a = reduce(initialState(), { type: "text", text: "ab" });
+  it("text change searches with incremented seq and the mode scope", () => {
+    const a = reduce(inMode("commands"), { type: "text", text: "ab" });
     const b = reduce(a.state, { type: "text", text: "abc" });
-    expect(a.effects).toEqual([{ type: "search", seq: 1, mode: "command", text: "ab" }]);
-    expect(b.effects).toEqual([{ type: "search", seq: 2, mode: "command", text: "abc" }]);
+    expect(a.effects).toEqual([
+      { type: "search", seq: 1, mode: "command", text: "ab", scope: "commands" },
+    ]);
+    expect(b.effects).toEqual([
+      { type: "search", seq: 2, mode: "command", text: "abc", scope: "commands" },
+    ]);
+  });
+
+  it("run mode searches command with apps scope; find has no scope", () => {
+    expect(reduce(inMode("run"), { type: "text", text: "a" }).effects).toEqual([
+      { type: "search", seq: 1, mode: "command", text: "a", scope: "apps" },
+    ]);
+    expect(reduce(inMode("find"), { type: "text", text: "a" }).effects).toEqual([
+      { type: "search", seq: 1, mode: "find", text: "a", scope: undefined },
+    ]);
+  });
+
+  it("plain text in none mode searches nothing and keeps the hints", () => {
+    const r = reduce(initialState(), { type: "text", text: "abc" });
+    expect(r.effects).toEqual([]);
+    expect(r.state).toMatchObject({ mode: "none", input: "abc", items: [] });
   });
 
   it("text change in query mode does not search", () => {
@@ -58,47 +78,47 @@ describe("reducer", () => {
   });
 
   it("ignores stale results", () => {
-    const s = reduce(initialState(), { type: "text", text: "a" }).state;
+    const s = reduce(inMode("commands"), { type: "text", text: "a" }).state;
     const r = reduce(s, { type: "results", seq: 0, items: [item("x")] });
     expect(r.state.items).toEqual([]);
   });
 
   it("accepts current results and resets selection", () => {
-    const s = { ...reduce(initialState(), { type: "text", text: "a" }).state, selected: 2 };
+    const s = { ...reduce(inMode("commands"), { type: "text", text: "a" }).state, selected: 2 };
     const r = reduce(s, { type: "results", seq: 1, items: [item("x")] });
     expect(r.state.items).toHaveLength(1);
     expect(r.state.selected).toBe(0);
   });
 
   it("Down wraps to top", () => {
-    const s = { ...withItems(initialState()), selected: 2 };
+    const s = { ...withItems(inMode("commands")), selected: 2 };
     expect(reduce(s, k("ArrowDown")).state.selected).toBe(0);
   });
 
   it("Up wraps to bottom", () => {
-    expect(reduce(withItems(initialState()), k("ArrowUp")).state.selected).toBe(2);
+    expect(reduce(withItems(inMode("commands")), k("ArrowUp")).state.selected).toBe(2);
   });
 
   it("arrows with no items do nothing", () => {
-    expect(reduce(initialState(), k("ArrowDown")).state.selected).toBe(0);
+    expect(reduce(inMode("commands"), k("ArrowDown")).state.selected).toBe(0);
   });
 
   it("Enter launches selected", () => {
-    const s = { ...withItems(initialState()), selected: 1 };
+    const s = { ...withItems(inMode("commands")), selected: 1 };
     expect(reduce(s, k("Enter")).effects).toEqual([{ type: "launch", itemId: "i1", admin: false }]);
   });
 
   it("Enter with no items does nothing", () => {
-    expect(reduce(initialState(), k("Enter")).effects).toEqual([]);
+    expect(reduce(inMode("commands"), k("Enter")).effects).toEqual([]);
   });
 
   it("Ctrl+Enter reveals location", () => {
-    const r = reduce(withItems(initialState()), k("Enter", { ctrl: true }));
+    const r = reduce(withItems(inMode("commands")), k("Enter", { ctrl: true }));
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i0" }]);
   });
 
   it("Ctrl+Shift+Enter launches as admin in Command", () => {
-    const r = reduce(withItems(initialState()), k("Enter", { ctrl: true, shift: true }));
+    const r = reduce(withItems(inMode("commands")), k("Enter", { ctrl: true, shift: true }));
     expect(r.effects).toEqual([{ type: "launch", itemId: "i0", admin: true }]);
   });
 
@@ -118,65 +138,103 @@ describe("reducer", () => {
   });
 
   it("Ctrl+C ignored outside Find", () => {
-    expect(reduce(withItems(initialState()), k("c", { ctrl: true })).effects).toEqual([]);
+    expect(reduce(withItems(inMode("commands")), k("c", { ctrl: true })).effects).toEqual([]);
   });
 
-  it("Tab cycles command, find, query, command", () => {
-    let s = initialState();
-    const seen: Mode[] = [];
-    for (let i = 0; i < 3; i++) {
-      s = reduce(s, k("Tab")).state;
-      seen.push(s.mode);
-    }
-    expect(seen).toEqual(["find", "query", "command"]);
-  });
-
-  it("Shift+Tab cycles backwards", () => {
-    expect(reduce(initialState(), k("Tab", { shift: true })).state.mode).toBe("query");
-  });
-
-  it("Tab skips disabled Find", () => {
-    const s = { ...initialState(), enabledModes: ["command", "query"] as Mode[] };
-    expect(reduce(s, k("Tab")).state.mode).toBe("query");
-  });
-
-  it("Command stays reachable when enabledModes omits it", () => {
-    const s = { ...initialState(), enabledModes: [] as Mode[] };
-    expect(reduce(s, k("Tab")).state.mode).toBe("command");
-  });
-
-  it("Tab to a search mode searches with empty text", () => {
-    const r = reduce(initialState(), k("Tab"));
-    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: "find", text: "" }]);
+  it.each(["Tab", "Shift+Tab"])("%s does not change mode", (name) => {
+    const s = inMode("commands");
+    const r = reduce(s, k("Tab", { shift: name !== "Tab" }));
+    expect(r.state).toBe(s);
+    expect(r.effects).toEqual([]);
   });
 
   it.each([
-    ["/", "find"],
-    ["?", "query"],
-  ] as const)("prefix %s as first char switches to %s and is removed", (ch, mode) => {
+    [">", "commands", "command", "commands"],
+    ["!", "run", "command", "apps"],
+    ["/", "find", "find", undefined],
+  ] as const)("prefix %s enters %s, is consumed, and searches", (ch, mode, wire, scope) => {
     const r = reduce(initialState(), { type: "text", text: ch });
     expect(r.state.mode).toBe(mode);
     expect(r.state.input).toBe("");
+    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: wire, text: "", scope }]);
   });
 
-  it("> switches back to Command", () => {
-    const r = reduce(inMode("find"), { type: "text", text: ">" });
-    expect(r.state.mode).toBe("command");
-    expect(r.state.input).toBe("");
+  it("? enters query without searching", () => {
+    const r = reduce(initialState(), { type: "text", text: "?" });
+    expect(r.state).toMatchObject({ mode: "query", input: "" });
+    expect(r.effects).toEqual([]);
+  });
+
+  it("prefix table is one-to-one", () => {
+    expect(Object.values(MODES).map((m) => m.prefix)).toEqual([">", "!", "/", "?"]);
+  });
+
+  it("a prefix typed on an empty field in another mode switches mode", () => {
+    expect(reduce(inMode("find"), { type: "text", text: ">" }).state.mode).toBe("commands");
   });
 
   it("prefix not at position 0 is kept as text", () => {
-    const s = reduce(initialState(), { type: "text", text: "a" }).state;
+    const s = reduce(inMode("commands"), { type: "text", text: "a" }).state;
     const r = reduce(s, { type: "text", text: "a/" });
-    expect(r.state.mode).toBe("command");
+    expect(r.state.mode).toBe("commands");
     expect(r.state.input).toBe("a/");
   });
 
-  it("prefix for a disabled mode stays as text", () => {
-    const s = { ...initialState(), enabledModes: ["command"] as Mode[] };
-    const r = reduce(s, { type: "text", text: "/" });
-    expect(r.state.mode).toBe("command");
-    expect(r.state.input).toBe("/");
+  it.each(["/", "?"])("prefix %s for a disabled mode stays as text", (ch) => {
+    const s = initialState(["command"]);
+    const r = reduce(s, { type: "text", text: ch });
+    expect(r.state).toMatchObject({ mode: "none", input: ch });
+    expect(r.effects).toEqual([]);
+  });
+
+  it("Backspace on empty input inside a mode returns to none", () => {
+    const r = reduce(inMode("find"), k("Backspace"));
+    expect(r.state.mode).toBe("none");
+    expect(r.effects).toEqual([]);
+  });
+
+  it("Backspace with text stays in the mode; in none it does nothing", () => {
+    const s = inMode("find", { input: "a" });
+    expect(reduce(s, k("Backspace")).state.mode).toBe("find");
+    expect(reduce(initialState(), k("Backspace")).effects).toEqual([]);
+  });
+
+  it("Backspace leaving a streaming ask cancels it", () => {
+    const r = reduce(streaming(), k("Backspace"));
+    expect(r.state.mode).toBe("none");
+    expect(r.effects).toEqual([{ type: "cancelAsk", token: 0 }]);
+  });
+
+  it("none mode: arrows move over the hint rows and Enter enters the highlighted mode", () => {
+    const s = reduce(initialState(), k("ArrowDown")).state;
+    expect(s.selected).toBe(1);
+    const r = reduce(s, k("Enter"));
+    expect(r.state.mode).toBe("run");
+    expect(r.effects).toEqual([
+      { type: "search", seq: 1, mode: "command", text: "", scope: "apps" },
+    ]);
+  });
+
+  it("none mode: hints skip disabled modes", () => {
+    const s = initialState(["command"]);
+    expect(reduce(s, k("ArrowUp")).state.selected).toBe(1);
+    expect(reduce({ ...s, selected: 1 }, k("Enter")).state.mode).toBe("run");
+  });
+
+  it("enterMode event enters a mode and ignores a disabled one", () => {
+    expect(reduce(initialState(), { type: "enterMode", mode: "find" }).state.mode).toBe("find");
+    const s = initialState(["command"]);
+    expect(reduce(s, { type: "enterMode", mode: "query" }).state).toBe(s);
+  });
+
+  it("Ctrl+Shift+Enter skips a program row with no Admin action", () => {
+    const prog = { ...item("p"), payload: { program: true } };
+    const s = { ...inMode("run"), items: [prog] };
+    expect(reduce(s, k("Enter", { ctrl: true, shift: true })).effects).toEqual([]);
+    const withAdmin = { ...s, items: [{ ...prog, actions: [{ type: "admin" } as const] }] };
+    expect(reduce(withAdmin, k("Enter", { ctrl: true, shift: true })).effects).toEqual([
+      { type: "launch", itemId: "p", admin: true },
+    ]);
   });
 
   it("Query Enter submits the question with effort", () => {
@@ -206,23 +264,26 @@ describe("reducer", () => {
     expect(r.effects).toEqual([{ type: "hide" }]);
   });
 
-  it("Esc clearing in Command re-searches most-used", () => {
-    const r = reduce({ ...initialState(), input: "ab" }, k("Escape"));
-    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: "command", text: "" }]);
+  it("Esc clearing input keeps the mode and re-searches", () => {
+    const r = reduce(inMode("commands", { input: "ab" }), k("Escape"));
+    expect(r.state.mode).toBe("commands");
+    expect(r.effects).toEqual([
+      { type: "search", seq: 1, mode: "command", text: "", scope: "commands" },
+    ]);
   });
 
   it("Ctrl+T toggles Fast/Think in Query only", () => {
     const a = reduce(inMode("query"), k("t", { ctrl: true })).state;
     expect(a.query.effort).toBe("think");
     expect(reduce(a, k("t", { ctrl: true })).state.query.effort).toBe("fast");
-    expect(reduce(initialState(), k("t", { ctrl: true })).state.query.effort).toBe("fast");
+    expect(reduce(inMode("commands"), k("t", { ctrl: true })).state.query.effort).toBe("fast");
   });
 
   it("Ctrl+P emits nextProvider in Query only", () => {
     expect(reduce(inMode("query"), k("p", { ctrl: true })).effects).toEqual([
       { type: "nextProvider" },
     ]);
-    expect(reduce(initialState(), k("p", { ctrl: true })).effects).toEqual([]);
+    expect(reduce(inMode("commands"), k("p", { ctrl: true })).effects).toEqual([]);
   });
 
   it("ask events build the answer and finish", () => {
@@ -266,10 +327,6 @@ describe("reducer", () => {
     ]);
   });
 
-  it("Tab away while streaming emits cancelAsk", () => {
-    expect(reduce(streaming(), k("Tab")).effects[0]).toEqual({ type: "cancelAsk", token: 0 });
-  });
-
   it("second question cancels the first and ignores its events", () => {
     const r = reduce(streaming({ input: "next" }), k("Enter"));
     expect(r.effects.slice(0, 2)).toEqual([
@@ -281,7 +338,7 @@ describe("reducer", () => {
   });
 
   it("needsConfirm then Enter on same item confirms", () => {
-    let s = withItems(initialState(), 1);
+    let s = withItems(inMode("commands"), 1);
     s = reduce(s, {
       type: "outcome",
       commandId: "i0",
@@ -293,7 +350,7 @@ describe("reducer", () => {
   });
 
   it("clicking a guarded item twice launches then confirms", () => {
-    let s = withItems(initialState(), 3);
+    let s = withItems(inMode("commands"), 3);
     const first = reduce(s, { type: "activate", index: 1 });
     expect(first.state.selected).toBe(1);
     expect(first.effects).toEqual([{ type: "launch", itemId: "i1", admin: false }]);
@@ -307,13 +364,13 @@ describe("reducer", () => {
   });
 
   it("activate with ctrl reveals the clicked row", () => {
-    const r = reduce(withItems(initialState(), 3), { type: "activate", index: 2, ctrl: true });
+    const r = reduce(withItems(inMode("commands"), 3), { type: "activate", index: 2, ctrl: true });
     expect(r.state.selected).toBe(2);
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i2" }]);
   });
 
   it("showItems outcome replaces the list", () => {
-    const r = reduce(initialState(), {
+    const r = reduce(inMode("commands"), {
       type: "outcome",
       commandId: "x",
       outcome: { type: "showItems", items: [item("a")] },
@@ -322,7 +379,7 @@ describe("reducer", () => {
   });
 
   it("hidden resets state but keeps seq so stale results stay stale", () => {
-    const s = reduce(initialState(), { type: "text", text: "a" }).state;
+    const s = reduce(inMode("commands"), { type: "text", text: "a" }).state;
     const r = reduce(s, { type: "hidden" });
     expect(r.state.input).toBe("");
     expect(r.state.seq).toBe(1);
@@ -353,7 +410,7 @@ describe("query state flags", () => {
 
   describe("Backspace kill", () => {
     const procs = (): State => ({
-      ...initialState(),
+      ...inMode("commands"),
       items: [
         { ...item("p0"), kind: "process" },
         { ...item("p1"), kind: "process" },
@@ -379,7 +436,7 @@ describe("query state flags", () => {
     });
 
     it("ignores non-process rows", () => {
-      const s = reduce(withItems(initialState()), k("ArrowDown")).state;
+      const s = reduce(withItems(inMode("commands")), k("ArrowDown")).state;
       expect(reduce(s, k("Backspace")).effects).toEqual([]);
     });
   });
@@ -447,6 +504,8 @@ describe("explain attachment", () => {
   });
 
   it("switching mode clears it", () => {
-    expect(reduce(captured(att()), k("Tab")).state.attachment).toBeNull();
+    expect(
+      reduce(captured(att()), { type: "enterMode", mode: "find" }).state.attachment,
+    ).toBeNull();
   });
 });

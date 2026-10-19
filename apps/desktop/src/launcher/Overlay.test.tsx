@@ -46,7 +46,7 @@ describe("prefixes overlay", () => {
     expect(screen.queryByRole("note")).toBeNull();
     expect(localStorage.getItem(KEY)).toBe("1");
     expect(input().value).toBe("");
-    expect(input().placeholder).toBe("Open an app or run a command");
+    expect(input().placeholder).toBe("Type > ! / or ? to start");
   });
 
   it("is not shown when the flag is set", async () => {

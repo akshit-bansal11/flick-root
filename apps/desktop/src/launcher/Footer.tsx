@@ -1,13 +1,15 @@
 import { APP_DISPLAY_NAME } from "../brand";
-import type { Mode } from "../types";
+import type { LaunchMode } from "../types";
 
-const KEYS: Record<Mode, string[]> = {
-  command: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin", "Tab mode"],
-  find: ["↵ open", "Ctrl ↵ location", "Ctrl C copy path", "Tab mode"],
-  query: ["↵ ask", "Ctrl T effort", "Ctrl P provider", "Tab mode"],
+const KEYS: Record<LaunchMode, string[]> = {
+  none: ["> commands", "! apps", "/ find", "? ask"],
+  commands: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
+  run: ["↵ open", "Ctrl ↵ location", "Ctrl Shift ↵ admin"],
+  find: ["↵ open", "Ctrl ↵ location", "Ctrl C copy path"],
+  query: ["↵ ask", "Ctrl T effort", "Ctrl P provider"],
 };
 
-export function Footer({ mode, canKill = false }: { mode: Mode; canKill?: boolean }) {
+export function Footer({ mode, canKill = false }: { mode: LaunchMode; canKill?: boolean }) {
   const keys = canKill ? ["⌫ kill", ...KEYS[mode]] : KEYS[mode];
   return (
     <div className="foot">

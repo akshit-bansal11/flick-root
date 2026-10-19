@@ -11,11 +11,17 @@ import type {
   Mode,
   Outcome,
   SearchResponse,
+  SearchScope,
   ShownPayload,
 } from "./types";
 
-export const search = (req: { seq: number; mode: Mode; text: string }) =>
-  invoke<SearchResponse>("search", { seq: req.seq, mode: req.mode, text: req.text });
+export const search = (req: { seq: number; mode: Mode; text: string; scope?: SearchScope }) =>
+  invoke<SearchResponse>("search", {
+    seq: req.seq,
+    mode: req.mode,
+    text: req.text,
+    scope: req.scope,
+  });
 
 export const launch = (itemId: string, admin: boolean) =>
   invoke<Outcome>("launch", { itemId, admin });

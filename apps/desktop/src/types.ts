@@ -2,6 +2,12 @@
 
 export type Mode = "command" | "find" | "query";
 
+/** Which sources a Command-mode search draws from (Rust `SearchScope`). */
+export type SearchScope = "all" | "apps" | "commands";
+
+/** UI mode: "none" is the prefix-hint state; the others map onto a wire `Mode` (and scope). */
+export type LaunchMode = "none" | "commands" | "run" | "find" | "query";
+
 export type ItemKind =
   | "app"
   | "command"

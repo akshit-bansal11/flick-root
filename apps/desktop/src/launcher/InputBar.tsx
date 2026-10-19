@@ -1,24 +1,21 @@
 import type { Ref } from "react";
-import type { Mode } from "../types";
-import { LISTBOX_ID, optionId } from "./Results";
+import type { LaunchMode } from "../types";
+import { MODES } from "./reducer";
 
-const COPY: Record<Mode, { label: string; placeholder: string }> = {
-  command: { label: "Command", placeholder: "Open an app or run a command" },
-  find: { label: "Find", placeholder: "Find a file or folder" },
-  query: { label: "Query", placeholder: "Ask anything" },
-};
+const NONE_PLACEHOLDER = "Type > ! / or ? to start";
 
 interface Props {
-  mode: Mode;
+  mode: LaunchMode;
   value: string;
-  hasItems: boolean;
-  selected: number;
+  /** Id of the list the input controls, and the highlighted descendant in it. */
+  listId: string;
+  activeId: string | undefined;
   onChange: (text: string) => void;
   inputRef: Ref<HTMLInputElement>;
 }
 
-export function InputBar({ mode, value, hasItems, selected, onChange, inputRef }: Props) {
-  const { label, placeholder } = COPY[mode];
+export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: Props) {
+  const def = mode === "none" ? null : MODES[mode];
   return (
     <div className="inputbar">
       <svg
@@ -33,24 +30,26 @@ export function InputBar({ mode, value, hasItems, selected, onChange, inputRef }
         <circle cx="11" cy="11" r="7" />
         <path d="m20 20-3.5-3.5" />
       </svg>
+      {def && (
+        <span className="chip" data-testid="mode-chip">
+          {def.label}
+        </span>
+      )}
       <input
         ref={inputRef}
         className="input"
         type="text"
         role="combobox"
-        aria-label={`${label} search`}
-        aria-expanded={hasItems}
-        aria-controls={LISTBOX_ID}
-        aria-activedescendant={hasItems ? optionId(selected) : undefined}
+        aria-label={def ? `${def.label} search` : "Search"}
+        aria-expanded={activeId !== undefined}
+        aria-controls={listId}
+        aria-activedescendant={activeId}
         autoComplete="off"
         spellCheck={false}
-        placeholder={placeholder}
+        placeholder={def ? def.placeholder : NONE_PLACEHOLDER}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
-      <span className="hint" data-testid="mode-hint">
-        {label} · Tab
-      </span>
     </div>
   );
 }

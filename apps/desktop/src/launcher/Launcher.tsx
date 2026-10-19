@@ -6,8 +6,8 @@ import { Actions } from "./Actions";
 import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
 import { Overlay, useOverlay } from "./Overlay";
-import { Results } from "./Results";
-import { DEFAULT_QUESTION } from "./reducer";
+import { HINTS_ID, hintId, LISTBOX_ID, optionId, PrefixHints, Results } from "./Results";
+import { availableModes, DEFAULT_QUESTION } from "./reducer";
 import { useLauncher } from "./useLauncher";
 
 export function Launcher() {
@@ -15,6 +15,7 @@ export function Launcher() {
   const {
     state,
     removeAttachment,
+    enterMode,
     setText,
     activate,
     press,
@@ -27,6 +28,10 @@ export function Launcher() {
   const overlay = useOverlay();
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
+  const none = state.mode === "none";
+  const hints = availableModes(state.enabledModes);
+  const hasList = none ? hints.length > 0 : state.items.length > 0;
+  const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
 
   return (
     <>
@@ -41,8 +46,8 @@ export function Launcher() {
         <InputBar
           mode={state.mode}
           value={state.input}
-          hasItems={state.items.length > 0}
-          selected={state.selected}
+          listId={none ? HINTS_ID : LISTBOX_ID}
+          activeId={activeId}
           onChange={setText}
           inputRef={inputRef}
         />
@@ -68,6 +73,13 @@ export function Launcher() {
               onToggleEffort={toggleEffort}
               onOpenSettings={() => openSettings("providers")}
               onOpenLink={openLink}
+            />
+          ) : none ? (
+            <PrefixHints
+              modes={hints}
+              selected={state.selected}
+              typed={state.input !== ""}
+              onEnter={enterMode}
             />
           ) : (
             <Results

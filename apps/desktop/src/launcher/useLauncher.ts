@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
-import type { Outcome } from "../types";
+import type { LaunchMode, Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape", "Backspace"]);
+const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Escape", "Backspace"]);
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
@@ -27,7 +27,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
       switch (e.type) {
         case "search":
           ipc
-            .search({ seq: e.seq, mode: e.mode, text: e.text })
+            .search({ seq: e.seq, mode: e.mode, text: e.text, scope: e.scope })
             .then((res) => dispatch({ type: "results", seq: res.seq, items: res.items }))
             .catch(warn);
           break;
@@ -122,7 +122,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           hasSelection: !!el && el.selectionStart !== el.selectionEnd,
         },
       });
-      if (handled && (HANDLED.has(e.key) || e.ctrlKey)) e.preventDefault();
+      if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey))) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -141,6 +141,13 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     [dispatch],
   );
   const toggleEffort = useCallback(() => press("t", true), [press]);
+  const enterMode = useCallback(
+    (mode: LaunchMode) => {
+      dispatch({ type: "enterMode", mode });
+      inputRef.current?.focus();
+    },
+    [dispatch, inputRef],
+  );
   const removeAttachment = useCallback(() => dispatch({ type: "removeAttachment" }), [dispatch]);
   const openSettings = useCallback((section: string) => ipc.openSettings(section).catch(warn), []);
 
@@ -151,6 +158,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
   return {
     state,
     removeAttachment,
+    enterMode,
     setText,
     activate,
     press,

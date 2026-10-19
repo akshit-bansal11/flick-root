@@ -1,4 +1,5 @@
-import type { AskEvent, Effort, Item, Mode, Outcome } from "../types";
+import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, SearchScope } from "../types";
+import { isProgram } from "./kinds";
 
 export interface KeyInput {
   key: string;
@@ -35,7 +36,7 @@ export interface QueryState {
 }
 
 export interface State {
-  mode: Mode;
+  mode: LaunchMode;
   enabledModes: Mode[];
   input: string;
   seq: number;
@@ -61,6 +62,7 @@ export type Event =
   | { type: "results"; seq: number; items: Item[] }
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
+  | { type: "enterMode"; mode: LaunchMode }
   | { type: "enabledModes"; modes: Mode[] }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
@@ -68,7 +70,7 @@ export type Event =
   | { type: "hidden" };
 
 export type Effect =
-  | { type: "search"; seq: number; mode: Mode; text: string }
+  | { type: "search"; seq: number; mode: Mode; text: string; scope?: SearchScope }
   | { type: "launch"; itemId: string; admin: boolean }
   | { type: "confirm"; commandId: string; token: string; kill: boolean }
   | { type: "kill"; itemId: string }
@@ -85,11 +87,62 @@ export interface Result {
   effects: Effect[];
 }
 
-export const MODE_ORDER: Mode[] = ["command", "find", "query"];
-const PREFIX: Record<string, Mode> = { ">": "command", "/": "find", "?": "query" };
+/** A mode reachable by a prefix: how it is typed, shown and searched. The one prefix table. */
+export interface ModeDef {
+  prefix: string;
+  label: string;
+  placeholder: string;
+  /** Hint-panel description. */
+  desc: string;
+  /** Wire mode sent to Rust `search`; query never searches. */
+  wire: Mode;
+  scope?: SearchScope;
+}
 
-export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
-  mode: "command",
+export const MODES: Record<Exclude<LaunchMode, "none">, ModeDef> = {
+  commands: {
+    prefix: ">",
+    label: "Commands",
+    placeholder: "Run a command, math, units or web search",
+    desc: "system commands, math, units, web, ports, media, capture",
+    wire: "command",
+    scope: "commands",
+  },
+  run: {
+    prefix: "!",
+    label: "Apps",
+    placeholder: "Open an app or program",
+    desc: "every app and program on your drives",
+    wire: "command",
+    scope: "apps",
+  },
+  find: {
+    prefix: "/",
+    label: "Find",
+    placeholder: "Find a file or folder",
+    desc: "files and folders, plain-language too",
+    wire: "find",
+  },
+  query: {
+    prefix: "?",
+    label: "Ask",
+    placeholder: "Ask anything",
+    desc: "your AI providers",
+    wire: "query",
+  },
+};
+
+type Entered = Exclude<LaunchMode, "none">;
+const ENTERED = Object.keys(MODES) as Entered[];
+const modeOf = (prefix: string): Entered | undefined =>
+  ENTERED.find((m) => MODES[m].prefix === prefix);
+
+/** Modes the user can enter now, in hint-panel order; Query and Find follow enabledModes. */
+export const availableModes = (enabled: Mode[]): Entered[] =>
+  ENTERED.filter((m) => MODES[m].wire === "command" || enabled.includes(MODES[m].wire));
+
+export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]): State => ({
+  mode: "none",
   enabledModes,
   input: "",
   seq: 0,
@@ -117,15 +170,16 @@ export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
 
-/** Set mode and input; Command and Find bump seq and search, Query never searches. */
-function search(s: State, mode: Mode, input: string): Result {
+/** Set mode and input; Commands, Apps and Find bump seq and search, the rest never search. */
+function search(s: State, mode: LaunchMode, input: string): Result {
   const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null, armed: false };
-  if (mode === "query") return out({ ...next, items: [] });
+  if (mode === "none" || mode === "query") return out({ ...next, items: [] });
+  const { wire, scope } = MODES[mode];
   const seq = s.seq + 1;
-  return out({ ...next, seq }, { type: "search", seq, mode, text: input });
+  return out({ ...next, seq }, { type: "search", seq, mode: wire, text: input, scope });
 }
 
-function switchMode(s: State, mode: Mode, input: string): Result {
+function switchMode(s: State, mode: LaunchMode, input: string): Result {
   const cancel: Effect[] =
     s.query.status === "streaming" ? [{ type: "cancelAsk", token: s.askToken }] : [];
   const cleared: State = {
@@ -148,25 +202,21 @@ function switchMode(s: State, mode: Mode, input: string): Result {
   return { state: r.state, effects: [...cancel, ...r.effects] };
 }
 
-function cycle(s: State, dir: 1 | -1): Result {
-  const modes = MODE_ORDER.filter((m) => m === "command" || s.enabledModes.includes(m));
-  const i = modes.indexOf(s.mode);
-  const mode = modes[(i + dir + modes.length) % modes.length] ?? "command";
-  return mode === s.mode ? out(s) : switchMode(s, mode, "");
+function enterMode(s: State, mode: LaunchMode): Result {
+  if (mode !== "none" && !availableModes(s.enabledModes).includes(mode)) return out(s);
+  return switchMode(s, mode, "");
 }
 
 function textChange(s: State, text: string): Result {
   // Prefix only counts as the first typed character into an empty field.
-  const target = s.input === "" && text.length === 1 ? PREFIX[text] : undefined;
-  if (target && (target === "command" || s.enabledModes.includes(target))) {
-    return target === s.mode ? search(s, target, "") : switchMode(s, target, "");
-  }
-  if (s.mode === "query") return out({ ...s, input: text });
+  const target = s.input === "" && text.length === 1 ? modeOf(text) : undefined;
+  if (target && availableModes(s.enabledModes).includes(target)) return enterMode(s, target);
+  if (s.mode === "none" || s.mode === "query") return out({ ...s, input: text });
   return search(s, s.mode, text);
 }
 
 function move(s: State, delta: number): Result {
-  const n = s.items.length;
+  const n = s.mode === "none" ? availableModes(s.enabledModes).length : s.items.length;
   if (n === 0) return out(s);
   return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
@@ -200,6 +250,10 @@ function enter(s: State, k: KeyInput): Result {
       { type: "ask", token, text, attachment: att?.preview, effort: s.query.effort },
     );
   }
+  if (s.mode === "none") {
+    const mode = availableModes(s.enabledModes)[s.selected];
+    return mode ? enterMode(s, mode) : out(s);
+  }
   return openSelected(s, k);
 }
 
@@ -208,7 +262,10 @@ function openSelected(s: State, k: Pick<KeyInput, "ctrl" | "shift">): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
   if (k.ctrl && k.shift) {
-    return s.mode === "command" ? out(s, { type: "launch", itemId: item.id, admin: true }) : out(s);
+    const admin = s.mode === "commands" || s.mode === "run";
+    // Scanned programs only offer Admin when Rust listed it (.exe/.msi).
+    if (!admin || (isProgram(item) && !item.actions.some((a) => a.type === "admin"))) return out(s);
+    return out(s, { type: "launch", itemId: item.id, admin: true });
   }
   if (k.ctrl) return out(s, { type: "reveal", itemId: item.id });
   const pending = s.pendingConfirm;
@@ -246,15 +303,16 @@ function key(s: State, k: KeyInput): Result {
     case "Enter":
       return enter(s, k);
     case "Tab":
-      return cycle(s, k.shift ? -1 : 1);
+      // No tab switcher: modes are prefix-only. Handled so focus stays in the input.
+      return out(s);
     case "Escape":
       return onEscape(s);
     case "Backspace": {
       // Edits text until the user arrowed to a row; then it asks to end that process.
       const item = s.items[s.selected];
-      return s.armed && item?.kind === "process"
-        ? out(s, { type: "kill", itemId: item.id })
-        : out(s);
+      if (s.armed && item?.kind === "process") return out(s, { type: "kill", itemId: item.id });
+      // Empty input inside a mode: step back out to the hint panel.
+      return s.input === "" && s.mode !== "none" ? enterMode(s, "none") : out(s);
     }
     default:
       break;
@@ -351,14 +409,17 @@ export function reduce(s: State, ev: Event): Result {
         : out(s);
     case "removeAttachment":
       return out({ ...s, attachment: null, notice: null });
+    case "enterMode":
+      return enterMode(s, ev.mode);
     case "enabledModes":
       return out({ ...s, enabledModes: ev.modes });
     case "shown":
-      return search(
-        { ...initialState(s.enabledModes), seq: s.seq, askToken: s.askToken, visible: true },
-        "command",
-        "",
-      );
+      return out({
+        ...initialState(s.enabledModes),
+        seq: s.seq,
+        askToken: s.askToken,
+        visible: true,
+      });
     case "hidden":
       return out(
         { ...initialState(s.enabledModes), seq: s.seq, askToken: s.askToken },
