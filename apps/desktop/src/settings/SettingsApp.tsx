@@ -3,6 +3,7 @@ import { type ReactElement, useEffect, useState } from "react";
 import { FirstRun } from "../firstrun/FirstRun";
 import { About } from "./About";
 import * as api from "./api";
+import { Decision } from "./Decision";
 import { Features } from "./Features";
 import { General } from "./General";
 import { Nav, PAGES, type PageId } from "./Nav";
@@ -84,7 +85,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     ),
     features: <Features />,
     providers: <Providers />,
-    engine: <Placeholder id="engine" />,
+    engine: <Decision />,
     integrations: <Placeholder id="integrations" />,
     about: <About />,
   };

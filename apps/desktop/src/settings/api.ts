@@ -4,6 +4,9 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   About,
   ClearScope,
+  EnginePatch,
+  EngineProbe,
+  EngineView,
   FeatureChanged,
   FeatureList,
   FeatureView,
@@ -57,6 +60,18 @@ export const setProvider = (id: string, patch: ProviderPatch) =>
     effort: patch.effort,
   });
 export const setProviderOrder = (ids: string[]) => invoke<void>("set_provider_order", { ids });
+
+export const listEngines = () => invoke<EngineView[]>("list_engines");
+export const probeDecisionEngines = () => invoke<EngineProbe[]>("probe_decision_engines");
+export const setEngine = (id: string, patch: EnginePatch) =>
+  invoke<EngineView[]>("set_engine", {
+    id,
+    enabled: patch.enabled,
+    baseUrl: patch.baseUrl,
+    candidates: patch.candidates,
+    threshold: patch.threshold,
+    timeoutMs: patch.timeoutMs,
+  });
 
 // The value goes in, never out: the result is metadata only.
 export const setSecret = (name: string, value: string, acknowledged: boolean) =>

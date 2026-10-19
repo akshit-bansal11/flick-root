@@ -2,6 +2,7 @@
 use crate::error::CommandError;
 
 pub mod ask;
+pub mod engines;
 pub mod features;
 pub mod firstrun;
 pub mod launch;

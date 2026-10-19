@@ -146,3 +146,34 @@ export function errorText(e: unknown): string {
   if (typeof e === "object" && e !== null && "message" in e) return String(e.message);
   return typeof e === "string" ? e : "Something went wrong";
 }
+
+export type EngineProbeStatus = "reachable" | "not_running" | "no_key" | "no_provider";
+
+// Rust EngineView / EngineProbe: snake_case on the wire.
+export interface EngineView {
+  id: string;
+  title: string;
+  enabled: boolean;
+  base_url: string;
+  key_host: string | null;
+  needs_key: boolean;
+  key_present: boolean;
+  candidates: number;
+  threshold: number;
+  timeout_ms: number | null;
+  order: number;
+}
+
+export interface EngineProbe {
+  id: string;
+  status: EngineProbeStatus;
+  detail: string | null;
+}
+
+export interface EnginePatch {
+  enabled?: boolean;
+  baseUrl?: string;
+  candidates?: number;
+  threshold?: number;
+  timeoutMs?: number;
+}

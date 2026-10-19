@@ -28,7 +28,7 @@ fn bound_host(cfg: &Config, name: &SecretName) -> Option<String> {
             .decision
             .engines
             .get(name.id())
-            .and_then(|e| e.key_host.clone()),
+            .and_then(super::engines::effective_host),
         _ => None,
     }
 }
@@ -75,6 +75,8 @@ pub async fn set_secret(
             .map_err(|e| vault_err(&e))?;
         if name.kind() == "provider" {
             bind_provider_host(&s, &name)?;
+        } else if name.kind() == "engine" {
+            bind_engine_host(&s, &name)?;
         }
         s.vault.info(&name).map_err(|e| vault_err(&e))
     })
@@ -100,6 +102,18 @@ fn bind_provider_host(s: &AppState, name: &SecretName) -> Result<(), CommandErro
             if !cfg.providers.order.iter().any(|i| i == id) {
                 cfg.providers.order.push(id.to_owned());
             }
+        }
+        Ok(())
+    })
+}
+
+/// Persists `key_host` for a decision engine whose entry has none.
+fn bind_engine_host(s: &AppState, name: &SecretName) -> Result<(), CommandError> {
+    s.update_config(|cfg| {
+        if let Some(e) = cfg.decision.engines.get_mut(name.id())
+            && e.key_host.is_none()
+        {
+            e.key_host = Some(name.host().to_owned());
         }
         Ok(())
     })
@@ -221,6 +235,9 @@ mod tests {
         assert!(validate_set(&cfg, "provider.anthropic@api.anthropic.com", true).is_ok());
         assert_eq!(code("provider.openrouter@evil.test"), "host_unbound");
         assert_eq!(code("provider.nosuch@x.test"), "host_unbound");
+        assert!(validate_set(&cfg, "engine.jev@api.typesafe.ai", true).is_ok());
+        assert!(validate_set(&cfg, "engine.laya@localhost", true).is_ok());
+        assert_eq!(code("engine.jev@evil.test"), "host_unbound");
         assert_eq!(code("integration.spotify@spotify.com"), "host_unbound");
     }
 
