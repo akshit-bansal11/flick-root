@@ -11,8 +11,17 @@ Flick is a keyboard-first launcher for Windows. It needs a window that appears w
 - The shell is Tauri 2. All logic lives in Rust crates under `crates/`.
 - The UI is React 19 and TypeScript, built with Vite, and rendered by WebView2.
 - The launcher window is created at startup, hidden, and only shown and hidden after that. The window is prewarmed, so WebView2 startup cost is paid once.
-- v0.0.1 pins Tauri `2.12.4` (`apps/desktop/src-tauri/Cargo.toml`) and React `19.3.1` (`apps/desktop/package.json`). The launcher window starts hidden at 700 x 64 px.
+- v0.0.1 pins Tauri `2.12.4` (`apps/desktop/src-tauri/Cargo.toml`) and React `19.3.1` (`apps/desktop/package.json`). The launcher window starts hidden.
 - The Rust package is named `desktop-shell`. The product name, Flick, lives in `tauri.conf.json` and `crates/launcher-core/src/brand.rs`.
+
+## Launcher placement (changed 2026-10-19)
+
+The user instructed this on 2026-10-19, in the v0.0.2/v0.0.3 review. It replaces the earlier decision (700 px wide, 28% from the top of the screen, solid material):
+
+- The bar is centred on the monitor under the cursor, 40% of the monitor width, clamped to 560-960 px.
+- The result list is vertically centred when full, and the input stays at a fixed position.
+- The window is transparent and covers the whole monitor, with no backdrop. A click outside the bar closes it.
+- The window is never resized per keystroke.
 
 ## Alternatives
 

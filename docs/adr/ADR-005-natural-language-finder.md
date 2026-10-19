@@ -1,6 +1,6 @@
 # ADR-005: Natural-language finder
 
-Status: Accepted, not yet implemented (planned for v0.1.0)
+Status: Accepted; implemented in v0.1.0 (`crates/decision`, `crates/features/src/nlfind/`)
 
 ## Context
 
@@ -22,6 +22,6 @@ Find mode works on words typed as a file name. Users also phrase requests in pla
 
 ## Consequences
 
-- Nothing in this ADR ships in v0.0.1. The `crates/decision` crate exists with a doc comment only.
-- With every engine off (the default), the parser and the plain choices list still work once built.
+- This ADR shipped in v0.1.0. Through v0.0.1 the `crates/decision` crate held a doc comment only.
+- With every engine off (the default), the parser and the plain choices list still work.
 - Keeping the candidate count at 8 is deliberate. Laya's accuracy drops with many options and is weak without fine-tuning.

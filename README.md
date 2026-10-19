@@ -12,7 +12,7 @@ Flick is v0.0.1 in progress. Built so far:
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
 - Settings window (General, Features, AI providers, About) and first run.
 
-Planned for v0.1.0: Natural-language finder, ports and processes, media controls, Explain this, and Quick capture.
+Added in v0.1.0: Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
 
 ## Install
 
@@ -45,6 +45,11 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 - **System commands:** Lock, Sleep, Hibernate, Restart, Shut down, Sign out, Empty Recycle Bin, Restart Explorer, Wi-Fi on/off and Bluetooth on/off. Restart, Shut down, Sign out and Empty Recycle Bin need Enter twice within 3 seconds.
 - **Web shortcuts:** a keyword plus a query opens a URL. Defaults: `g` (Google), `yt` (YouTube), `gh` (GitHub), `amz` (amazon.in), `maps` (Google Maps), `wiki` (Wikipedia). Add, edit, remove and reorder them in Settings.
 - **Project launcher:** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder.
+- **Natural-language finder:** in Find, `the invoice i downloaded last week` is parsed offline and opens only a clear winner of a safe file type; otherwise it lists the candidates. Decision engines (Laya, Kev, your AI provider, Jev) are optional and off by default. [Details](docs/features/natural-language-finder.md).
+- **Ports and processes:** `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Backspace`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
+- **Media controls:** `play`, `pause`, `next`, `previous`, `now playing` work on any player. `play X on spotify` / `on youtube` open a search; connecting your own Spotify developer app is optional. [Details](docs/features/media-controls.md).
+- **Explain this:** a second hotkey (`Alt+Shift+Space`) captures the selected text and shows it in Query mode before anything is sent; secret-looking text is blocked. [Details](docs/features/explain-this.md).
+- **Quick capture:** `log 250 lunch #food`, `note ...`, `todo ...` go to an Obsidian daily note, a Markdown file, Notion or a webhook. [Details](docs/features/quick-capture.md).
 
 ## AI providers
 
