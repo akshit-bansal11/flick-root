@@ -4,18 +4,20 @@ Flick is a free, open-source, keyboard-first launcher for Windows. Commands, app
 
 ## Status
 
-Flick is at v0.2.0. Built so far:
+Flick is at v0.2.1. Built so far:
 
 - Apps (`!`): fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them, plus programs found on your drives.
 - Commands (`>`): system commands, math, units, web shortcuts, ports, media, capture.
 - Find (`/`): fuzzy search of files and folders under the indexed roots, with Open, Open file location and Copy path.
 - Ask (`?`): streams an answer from the provider and model you pick, with Fast/Think, thinking modes and provider fallback.
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
-- Settings window (General, Appearance, Features, AI providers, About), first run and a skippable tutorial.
+- Settings window (General, Appearance, Features, AI providers, About), first run with a welcome screen, and an interactive tour.
 
 Added in v0.1.0: Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
 
 Added in v0.2.0: prefix-only modes, programs on all drives, thinking modes, a liquid glass launcher with six themes, and the tutorial.
+
+Changed in v0.2.1: one shortcut table for the launcher and Settings (below), a welcome screen and an interactive tour in its own window, and stricter program matching.
 
 ## Install
 
@@ -36,34 +38,42 @@ Modes are chosen only by a prefix typed first in the empty bar; there is no Tab 
 
 | Key | Action |
 | --- | --- |
-| `Alt+Space` | Show or hide Flick (configurable) |
+| `Alt+Space` | Show or hide Flick (configurable). It replaces Windows' window menu; the hotkey picker warns about it. |
 | `Up` / `Down` | Move the selection |
-| `Enter` | Primary action (launch, open, copy result, ask) |
-| `Ctrl+Enter` | Open file location (Find, Apps) |
-| `Ctrl+Shift+Enter` | Run as admin (Apps) |
-| `Ctrl+C` | Copy path (Find) or copy answer (Ask), only when no text is selected |
+| `Enter` | Primary action (open, launch, ask) |
+| `Ctrl+Enter` | Show location (Commands, Apps, Find) |
+| `Ctrl+Shift+Enter` | Run as admin (Commands, Apps, when the result can) |
+| `Ctrl+Shift+C` | Copy: path in Find, result in Commands, answer in Ask |
+| `Delete` | End a process, after arrowing to its row in Commands; `Enter` confirms |
+| `Ctrl+1` to `Ctrl+4` | Go to Commands, Apps, Find, Ask |
 | `Tab` / `Shift+Tab` | Next / previous thinking mode (Ask) |
 | `Ctrl+T` | Fast/Think toggle (Ask) |
-| `Ctrl+Right` / `Ctrl+Left` | Next / previous tutorial step |
-| `Alt+T` | Try the tutorial example |
-| `F1` | Open the tutorial |
-| `Esc` | Cancel a running answer, then clear the input, then hide (skips the tutorial while it is open) |
+| `Ctrl+Shift+X` | Remove the attached Explain text (Ask) |
+| `Backspace` | On an empty input, leave the mode |
+| `Esc` | Cancel a running answer, then clear the input, then hide |
+| `Ctrl+,` | Open Settings |
+| `F1` or `Ctrl+/` | Shortcut list |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous page (Settings) |
+| `Esc` or `Ctrl+W` | Close Settings |
+| `PageDown` / `PageUp` | Next / previous tour step |
+
+Text-editing chords (such as `Ctrl+C`, `Ctrl+V`, `Ctrl+Backspace`, `Shift+Arrow`) and browser/WebView chords (such as `Ctrl+F`, `Ctrl+R`, `F5`, `F12`) are reserved: Flick never uses them, and the launcher and tour cancel the browser action of the browser ones.
 
 Flick hides on `Esc`, on focus loss, and after a successful launch.
 
 ## Features
 
-- **Programs:** `!` also lists programs found by scanning every fixed drive, ranked below installed apps. [Details](docs/features/programs.md).
+- **Programs:** `!` also lists programs found by scanning every fixed drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
 - **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
 - **Themes:** Glass, Frost, Midnight, Aurora, Ember and Solid, in Settings, Appearance. [Details](docs/features/appearance.md).
-- **Tutorial:** a skippable tour on first open; replay with `F1`. [Details](docs/features/tutorial.md).
+- **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).
 - **Frecency:** ranks items you use often and recently higher, with a 7-day half-life. You can turn on prefix learning, change the half-life, clear history, or turn ranking off to get pure match order.
 - **Math and units:** type arithmetic, units, currency or time zones in Commands mode (`>`), for example `2.5 kg to lb`, `250 usd in inr` or `5pm ist in pst`. Enter copies the result. Currency uses the ECB daily reference rates, fetched at most once a day and cached. When offline, Flick uses the last cached rate and shows its age. The rates are published by the European Central Bank.
 - **System commands:** Lock, Sleep, Hibernate, Restart, Shut down, Sign out, Empty Recycle Bin, Restart Explorer, Wi-Fi on/off and Bluetooth on/off. Restart, Shut down, Sign out and Empty Recycle Bin need Enter twice within 3 seconds.
 - **Web shortcuts:** a keyword plus a query opens a URL. Defaults: `g` (Google), `yt` (YouTube), `gh` (GitHub), `amz` (amazon.in), `maps` (Google Maps), `wiki` (Wikipedia). Add, edit, remove and reorder them in Settings.
 - **Project launcher:** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder.
 - **Natural-language finder:** in Find, `the invoice i downloaded last week` is parsed offline and opens only a clear winner of a safe file type; otherwise it lists the candidates. Decision engines (Laya, Kev, your AI provider, Jev) are optional and off by default. [Details](docs/features/natural-language-finder.md).
-- **Ports and processes:** `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Backspace`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
+- **Ports and processes:** `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Delete`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
 - **Media controls:** `play`, `pause`, `next`, `previous`, `now playing` work on any player. `play X on spotify` / `on youtube` open a search; connecting your own Spotify developer app is optional. [Details](docs/features/media-controls.md).
 - **Explain this:** a second hotkey (`Alt+Shift+Space`) captures the selected text and shows it in Ask mode (`?`) before anything is sent; secret-looking text is blocked. [Details](docs/features/explain-this.md).
 - **Quick capture:** `log 250 lunch #food`, `note ...`, `todo ...` go to an Obsidian daily note, a Markdown file, Notion or a webhook. [Details](docs/features/quick-capture.md).

@@ -1,12 +1,23 @@
-# Tutorial
+# Welcome and tour
 
-A skippable step-by-step tour inside the launcher. It opens the first time you show the launcher after first-run setup.
+## Welcome screen
 
-## Keys
+On first launch, setup opens with a welcome screen: the animated logo, the four prefixes (`>`, `!`, `/`, `?`) and "Take a 2-minute interactive tour?" with two buttons.
 
-- `Ctrl+Right` / `Ctrl+Left`: next / previous step.
-- `Alt+T`: try the step's example.
-- `Esc`: skip the tutorial. It is marked done and does not open again.
-- `F1`: open it again from the launcher.
+- **Take the tour** starts the tour.
+- **Not now** shows a note that you can take the tour any time from Settings > General > Take the tour, then Continue.
 
-Settings, General, "Replay tutorial" opens it too. It keeps its step if the launcher is hidden and shown again before you finish.
+The launcher itself never shows the tour.
+
+## The tour
+
+The tour runs in its own window on the real launcher UI, fed with sample data. Nothing is opened or copied for real, and nothing is sent to a model.
+
+Steps, in order: Open the bar (your hotkey), `!` Apps, `>` Commands (copy the answer), `/` Find, `?` Ask (switch model, ask), Explain this (select the sample text, press the Explain hotkey), Getting around, Themes (the bar restyles live), and a closing step. A step checks itself off when you do what it asks and moves on after a short pause.
+
+- **Show me** types the step's example for you (or presses the hotkey, selects the text, or picks a theme).
+- `PageDown` / `PageUp`: next / previous step.
+
+While the tour runs, the global hotkeys are paused so the demo can see the keys. They resume when the tour ends or Settings closes.
+
+Settings > General > "Take the tour" starts it again.

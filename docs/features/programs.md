@@ -9,10 +9,15 @@ Type `!` first in the empty bar, then part of a name. Installed apps rank first.
 ## What is scanned
 
 - Extensions: exe, msi, msix, msixbundle, appx, appxbundle, apk, xapk, aab, bat, cmd, ps1, lnk, url, appref-ms, jar, appinstaller, app, pkg, dmg, appimage, deb, rpm, flatpak, flatpakref, snap, run, sh.
-- Skipped folders: windows, $recycle.bin, system volume information, $winreagent, $sysreset, recovery, config.msi, winsxs, node_modules, .git, target, __pycache__, .cache, temp, tmp, recent, onedrivetemp, and start menu (its shortcuts already appear as apps).
+- Skipped folders: any folder whose name starts with a dot (`.claude`, `.npm`, `.vscode` and so on), system-attribute entries, and these names: windows, $recycle.bin, system volume information, $winreagent, $sysreset, recovery, config.msi, winsxs, node_modules, .git, target, __pycache__, .cache, temp, tmp, recent, onedrivetemp, and start menu (its shortcuts already appear as apps).
 - At most 50,000 programs are kept; the walk stops there.
-- The scan runs at startup. There is no watcher, so a program installed later appears after the next start.
+- Drive roots are scanned even though Windows marks them hidden or system.
+- The scan runs at startup, after the Find scan has finished. There is no watcher, so a program installed later appears after the next start.
 - Programs match in their own index, off the keystroke thread.
+
+## Matching
+
+A program is listed only if its name contains what you typed, or every word you typed starts a word in its name. Scattered fuzzy hits are dropped, so an abbreviation such as `vsc` does not match programs.
 
 ## Notes
 

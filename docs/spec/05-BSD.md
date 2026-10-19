@@ -183,7 +183,8 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `search` | `{ seq, mode, text, scope? }` (`scope`: `all`, `apps` or `commands`; `!` sends `apps`, `>` sends `commands`) | `{ seq, items, group }` | `mode_disabled` | Launcher |
 | `launch` | `item_id, admin: bool` | `Outcome` | `not_found`, `launch_failed` | Launcher |
 | `reveal` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Enter) |
-| `copy_path` | `item_id` | `()` | `not_found` | Launcher (Ctrl+C, Find) |
+| `copy_path` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Shift+C, Find) |
+| `copy_text` | `text` | `()` | see `commands/launch.rs` | Launcher (Ctrl+Shift+C; Copied shows only after the copy succeeds) |
 | `run_system_command` | `command_id, confirm_token?` | `Outcome` (`NeedsConfirm` first for guarded ones) | `unavailable`, `confirm_expired`, `failed` | Launcher |
 | `run_system_command` with `kill: true` | `command_id, confirm_token?, kill` | `Outcome` | `not_found`, `unknown_feature`, `confirm_expired`, plus feature errors (`internal`) | Launcher (ports) |
 | `ask_stream` | `{ text, attachment?, effort }, on_event: Channel<AskEvent>` | `ask_id` | `query_disabled`, `no_provider`, `secret_blocked` | Query view |
@@ -204,7 +205,8 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `list_thinking_modes` | none | `{ modes: Vec<{ id, provider_id, provider_label, model, local }>, selected? }` (every enabled provider x model, fallback order; stale or missing `selected` means the first) | none | Launcher (Ask) |
 | `set_thinking_mode` | `id` | `()` | see `providers.rs` | Launcher (Ask) |
 | `get_appearance` / `set_appearance` | none / `{ theme, glass, scheme }` | `AppearanceView` | `invalid_value` | Appearance |
-| `set_tutorial_done` | none | `()` | none | Launcher, General (replay) |
+| `set_tutorial_done` | `done` | `()` | none | Settings window only (the tour) |
+| `set_hotkeys_paused` | `paused: bool` | `()` | none | Settings window only (the tour pauses the global hotkeys) |
 | `list_providers` | none | `Vec<ProviderView>` | none | AI providers |
 | `probe_providers` | none | `Vec<ProbeResult>` | none | AI providers, first run |
 | `set_provider` | `id, patch` (enabled, base_url, model, effort) | `ProviderView` | `invalid_url`, `key_needed` | AI providers |
@@ -231,7 +233,7 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 
 | Event | Payload | Notes |
 |---|---|---|
-| `launcher://shown` | `{ shown_id, reason, glass, appearance, tutorial }` | UI resets, focuses, fades in. `glass`: acrylic is on (false when Windows transparency effects are off). `appearance`: `{ theme, glass, scheme }`. `tutorial`: first run is done and the tutorial is not. |
+| `launcher://shown` | `{ shown_id, reason, glass, appearance }` | UI resets, focuses, fades in. `glass`: acrylic is on (false when Windows transparency effects are off). `appearance`: `{ theme, glass, scheme }`.  |
 | `launcher://hidden` | `{}` | UI clears state. |
 | `index://progress` | `{ kind, scanned, done }` | App and file index status. |
 | `providers://status` | `{ id, state, model? }` | State: running, not_running, no_key, error. |
@@ -271,7 +273,7 @@ explain_hotkey = "Alt+Shift+Space"
 theme = "system"            # system | dark | light
 launch_at_startup = false
 first_run_done = false
-tutorial_done = false       # set when the tutorial is finished or skipped
+tutorial_done = false       # written by the tour; nothing reads it yet
 
 [appearance]
 theme = "glass"            # glass | frost | midnight | aurora | ember | solid

@@ -68,3 +68,11 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - Device check: acrylic resize smoothness as the launcher height follows results. Fallback: Mica or a fixed-height window.
 - Program watcher: programs are scanned at startup only; no rescan on install.
 - Idle RAM with programs loaded (up to 50,000 entries) is not measured against the 120 MB budget.
+
+## v0.2.1
+
+- Live check: the tour in the real WebView (window, ghost typing, step checks).
+- Live check: capturing Alt+Space inside the tour with the global hotkeys paused.
+- Live check: motion smoothness (gliding selection, row fade-in, page fade) on the dev machine.
+- Live check: acrylic on launcher resize.
+- `general.tutorial_done` is written by `set_tutorial_done` but never read.

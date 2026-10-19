@@ -91,8 +91,8 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Tutorial",
-    line: "A skippable tour on first open; replay it any time.",
-    example: "F1",
+    line: "A welcome screen and an interactive tour; replay it in Settings.",
+    example: "Settings, General",
     since: "v0.2.0",
     doc: "tutorial",
   },
