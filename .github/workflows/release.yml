@@ -61,10 +61,12 @@ jobs:
           $exes = Get-ChildItem -Path target -Recurse -Filter *.exe |
             Where-Object { $_.FullName -match '[\\/]bundle[\\/]nsis[\\/]' }
           if (-not $exes) { throw 'No NSIS installer found' }
-          $exes | ForEach-Object {
+          $lines = $exes | ForEach-Object {
             $h = (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLower()
             "$h  $($_.Name)"
-          } | Set-Content -Encoding ascii SHA256SUMS.txt
+          }
+          # LF endings so `sha256sum -c SHA256SUMS.txt` works on any platform.
+          [System.IO.File]::WriteAllText("$PWD/SHA256SUMS.txt", (($lines -join "`n") + "`n"))
           Get-Content SHA256SUMS.txt
           New-Item -ItemType Directory -Force installer | Out-Null
           $exes | Copy-Item -Destination installer
