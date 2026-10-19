@@ -90,3 +90,33 @@
     transition: none;
   }
 }
+
+.fr-welcome {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--l-sp-6);
+}
+.fr-chips {
+  display: flex;
+  gap: var(--l-sp-4);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.fr-chip {
+  padding: var(--l-sp-2) var(--l-sp-6);
+  border: var(--l-border);
+  border-radius: var(--l-r);
+  background: var(--l-surface);
+  animation: fr-rise var(--l-dur-slow) var(--l-ease-out) backwards;
+  animation-delay: calc(var(--i) * var(--l-dur-slow));
+}
+.fr-rise {
+  animation: fr-rise var(--l-dur-slow) var(--l-ease-out) backwards;
+}
+@keyframes fr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}

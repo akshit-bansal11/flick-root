@@ -4,6 +4,7 @@ import { FirstRun } from "../firstrun/FirstRun";
 import * as ipc from "../ipc";
 import { fromEvent, idFor } from "../shortcuts";
 import { applyAppearance } from "../theme";
+import { Tour } from "../tour/Tour";
 import { About } from "./About";
 import { Appearance } from "./Appearance";
 import * as api from "./api";
@@ -53,6 +54,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
   const [settings, setSettings] = useState<SettingsView | null>(null);
   const [counts, setCounts] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [touring, setTouring] = useState(false);
 
   useEffect(() => {
     api
@@ -74,6 +76,8 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
   // Window shortcuts. Page keys never fire while typing; Esc and Ctrl+W always close, except Esc inside a dialog.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // The tour owns Esc and its own keys while it is open.
+      if (touring) return;
       const id = idFor("settings", fromEvent(e));
       if (!id) return;
       const target = e.target instanceof Element ? e.target : null;
@@ -89,7 +93,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [page, onPage]);
+  }, [page, onPage, touring]);
 
   // Apply the saved appearance on load and whenever Rust says it changed.
   useEffect(() => {
@@ -110,7 +114,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
   // One slot per page: later cards replace one entry each.
   const pages: Record<PageId, ReactElement> = {
     general: settings ? (
-      <General settings={settings} onChange={setSettings} />
+      <General settings={settings} onChange={setSettings} onTour={() => setTouring(true)} />
     ) : (
       <p className="s-help" role={loadError ? "alert" : undefined}>
         {loadError ?? "Loading…"}
@@ -123,6 +127,8 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     integrations: <Integrations />,
     about: <About />,
   };
+
+  if (touring) return <Tour onDone={() => setTouring(false)} />;
 
   return (
     <div className="s-shell">

@@ -11,7 +11,6 @@ vi.mock("./api", () => ({
   setIncludeDrives: vi.fn(),
   clearHistory: vi.fn(),
   reindex: vi.fn(),
-  setTutorialDone: vi.fn(() => Promise.resolve()),
 }));
 
 const settings: SettingsView = {
@@ -62,13 +61,13 @@ describe("General index all drives", () => {
   });
 });
 
-describe("General replay tutorial", () => {
+describe("General take the tour", () => {
   afterEach(cleanup);
-  it("clears tutorial_done and confirms", async () => {
-    render(<General settings={settings} onChange={() => {}} />);
-    fireEvent.click(screen.getByText("Replay tutorial"));
-    expect(api.setTutorialDone).toHaveBeenCalledWith(false);
-    expect(await screen.findByText("Opens the next time you open the launcher.")).toBeTruthy();
+  it("asks the window to open the tour", () => {
+    const onTour = vi.fn();
+    render(<General settings={settings} onChange={() => {}} onTour={onTour} />);
+    fireEvent.click(screen.getByText("Take the tour"));
+    expect(onTour).toHaveBeenCalled();
   });
 });
 

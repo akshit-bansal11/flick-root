@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { APP_DISPLAY_NAME } from "../brand";
 import { getSettings } from "../settings/api";
 import { errorText } from "../settings/types";
+import { Tour } from "../tour/Tour";
 import { Detect } from "./Detect";
 import { Hotkey } from "./Hotkey";
+import { Welcome } from "./Welcome";
 import "../settings/settings.css";
 import "./firstrun.css";
 
@@ -19,6 +21,7 @@ export const completeFirstRun = () => invoke<void>("complete_first_run");
 export function FirstRun() {
   const [state, setState] = useState<FirstRunState | null>(null);
   const [explain, setExplain] = useState("");
+  const [intro, setIntro] = useState<"welcome" | "tour" | "note" | null>("welcome");
   const [step, setStep] = useState<1 | 2>(1);
   const [valid, setValid] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -42,6 +45,18 @@ export function FirstRun() {
           {err ?? "Loading…"}
         </p>
       </main>
+    );
+  }
+
+  if (intro === "tour") return <Tour onDone={() => setIntro(null)} />;
+  if (intro) {
+    return (
+      <Welcome
+        note={intro === "note"}
+        onTour={() => setIntro("tour")}
+        onSkip={() => setIntro("note")}
+        onContinue={() => setIntro(null)}
+      />
     );
   }
 

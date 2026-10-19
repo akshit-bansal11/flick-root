@@ -73,7 +73,7 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
         Some(s) => format!("settings.html#{s}"),
         None => "settings.html".to_string(),
     };
-    WebviewWindowBuilder::new(app, SETTINGS_LABEL, WebviewUrl::App(url.into()))
+    let win = WebviewWindowBuilder::new(app, SETTINGS_LABEL, WebviewUrl::App(url.into()))
         .title(format!("{} Settings", app.package_info().name))
         .inner_size(960.0, 640.0)
         .min_inner_size(760.0, 520.0)
@@ -81,6 +81,16 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
         .visible(true)
         .center()
         .build()?;
+    // Hotkeys always come back when Settings goes away, even if the tour did not unmount cleanly.
+    let handle = app.clone();
+    win.on_window_event(move |event| {
+        if matches!(
+            event,
+            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+        ) {
+            crate::hotkey::set_paused(&handle, false);
+        }
+    });
     Ok(())
 }
 

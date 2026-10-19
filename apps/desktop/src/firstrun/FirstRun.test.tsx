@@ -7,6 +7,13 @@ import { FirstRun } from "./FirstRun";
 import { Hotkey } from "./Hotkey";
 import { comboFromEvent, validateCombo } from "./hotkeyRules";
 
+vi.mock("../tour/Tour", () => ({
+  Tour: ({ onDone }: { onDone: (c: boolean) => void }) => (
+    <button type="button" data-testid="tour" onClick={() => onDone(true)}>
+      tour
+    </button>
+  ),
+}));
 vi.mock("../settings/api", () => ({
   getSettings: vi.fn(() => Promise.resolve({ hotkeyExplain: "Ctrl+Shift+E" })),
   setGeneral: vi.fn(),
@@ -109,7 +116,7 @@ describe("Detect", () => {
 });
 
 describe("FirstRun", () => {
-  it("Finish calls complete_first_run", async () => {
+  const setup = async () => {
     core.invoke.mockImplementation((cmd: string) =>
       Promise.resolve(
         cmd === "get_first_run"
@@ -119,10 +126,27 @@ describe("FirstRun", () => {
     );
     vi.mocked(api.probeProviders).mockResolvedValue([]);
     await mount(<FirstRun />);
+  };
+  const byText = (t: string) =>
+    [...host.querySelectorAll("button")].find((b) => b.textContent === t);
+
+  it("yes: welcome, tour, hotkey, models, finish", async () => {
+    await setup();
+    expect(host.textContent).toContain("Take a 2-minute interactive tour?");
+    await click(byText("Take the tour"));
+    await click(host.querySelector('[data-testid="tour"]'));
     expect(host.textContent).toContain("Step 1 of 2");
     await click(host.querySelector(".fr-primary"));
     expect(host.textContent).toContain("Step 2 of 2");
     await click(host.querySelector(".fr-primary"));
     expect(core.invoke).toHaveBeenCalledWith("complete_first_run");
+  });
+
+  it("no: note, then hotkey step", async () => {
+    await setup();
+    await click(byText("Not now"));
+    expect(host.textContent).toContain("Settings > General > Take the tour");
+    await click(byText("Continue"));
+    expect(host.textContent).toContain("Step 1 of 2");
   });
 });

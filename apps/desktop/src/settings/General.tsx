@@ -7,6 +7,7 @@ import { errorText, type GeneralPatch, type SettingsView } from "./types";
 interface Props {
   settings: SettingsView;
   onChange: (s: SettingsView) => void;
+  onTour?: () => void;
 }
 
 function Row({
@@ -36,7 +37,7 @@ function Row({
   );
 }
 
-export function General({ settings, onChange }: Props) {
+export function General({ settings, onChange, onTour }: Props) {
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLButtonElement>(null);
@@ -47,7 +48,6 @@ export function General({ settings, onChange }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [cleared, setCleared] = useState(false);
   const [reindexing, setReindexing] = useState(false);
-  const [replayed, setReplayed] = useState(false);
 
   const setError = (k: string, e: unknown) =>
     setErrors((p) => ({ ...p, [k]: e ? errorText(e) : null }));
@@ -107,16 +107,6 @@ export function General({ settings, onChange }: Props) {
       setError("reindex", e);
     }
     setReindexing(false);
-  };
-
-  const replay = async () => {
-    try {
-      await api.setTutorialDone(false);
-      setError("tutorial", null);
-      setReplayed(true);
-    } catch (e) {
-      setError("tutorial", e);
-    }
   };
 
   return (
@@ -252,15 +242,9 @@ export function General({ settings, onChange }: Props) {
         </button>
       </Row>
 
-      <Row
-        label="Tutorial"
-        help={
-          replayed ? "Opens the next time you open the launcher." : "A short tour of every mode."
-        }
-        error={errors.tutorial}
-      >
-        <button type="button" className="s-btn" onClick={() => void replay()}>
-          Replay tutorial
+      <Row label="Tour" help="A 2-minute interactive tour of every mode.">
+        <button type="button" className="s-btn" onClick={onTour}>
+          Take the tour
         </button>
       </Row>
     </section>
