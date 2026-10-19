@@ -1,4 +1,4 @@
-//! `DecisionEngine` trait and the `/v1/systemone` client for Laya, Kev and Jev.
+//! `DecisionEngine` trait and the `/v1/systemone` client for Laya, Kev, Jev and Custom.
 //!
 //! Protocol (docs.typesafe.ai/api.md): POST `{state, model, questions}` with a Bearer key;
 //! the reply holds `answers.<qid>` of `type: "choice"` with `choice` (the option key),
@@ -22,7 +22,7 @@ const QID: &str = "pick";
 /// A decision engine that answers a Choice question (ADR-005).
 #[async_trait]
 pub trait DecisionEngine: Send + Sync {
-    /// "laya", "kev", "llm" or "jev".
+    /// "laya", "kev", "llm", "jev" or "custom".
     fn id(&self) -> &'static str;
     /// Pick one candidate.
     async fn choose(&self, q: &ChoiceQuestion) -> Result<ChoiceAnswer, EngineError>;
@@ -106,7 +106,7 @@ fn parse_answer(id: &'static str, n: usize, body: &[u8]) -> Result<ChoiceAnswer,
 /// Client for one `/v1/systemone` engine.
 #[derive(Debug)]
 pub struct SystemOneEngine {
-    /// "laya", "kev" or "jev".
+    /// "laya", "kev", "jev" or "custom".
     pub id: &'static str,
     /// Server base URL.
     pub base_url: Url,

@@ -185,16 +185,15 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `reveal` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Enter) |
 | `copy_path` | `item_id` | `()` | `not_found` | Launcher (Ctrl+C, Find) |
 | `run_system_command` | `command_id, confirm_token?` | `Outcome` (`NeedsConfirm` first for guarded ones) | `unavailable`, `confirm_expired`, `failed` | Launcher |
-| `kill_process` | `pid, confirm_token?` | `Outcome` | `protected_pid`, `confirm_expired`, `access_denied` | Launcher (ports) |
+| `run_system_command` with `kill: true` | `command_id, confirm_token?, kill` | `Outcome` | `not_found`, `unknown_feature`, `confirm_expired`, plus feature errors (`internal`) | Launcher (ports) |
 | `ask_stream` | `{ text, attachment?, effort }, on_event: Channel<AskEvent>` | `ask_id` | `query_disabled`, `no_provider`, `secret_blocked` | Query view |
 | `cancel_ask` | `ask_id` | `()` | none | Query view (Esc) |
 | `open_link` | `url` | `()` | `invalid_url` | Query view |
 | `hide_launcher` | none | `()` | none | Launcher |
-| `resize_launcher` | `height_px` | `()` | none | Launcher |
 | `report_shown` | `shown_id` | `()` | none | Launcher |
 | `get_settings` | none | `SettingsView` (no secrets) | none | Settings |
 | `set_general` | `patch` (hotkeys, theme, startup, window) | `SettingsView` | `invalid_value` | General |
-| `set_roots` | `roots: Vec<String>` | `()` | `invalid_path` | General |
+| `set_roots` | `roots?: Vec<String>, include_drives?: bool` | `SettingsView` | `invalid_path` | General |
 | `register_hotkey` | `which, accelerator` | `Registered` or `Conflict` | `invalid_accelerator` | General, first run |
 | `clear_history` | `scope: frecency or nl_cache or all` | `()` | none | General |
 | `list_features` | none | `Vec<FeatureView>` (id, title, version, enabled, status, schema, options) | none | Features |
@@ -211,10 +210,12 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `list_secrets` | none | `Vec<SecretInfo>`: `name, present, last4?, host, added_at, last_used?` | none | AI providers, Integrations |
 | `list_engines` | none | `Vec<EngineView>` | none | Decision engine |
 | `probe_decision_engines` | none | `Vec<ProbeResult>` | none | Decision engine |
-| `set_engine` | `id, patch` (enabled, base_url, candidates, threshold) | `EngineView` | `invalid_url`, `key_needed` | Decision engine |
-| `connect_spotify` | `client_id` | `{ connected, name }` | `auth_cancelled`, `port_busy`, `network` | Integrations |
+| `set_engine` | `id, enabled?, base_url?, candidates?, threshold?, timeout_ms?` (flat args) | `Vec<EngineView>` | `unknown_engine`, `invalid_url`, `invalid_candidates`, `invalid_threshold`, `invalid_timeout`, `unsupported`, `key_needed` (Jev), `url_needed` (Custom), `store_failed` | Decision engine |
+| `connect_spotify` | none (reads `client_id` from config) | `{ connected, name }` | `no_client_id`, `auth_cancelled`, `port_busy`, `network`, `spotify` | Integrations |
 | `disconnect_spotify` | none | `()` | none | Integrations |
-| `test_capture_target` | `target_id` | `{ ok, message }` | `not_configured`, `network` | Integrations |
+| `get_integrations` | none | `IntegrationsView` (config plus `present` flags, no secrets) | none | Integrations |
+| `set_integration` | `target` (`spotify`, `youtube`, `obsidian`, `markdown`, `notion`, `webhook`), `patch` (camelCase: clientId, enabled, vault, dailyFolder, dailyFormat, file, databaseId, name, host, newName, remove) | `IntegrationsView` | `unknown_target`, `invalid_path`, `invalid_format`, `invalid_id`, `invalid_name`, `invalid_host`, `store_failed` | Integrations |
+| `test_capture_target` | `target_id` (`obsidian`, `markdown`, `notion`, `webhook.<name>`) | `{ ok, message }` | `not_configured`, `network`, `capture` | Integrations |
 | `reindex` | `kind: apps or files` | `()` | `mode_disabled` | General |
 | `get_first_run` / `complete_first_run` | none | `{ needed, detected_servers }` / `()` | none | First run |
 | `get_about` | none | `{ version, license, links, log_dir }` | none | About |
@@ -330,7 +331,7 @@ key_host = ""
 model = ""
 
 [decision]
-order = ["laya", "kev", "llm", "jev"]   # the built-in parser always runs first
+order = ["laya", "kev", "llm", "jev", "custom"]   # the built-in parser always runs first
 candidates = 8
 threshold = 0.6
 [decision.laya]
@@ -346,6 +347,9 @@ enabled = false
 base_url = "https://api.typesafe.ai"
 key_host = "api.typesafe.ai"
 timeout_ms = 4000
+[decision.custom]
+enabled = false             # needs a base URL; speaks /v1/systemone
+base_url = ""
 
 [features.frecency]
 enabled = true
@@ -382,7 +386,6 @@ enabled = true
 enabled = true
 [features.explain]
 enabled = true
-max_chars = 8000
 [features.capture]
 enabled = true
 default_target = ""
@@ -400,12 +403,13 @@ daily_folder = ""
 database_id = ""
 [[integrations.webhooks]]
 name = "example"            # the URL itself is stored as a secret
+host = "hooks.example.com"  # the only host the URL may use
 enabled = false
 ```
 
 **Decision:** Spotify redirect uses `http://127.0.0.1:43919/callback`, a fixed port the user adds to their Spotify app. Reason: Spotify needs an exact redirect URI and requires the loopback IP, not `localhost`; check the current docs.
 
-**Decision:** webhook URLs are secrets (many contain tokens), so they live in Credential Manager. Config holds only the name and the enabled flag.
+**Decision:** webhook URLs are secrets (many contain tokens), so they live in Credential Manager. Config holds the name, the host the URL is bound to (`host`), and the enabled flag.
 
 ### 6.2 SQLite schema
 
@@ -526,7 +530,7 @@ Full paths are rebuilt by walking `parent`. Matching runs on the name; ASCII nam
 |---|---|---|---|---|
 | OpenAI-compatible providers (Ollama, LM Studio, llama.cpp, OmniRoute, OpenRouter, OpenAI, Custom) | `GET {base}/models`; `POST {base}/chat/completions` with `stream: true`, messages, `max_tokens: 1024`, optional reasoning field per provider | Bearer key if set, bound to `key_host` | Probe 200 ms (local). Connect 3 s. First token 60 s local, 20 s cloud. Idle gap 30 s. | None on the same provider; fall back (TRD 8). |
 | Anthropic | `POST https://api.anthropic.com/v1/messages`, `stream: true`. Illustrative: `{ model, max_tokens, system, messages }`; events such as `content_block_delta`. No temperature, top_p, top_k or prefill for Haiku 5.5. Effort and thinking fields from current docs. | `x-api-key`, `anthropic-version` | As above (cloud) | None |
-| `/v1/systemone` (Laya, Kev, Jev) | `POST {base}/v1/systemone`. Illustrative: question text plus a list of choices; answer is a chosen index and a probability. One client, three base URLs. | Optional bearer key; Jev needs one | Connect 2 s, total 4 s (**Decision:** `timeout_ms`, configurable) | None; next engine. |
+| `/v1/systemone` (Laya, Kev, Jev, Custom) | `POST {base}/v1/systemone`. Illustrative: question text plus a list of choices; answer is a chosen index and a probability. One client, four base URLs. | Optional bearer key; Jev needs one | Total 3 s by default (`ENGINE_TIMEOUT_MS`); per-engine `timeout_ms` (100 to 60,000 ms) overrides it, and Jev's default config sets 4000 | None; next engine. |
 | LLM picker | Same as the Query provider. Prompt lists numbered candidates; reply must be strict JSON `{ "choice": n }`. Anything else is a failure. | Provider's | 4 s total | None |
 | ECB rates | `GET https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml` (`Cube` elements: currency, rate per EUR) | None | Connect 3 s, total 10 s | 3 tries: 1 min, 5 min, then next day. Uses `If-Modified-Since`. |
 | Spotify | Authorize and token endpoints on `accounts.spotify.com` (PKCE, loopback redirect). `GET /v1/search?type=track&limit=1`, `PUT /v1/me/player/play`. Scopes for playback control. | Access token from refresh token | 5 s | Refresh once on 401. `NO_ACTIVE_DEVICE` opens the `spotify:track:` link. |

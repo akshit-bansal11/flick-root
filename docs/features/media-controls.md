@@ -50,6 +50,7 @@ New apps start in Development Mode, which limits the number of users and API req
 - Connected, Flick talks to `accounts.spotify.com` and `api.spotify.com` with your own Client ID, from the Rust side only (never the WebView), and never on the keystroke path.
 - Only a refresh token is kept, in Windows Credential Manager as `integration.spotify.refresh@accounts.spotify.com`. Access tokens stay in memory. **Disconnect Spotify** removes the connection.
 - The callback listener runs only while you are connecting.
+- If Spotify revokes the token, or you change the Client ID, Flick disconnects automatically; connect again.
 
 ## Limits
 

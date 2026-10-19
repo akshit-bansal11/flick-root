@@ -13,11 +13,13 @@ The hotkey does nothing if the launcher is already showing (there is no foregrou
 
 ## How the text is captured
 
-First through Windows UI Automation (no clipboard). If the app does not support that, Flick sends Ctrl+C and reads the clipboard, then restores what the clipboard held before.
+First through Windows UI Automation (no clipboard). If the app does not support that, Flick sends Ctrl+C and reads the clipboard, then restores the text the clipboard held before. Only text is restored: images, files and other clipboard formats are not preserved.
+
+Flick never sends Ctrl+C to terminals or to apps that host one (VS Code, Cursor, JetBrains IDEs, Windows Terminal, and similar), because Ctrl+C there can interrupt a running process. In those apps, and when the foreground app cannot be identified, it relies on UI Automation only.
 
 ## Options
 
-The hotkey (General). The config also has `max_chars = 8000` under the explain feature; the preview, and what is sent, is the first 2,000 characters of the selection.
+The hotkey (General). The preview, and what is sent, is the first 2,000 characters of the selection (fixed; there is no length option).
 
 ## Privacy
 

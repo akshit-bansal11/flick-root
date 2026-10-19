@@ -27,7 +27,7 @@ A file that was opened is remembered for the same phrase; the cached file is reo
 
 ## Decision engines
 
-Settings, Decision engine. All engines are **off by default**; the built-in parser always runs first. Order: Laya, Kev, your AI provider, Jev.
+Settings, Decision engine. All engines are **off by default**; the built-in parser always runs first. Order: Laya, Kev, your AI provider, Jev, Custom.
 
 | Engine | Default address | Notes |
 | --- | --- | --- |
@@ -35,10 +35,11 @@ Settings, Decision engine. All engines are **off by default**; the built-in pars
 | Kev | empty | Set the base URL of a server you run. |
 | Your AI provider | none | Uses your first enabled Query provider (AI providers page). |
 | Jev | `https://api.typesafe.ai` | Hosted service. Needs your own API key; default timeout 4000 ms. |
+| Custom | empty | Any server that speaks `/v1/systemone`. Set its base URL before enabling. |
 
-Limits (Decision engine page): candidates sent, 1 to 8 (default 8; Laya's accuracy drops with many options), and threshold, 0 to 1 (default 0.6). Timeout per engine is 100 to 60,000 ms (default 3000 ms). A base URL must be https, or http for localhost. Keys are stored in Windows Credential Manager under `engine.<id>@<host>`, are write-only from the UI, and are sent only to the host they were entered for. Changing the host deletes the old key.
+Limits (Decision engine page): candidates sent, 1 to 8 (default 8; Laya's accuracy drops with many options), and threshold, 0 to 1 (default 0.6). Timeout per engine is 100 to 60,000 ms (default 3000 ms; Jev's default is 4000 ms). A base URL must be https, or http for localhost. Keys are stored in Windows Credential Manager under `engine.<id>@<host>`, are write-only from the UI, and are sent only to the host they were entered for. Changing the host deletes the old key.
 
-Laya, Kev and Jev speak the `/v1/systemone` API described at https://docs.typesafe.ai/api.md.
+Laya, Kev, Jev and Custom speak the `/v1/systemone` API described at https://docs.typesafe.ai/api.md.
 
 ### Running laya-serve locally
 

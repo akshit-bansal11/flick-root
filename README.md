@@ -4,7 +4,7 @@ Flick is a free, open-source, keyboard-first launcher for Windows. Command, Find
 
 ## Status
 
-Flick is v0.0.1 in progress. Built so far:
+Flick is at v0.1.0 (being released). Built so far:
 
 - Command: fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them.
 - Find: fuzzy search of files and folders under the indexed roots, with Open, Open file location and Copy path.
