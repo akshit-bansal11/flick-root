@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
-import { applyAppearance } from "../theme";
+import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
@@ -98,7 +98,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     const unlisten = [
       ipc.onShown((p) => {
         applyAppearance(document.documentElement, {
-          ...(p.appearance ?? { theme: "glass", glass: 62, scheme: "system" }),
+          ...(p.appearance ?? DEFAULT_APPEARANCE),
           glassAvailable: p.glass !== false,
         });
         dispatch({ type: "shown", tutorial: p.tutorial });
@@ -158,7 +158,8 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           hasSelection: !!el && el.selectionStart !== el.selectionEnd,
         },
       });
-      if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey))) e.preventDefault();
+      if (e.key === "Tab" || (handled && (HANDLED.has(e.key) || e.ctrlKey || e.altKey)))
+        e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

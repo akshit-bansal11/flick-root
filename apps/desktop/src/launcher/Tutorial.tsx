@@ -12,7 +12,7 @@ interface Props {
 // Keep focus in the input: buttons react to click, but never take focus on press.
 const keepFocus = (e: React.MouseEvent) => e.preventDefault();
 
-/** Compact tour card under the input. Keyboard: Ctrl+Left / Ctrl+Right / Esc, handled by the reducer. */
+/** Compact tour card under the input. Keyboard: Ctrl+Left / Ctrl+Right / Alt+T / Esc, handled by the reducer. */
 export function Tutorial({ step, onNext, onBack, onSkip, onExample }: Props) {
   const s = TUTORIAL_STEPS[step];
   if (!s) return null;
@@ -40,7 +40,7 @@ export function Tutorial({ step, onNext, onBack, onSkip, onExample }: Props) {
               onMouseDown={keepFocus}
               onClick={() => s.example && onExample(s.example)}
             >
-              Try: {s.example}
+              Try: {s.example} <kbd>Alt T</kbd>
             </button>
           )}
         </div>

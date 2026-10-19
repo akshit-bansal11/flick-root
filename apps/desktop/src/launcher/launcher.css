@@ -11,7 +11,7 @@ body,
 .launcher {
   position: relative;
   width: 100%;
-  max-height: var(--l-panel-max);
+  max-height: min(var(--l-panel-max), 100vh);
   display: flex;
   flex-direction: column;
   background: var(--l-glass-tint);
@@ -163,7 +163,7 @@ body,
   border: var(--l-border);
   border-bottom-width: 2px;
   border-radius: var(--l-r2);
-  background: color-mix(in srgb, var(--l-text) 8%, transparent);
+  background: color-mix(in srgb, var(--l-text) var(--l-kbd-mix), transparent);
 }
 
 .results {

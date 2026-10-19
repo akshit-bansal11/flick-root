@@ -30,6 +30,10 @@ describe("Tutorial", () => {
     expect(h.onSkip).toHaveBeenCalled();
     expect(h.onExample).toHaveBeenCalledWith("! notepad");
   });
+  it("shows the Alt T shortcut on the example button", () => {
+    setup(1);
+    expect(screen.getByText("Alt T")).toBeTruthy();
+  });
   it("first step disables Back; last step says Finish", () => {
     setup(0);
     expect((screen.getByText("Back") as HTMLButtonElement).disabled).toBe(true);

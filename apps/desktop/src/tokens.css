@@ -81,6 +81,7 @@
     var(--l-sp-7)
   );
   --l-sel-mix: 14%;
+  --l-kbd-mix: 8%;
   --l-hover-mix: 7%;
   --l-tile-settings: 32px;
   --l-nav-w: 200px;

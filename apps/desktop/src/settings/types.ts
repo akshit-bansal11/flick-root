@@ -15,20 +15,20 @@ export interface AppearanceView {
 export interface SettingsView {
   hotkeyLauncher: string;
   hotkeyExplain: string;
-  theme: Theme;
   launchAtStartup: boolean;
   findEnabled: boolean;
   queryEnabled: boolean;
   roots: string[];
   extraRoots: string[];
   includeDrives: boolean;
+  scanPrograms: boolean;
 }
 
 export interface GeneralPatch {
   hotkeyLauncher?: string;
   hotkeyExplain?: string;
-  theme?: Theme;
   launchAtStartup?: boolean;
+  scanPrograms?: boolean;
 }
 
 export type ClearScope = "frecency" | "nl_cache" | "all";

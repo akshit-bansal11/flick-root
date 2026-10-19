@@ -7,11 +7,6 @@
   border-top: var(--l-border);
 }
 
-.query {
-  max-height: var(--query-max, 60vh);
-  overflow-y: auto;
-}
-
 .query-q {
   font-weight: 600;
 }

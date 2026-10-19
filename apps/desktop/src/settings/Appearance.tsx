@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import {
   applyAppearance,
   FORCED_SCHEME,
@@ -48,6 +48,10 @@ function Swatch({ theme, scheme, glass }: { theme: ThemeId; scheme: Scheme; glas
 export function Appearance() {
   const [a, setA] = useState<AppearanceView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Slider value while dragging; null when idle. Saved on release. */
+  const [drag, setDrag] = useState<number | null>(null);
+  /** Saves run one after another so a slow reply never lands after a newer one. */
+  const chain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     api
@@ -64,19 +68,29 @@ export function Appearance() {
     );
   }
 
-  const save = async (patch: Partial<AppearanceView>) => {
+  const save = (patch: Partial<AppearanceView>) => {
+    const prev = a;
     const next = { ...a, ...patch };
     setA(next);
     applyAppearance(document.documentElement, { ...next, glassAvailable: true });
-    try {
-      setA(await api.setAppearance(patch));
-      setError(null);
-    } catch (e) {
-      setA(a);
-      applyAppearance(document.documentElement, { ...a, glassAvailable: true });
-      setError(errorText(e));
-    }
+    chain.current = chain.current.then(async () => {
+      try {
+        setA(await api.setAppearance(patch));
+        setError(null);
+      } catch (e) {
+        setA(prev);
+        applyAppearance(document.documentElement, { ...prev, glassAvailable: true });
+        setError(errorText(e));
+      }
+    });
   };
+
+  const commitGlass = () => {
+    if (drag === null) return;
+    setDrag(null);
+    if (drag !== a.glass) save({ glass: drag });
+  };
+  const glass = drag ?? a.glass;
 
   const forced = FORCED_SCHEME[a.theme];
   const reducedTransparency = matchMedia("(prefers-reduced-transparency: reduce)").matches;
@@ -99,7 +113,7 @@ export function Appearance() {
               name="theme"
               value={t}
               checked={a.theme === t}
-              onChange={() => void save({ theme: t })}
+              onChange={() => save({ theme: t })}
             />
             <Swatch theme={t} scheme={a.scheme} glass={a.glass} />
             <span className="s-theme-name">{LABELS[t]}</span>
@@ -120,11 +134,18 @@ export function Appearance() {
             type="range"
             min={GLASS_MIN}
             max={GLASS_MAX}
-            value={a.glass}
+            value={glass}
             disabled={a.theme === "solid"}
-            onChange={(e) => void save({ glass: Number(e.target.value) })}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setDrag(v);
+              applyAppearance(document.documentElement, { ...a, glass: v, glassAvailable: true });
+            }}
+            onPointerUp={commitGlass}
+            onKeyUp={commitGlass}
+            onBlur={commitGlass}
           />
-          <output htmlFor="s-glass">{a.glass}%</output>
+          <output htmlFor="s-glass">{glass}%</output>
         </div>
       </div>
 
@@ -148,7 +169,7 @@ export function Appearance() {
                 value={s.id}
                 checked={a.scheme === s.id}
                 disabled={!!forced}
-                onChange={() => void save({ scheme: s.id })}
+                onChange={() => save({ scheme: s.id })}
               />
               <span>{s.label}</span>
             </label>

@@ -77,7 +77,8 @@ describe("Launcher", () => {
   it("starts in none mode with four prefix hint rows and no search", async () => {
     await mount();
     expect(screen.getByPlaceholderText("Type > ! / or ? to start")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: /^(>|!|\/|\?)/ })).toHaveLength(4);
+    expect(screen.getAllByRole("option", { name: /^(>|!|\/|\?)/ })).toHaveLength(4);
+    expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
     expect(screen.getByText("> commands")).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
     expect(screen.queryByTestId("mode-chip")).toBeNull();
@@ -103,7 +104,7 @@ describe("Launcher", () => {
   it("clicking a hint row enters its mode", async () => {
     await mount();
     act(() => {
-      fireEvent.click(screen.getByRole("button", { name: /Find/ }));
+      fireEvent.click(screen.getByRole("option", { name: /Find/ }));
     });
     expect(screen.getByTestId("mode-chip").textContent).toBe("Find");
   });

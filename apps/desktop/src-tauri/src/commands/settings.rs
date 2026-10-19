@@ -19,8 +19,6 @@ pub struct SettingsView {
     pub hotkey_launcher: String,
     /// Explain hotkey.
     pub hotkey_explain: String,
-    /// `system`, `dark` or `light`.
-    pub theme: String,
     /// Launch at login, as the OS reports it.
     pub launch_at_startup: bool,
     /// Find mode on.
@@ -43,7 +41,6 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
     SettingsView {
         hotkey_launcher: c.general.hotkey.clone(),
         hotkey_explain: c.general.explain_hotkey.clone(),
-        theme: c.appearance.scheme.clone(),
         launch_at_startup,
         find_enabled: c.modes.find.enabled,
         query_enabled: c.modes.query.enabled,
@@ -110,24 +107,23 @@ pub async fn set_appearance(
     glass: Option<u8>,
     scheme: Option<String>,
 ) -> Result<AppearanceView, CommandError> {
-    let mut next = state.config.load().appearance.clone();
-    if let Some(t) = theme {
-        next.theme = t;
-    }
-    if let Some(g) = glass {
-        next.glass = g;
-    }
-    if let Some(s) = scheme {
-        next.scheme = s;
-    }
-    next.validate()
-        .map_err(|m| CommandError::new("invalid_appearance", m))?;
     let s = Arc::clone(&state);
-    let saved = next.clone();
-    blocking(move || {
+    let next = blocking(move || {
         s.update_config(|c| {
-            c.appearance = saved;
-            Ok(())
+            let mut next = c.appearance.clone();
+            if let Some(t) = theme {
+                next.theme = t;
+            }
+            if let Some(g) = glass {
+                next.glass = g;
+            }
+            if let Some(sc) = scheme {
+                next.scheme = sc;
+            }
+            next.validate()
+                .map_err(|m| CommandError::new("invalid_appearance", m))?;
+            c.appearance = next.clone();
+            Ok(next)
         })
     })
     .await?;
@@ -142,18 +138,9 @@ pub async fn set_general(
     state: State<'_, Arc<AppState>>,
     hotkey_launcher: Option<String>,
     hotkey_explain: Option<String>,
-    theme: Option<String>,
     launch_at_startup: Option<bool>,
     scan_programs: Option<bool>,
 ) -> Result<SettingsView, CommandError> {
-    if let Some(t) = &theme
-        && !matches!(t.as_str(), "system" | "dark" | "light")
-    {
-        return Err(CommandError::new(
-            "invalid_theme",
-            "theme must be system, dark or light",
-        ));
-    }
     if let Some(h) = &hotkey_explain {
         hotkey::sync_explain(&app, h)?;
     }
@@ -172,9 +159,6 @@ pub async fn set_general(
             }
             if let Some(h) = hotkey_explain {
                 c.general.explain_hotkey = h;
-            }
-            if let Some(t) = theme {
-                c.appearance.scheme = t;
             }
             if let Some(on) = launch_at_startup {
                 c.general.launch_at_startup = on;

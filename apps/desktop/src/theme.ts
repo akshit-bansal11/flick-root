@@ -21,6 +21,12 @@ export interface Appearance {
   scheme: Scheme;
 }
 
+export const DEFAULT_APPEARANCE: Appearance = {
+  theme: "glass",
+  glass: GLASS_DEFAULT,
+  scheme: "system",
+};
+
 export interface ApplyInput extends Appearance {
   /** False when Windows transparency effects are off. */
   glassAvailable: boolean;

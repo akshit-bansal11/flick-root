@@ -17,13 +17,13 @@ vi.mock("./api", () => ({
 const settings: SettingsView = {
   hotkeyLauncher: "Alt+Space",
   hotkeyExplain: "Ctrl+Alt+E",
-  theme: "system",
   launchAtStartup: false,
   findEnabled: false,
   queryEnabled: false,
   roots: [],
   extraRoots: [],
   includeDrives: true,
+  scanPrograms: true,
 };
 
 describe("General hotkey capture", () => {
@@ -69,5 +69,14 @@ describe("General replay tutorial", () => {
     fireEvent.click(screen.getByText("Replay tutorial"));
     expect(api.setTutorialDone).toHaveBeenCalledWith(false);
     expect(await screen.findByText("Opens the next time you open the launcher.")).toBeTruthy();
+  });
+});
+
+describe("programs scan toggle", () => {
+  afterEach(cleanup);
+  it("sends scanPrograms", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    fireEvent.click(screen.getByRole("switch", { name: "Find programs on all drives" }));
+    expect(api.setGeneral).toHaveBeenCalledWith({ scanPrograms: false });
   });
 });

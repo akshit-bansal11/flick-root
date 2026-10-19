@@ -9,7 +9,7 @@ import type {
   ThinkingMode,
 } from "../types";
 import { isProgram } from "./kinds";
-import { autoAdvance, nextStep, prevStep, splitExample } from "./tutorialSteps";
+import { autoAdvance, nextStep, prevStep, splitExample, TUTORIAL_STEPS } from "./tutorialSteps";
 
 export interface KeyInput {
   key: string;
@@ -232,15 +232,18 @@ function switchMode(s: State, mode: LaunchMode, input: string): Result {
   return { state: r.state, effects: [...cancel, ...r.effects, ...load] };
 }
 
+/** Enter a mode; plain text typed on the hint panel is carried into it. */
 function enterMode(s: State, mode: LaunchMode): Result {
   if (mode !== "none" && !availableModes(s.enabledModes).includes(mode)) return out(s);
-  return switchMode(s, mode, "");
+  return switchMode(s, mode, mode !== "none" && s.mode === "none" ? s.input : "");
 }
 
 function textChange(s: State, text: string): Result {
-  // Prefix only counts as the first typed character into an empty field.
-  const target = s.input === "" && text.length === 1 ? modeOf(text) : undefined;
-  if (target && availableModes(s.enabledModes).includes(target)) return enterMode(s, target);
+  // A prefix counts as the first character into an empty field, typed or pasted.
+  const target = s.input === "" ? modeOf(text.slice(0, 1)) : undefined;
+  if (target && availableModes(s.enabledModes).includes(target)) {
+    return switchMode(s, target, text.slice(1));
+  }
   if (s.mode === "none" || s.mode === "query") return out({ ...s, input: text });
   return search(s, s.mode, text);
 }
@@ -373,6 +376,10 @@ function key(s: State, k: KeyInput): Result {
   if (s.tutorial.open && k.ctrl && k.key === "ArrowRight") return tutorialNext(s);
   if (s.tutorial.open && k.ctrl && k.key === "ArrowLeft") {
     return out({ ...s, tutorial: { open: true, step: prevStep(s.tutorial.step) } });
+  }
+  if (s.tutorial.open && k.alt && k.key.toLowerCase() === "t") {
+    const example = TUTORIAL_STEPS[s.tutorial.step]?.example;
+    return example ? tutorialExample(s, example) : out(s);
   }
   switch (k.key) {
     case "ArrowDown":
@@ -520,7 +527,8 @@ function reduceCore(s: State, ev: Event): Result {
         seq: s.seq,
         askToken: s.askToken,
         visible: true,
-        tutorial: { open: ev.tutorial === true, step: 0 },
+        // An unfinished tour resumes where it was left.
+        tutorial: s.tutorial.open ? s.tutorial : { open: ev.tutorial === true, step: 0 },
       });
     case "tutorialStart":
       return out({ ...s, tutorial: { open: true, step: 0 } });
@@ -541,6 +549,7 @@ function reduceCore(s: State, ev: Event): Result {
           thinkingModes: s.thinkingModes,
           seq: s.seq,
           askToken: s.askToken,
+          tutorial: s.tutorial,
         },
         ...(s.query.status === "streaming"
           ? [{ type: "cancelAsk", token: s.askToken } as const]

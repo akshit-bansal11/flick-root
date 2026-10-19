@@ -24,10 +24,10 @@ vi.mock("./api", () => ({
 const settings: SettingsView = {
   hotkeyLauncher: "Alt+Space",
   hotkeyExplain: "Alt+Shift+Space",
-  theme: "system",
   launchAtStartup: false,
   findEnabled: true,
   includeDrives: true,
+  scanPrograms: true,
   queryEnabled: false,
   roots: [],
   extraRoots: [],

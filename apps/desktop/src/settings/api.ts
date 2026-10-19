@@ -36,8 +36,8 @@ export const setGeneral = (patch: GeneralPatch) =>
   invoke<SettingsView>("set_general", {
     hotkeyLauncher: patch.hotkeyLauncher,
     hotkeyExplain: patch.hotkeyExplain,
-    theme: patch.theme,
     launchAtStartup: patch.launchAtStartup,
+    scanPrograms: patch.scanPrograms,
   });
 export const setTutorialDone = (done: boolean) => invoke<void>("set_tutorial_done", { done });
 export const getAppearance = () => invoke<AppearanceView>("get_appearance");

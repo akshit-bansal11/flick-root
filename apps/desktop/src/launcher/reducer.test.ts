@@ -594,7 +594,42 @@ describe("tutorial", () => {
     const done = reduce(typed.state, { type: "results", seq: typed.state.seq, items: [item("a")] });
     expect(done.state.tutorial.step).toBe(cmd + 1);
   });
+  it("Alt+T types the step's example", () => {
+    const apps = TUTORIAL_STEPS.findIndex((s) => s.id === "apps");
+    const r = reduce(open(apps), {
+      type: "key",
+      key: { key: "t", ctrl: false, shift: false, alt: true },
+    });
+    expect(r.state.mode).toBe("run");
+    expect(r.state.input).toBe("notepad");
+  });
+  it("keeps the step across hide and show until finished", () => {
+    const hidden = reduce(open(3), { type: "hidden" }).state;
+    expect(hidden.tutorial).toEqual({ open: true, step: 3 });
+    expect(reduce(hidden, { type: "shown", tutorial: true }).state.tutorial.step).toBe(3);
+    const done = reduce(hidden, { type: "tutorialEnd" }).state;
+    expect(reduce(done, { type: "shown" }).state.tutorial.open).toBe(false);
+  });
   it("typing still works while open", () => {
     expect(reduce(open(), { type: "text", text: ">" }).state.mode).toBe("commands");
+  });
+});
+
+describe("entering modes with text", () => {
+  it("Enter on a hint carries typed plain text and searches it", () => {
+    const s = { ...initialState(), input: "notepad", selected: 1 };
+    const r = reduce(s, {
+      type: "key",
+      key: { key: "Enter", ctrl: false, shift: false, alt: false },
+    });
+    expect(r.state.mode).toBe("run");
+    expect(r.state.input).toBe("notepad");
+    expect(r.effects[0]).toMatchObject({ type: "search", text: "notepad" });
+  });
+  it("a pasted prefixed string enters that mode with the rest", () => {
+    const r = reduce(initialState(), { type: "text", text: "!spot" });
+    expect(r.state.mode).toBe("run");
+    expect(r.state.input).toBe("spot");
+    expect(reduce(initialState(), { type: "text", text: "?why" }).state.mode).toBe("query");
   });
 });

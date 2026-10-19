@@ -166,6 +166,18 @@ export function General({ settings, onChange }: Props) {
         />
       </Row>
 
+      <Row
+        label="Find programs on all drives"
+        help="Lists exe, msi, apk and other installers from every drive under !"
+        error={errors.programs}
+      >
+        <Toggle
+          label="Find programs on all drives"
+          checked={settings.scanPrograms}
+          onChange={(on) => void patch("programs", { scanPrograms: on })}
+        />
+      </Row>
+
       <Row label="Indexed folders" help="Extra folders Find mode searches." error={errors.roots}>
         <div className="s-roots">
           <ul className="s-list">

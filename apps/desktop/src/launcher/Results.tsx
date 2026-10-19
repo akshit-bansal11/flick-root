@@ -62,12 +62,14 @@ interface HintProps {
 /** Prefix cheat sheet shown in the default state; each row enters its mode. */
 export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
   return (
-    <div id={HINTS_ID} className="hints">
+    <div id={HINTS_ID} className="hints" role="listbox" aria-label="Modes">
       {modes.map((m, i) => (
         <button
           key={m}
           id={hintId(i)}
           type="button"
+          role="option"
+          aria-selected={i === selected}
           tabIndex={-1}
           className={i === selected ? "hint-row sel" : "hint-row"}
           onMouseDown={(e) => e.preventDefault()}

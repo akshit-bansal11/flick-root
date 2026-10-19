@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import type { Effort, ThinkingMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { Markdown } from "./Markdown";
@@ -24,15 +23,11 @@ interface Props {
 }
 
 export function QueryView(p: Props) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.style.setProperty("--query-max", `${window.screen.availHeight * 0.6}px`);
-  }, []);
   const modes = p.modes ?? [];
   const mode = modes.find((m) => m.id === p.selectedMode) ?? modes[0];
   if (p.noProvider) return <EmptyState onOpenSettings={p.onOpenSettings} />;
   return (
-    <div ref={ref} className="query">
+    <div className="query">
       {p.question && <div className="query-q">{p.question}</div>}
       <div className="query-chips">
         {mode ? (

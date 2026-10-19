@@ -19,13 +19,21 @@ const PANEL_W: f64 = 640.0;
 const PANEL_MAX_H: f64 = 586.0;
 /// Shortest window in logical px (the input row alone).
 const PANEL_MIN_H: f64 = 56.0;
+/// Gap kept between the panel and the work-area edge, in logical px.
+const WORK_MARGIN: f64 = 24.0;
+
+/// Tallest panel (logical px) that fits a work area `work_h` physical px high at `scale`.
+fn max_height(work_h: u32, scale: f64) -> f64 {
+    (f64::from(work_h) / scale - WORK_MARGIN).clamp(PANEL_MIN_H, PANEL_MAX_H)
+}
 
 /// Window origin and width in physical px for a work area `(x, y, w, h)` at `scale`:
 /// centred horizontally, top at the vertical centre of a max-height panel.
 fn layout(work: (i32, i32, u32, u32), scale: f64) -> (i32, i32, u32) {
     let w = (PANEL_W * scale).round();
     let x = f64::from(work.0) + (f64::from(work.2) - w) / 2.0;
-    let y = f64::from(work.1) + ((f64::from(work.3) - PANEL_MAX_H * scale) / 2.0).max(0.0);
+    let tall = max_height(work.3, scale) * scale;
+    let y = f64::from(work.1) + ((f64::from(work.3) - tall) / 2.0).max(0.0);
     (x.round() as i32, y.round() as i32, w as u32)
 }
 
@@ -202,6 +210,7 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
         .height
         .unwrap_or(PANEL_MIN_H);
     let pos = PhysicalPosition::new(x, y);
+    let height = height.min(max_height(wa.size.height, scale));
     let size = PhysicalSize::new(w, (height * scale).round() as u32);
     // Move first so a cross-monitor DPI change (WM_DPICHANGED) rescales the
     // old size, then set the size in physical px and re-pin the position,
@@ -222,7 +231,10 @@ pub async fn resize_launcher(
     let win = app
         .get_webview_window(LABEL)
         .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
-    let h = clamp_height(height);
+    let mut h = clamp_height(height);
+    if let Ok(Some(m)) = win.current_monitor() {
+        h = h.min(max_height(m.work_area().size.height, m.scale_factor()));
+    }
     state
         .inner
         .lock()
@@ -281,6 +293,14 @@ mod tests {
     #[test]
     fn layout_never_above_work_area() {
         assert_eq!(layout((0, 10, 800, 300), 1.0).1, 10);
+    }
+
+    #[test]
+    fn max_height_fits_short_screens() {
+        // 1366x768 at 125%: work area 1366x728 physical -> 582 logical, minus margin.
+        assert!((max_height(728, 1.25) - (582.4 - WORK_MARGIN)).abs() < 1e-9);
+        assert_eq!(max_height(2000, 1.0), PANEL_MAX_H);
+        assert_eq!(max_height(10, 1.0), PANEL_MIN_H);
     }
 
     #[test]
