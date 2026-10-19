@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+pub mod drives;
 pub mod error;
 pub mod query;
 pub mod scan;

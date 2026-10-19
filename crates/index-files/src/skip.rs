@@ -7,7 +7,7 @@ pub const ATTR_HIDDEN: u32 = 0x2;
 /// Windows `FILE_ATTRIBUTE_SYSTEM`.
 pub const ATTR_SYSTEM: u32 = 0x4;
 
-const SKIP_DIRS: [&str; 8] = [
+const SKIP_DIRS: [&str; 18] = [
     "node_modules",
     ".git",
     "target",
@@ -16,6 +16,16 @@ const SKIP_DIRS: [&str; 8] = [
     ".next",
     "appdata",
     "$recycle.bin",
+    "system volume information",
+    "program files",
+    "program files (x86)",
+    "windows",
+    "programdata",
+    "recovery",
+    "$winreagent",
+    "config.msi",
+    "onedrivetemp",
+    "$sysreset",
 ];
 
 /// True when an entry must not be indexed (and, for dirs, not descended into).
@@ -35,12 +45,16 @@ mod tests {
 
     #[test]
     fn table() {
-        let cases: [(&str, u32, bool, bool); 10] = [
+        let cases: [(&str, u32, bool, bool); 14] = [
             ("node_modules", 0, true, true),
             ("NODE_MODULES", 0, true, true),
             (".git", 0, true, true),
             ("AppData", 0, true, true),
             ("$Recycle.Bin", 0, true, true),
+            ("System Volume Information", 0, true, true),
+            ("Program Files (x86)", 0, true, true),
+            ("WINDOWS", 0, true, true),
+            ("Config.Msi", 0, true, true),
             ("build", 0, false, false),
             ("src", 0, true, false),
             ("a.txt", ATTR_HIDDEN, false, true),

@@ -6,6 +6,7 @@ use anyhow::Context;
 use arc_swap::ArcSwap;
 use features::{EventSink, FeatureCtx, Registry, TaskScope, builtin_features};
 use index_apps::{AppEntry, AppIndex, cache};
+use index_files::drives;
 use index_files::{FileIndex, Overlay, Root, WatchHandle, default_roots, scan, snapshot};
 use launcher_core::config::{Config, config_path, local_data_dir};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -16,7 +17,7 @@ use providers::KeySource;
 use providers::hub::ProviderHub;
 use providers::secret::{KeyringBackend, SecretVault, VaultKeys};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -169,22 +170,32 @@ impl AppState {
 
 fn roots_for(cfg: &Config) -> Vec<Root> {
     let find = &cfg.modes.find;
-    let mut roots: Vec<Root> = default_roots()
+    let user: Vec<Root> = default_roots()
         .into_iter()
         .filter(|r| find.roots.iter().any(|n| n.eq_ignore_ascii_case(&r.label)))
         .collect();
-    for p in &find.extra_roots {
-        let path = PathBuf::from(p);
-        if let Ok(id) = u8::try_from(roots.len())
-            && path.is_dir()
-        {
-            let label = path
-                .file_name()
-                .map_or_else(|| p.clone(), |n| n.to_string_lossy().into_owned());
-            roots.push(Root { id, path, label });
-        }
-    }
-    roots
+    // Runs on the blocking pool: GetDriveTypeW can stall on network or optical drives.
+    let drive_list: Vec<char> = if find.include_drives {
+        drives::present_drives()
+            .into_iter()
+            .filter(|d| win::drives::is_fixed_drive(Path::new(&format!("{d}:\\"))))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let extra = find
+        .extra_roots
+        .iter()
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
+        .collect();
+    drives::resolve_roots(
+        user,
+        &drive_list,
+        drives::system_drive(),
+        find.include_drives,
+        extra,
+    )
 }
 
 /// Creates and manages [`AppState`]. Cheap: no scanning here.

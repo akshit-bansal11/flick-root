@@ -81,6 +81,8 @@ pub struct FindMode {
     pub roots: Vec<String>,
     /// User-added roots.
     pub extra_roots: Vec<String>,
+    /// Also index every fixed, non-system drive root (D:\, E:\, ...).
+    pub include_drives: bool,
 }
 
 /// `[modes.query]`
@@ -257,6 +259,7 @@ impl Default for FindMode {
             .map(String::from)
             .to_vec(),
             extra_roots: Vec::new(),
+            include_drives: true,
         }
     }
 }
@@ -593,5 +596,19 @@ mod tests {
         let c = Config::load(&p).unwrap();
         assert_eq!(c.general.theme, "light");
         assert_eq!(c.general.hotkey, "Alt+Space");
+    }
+}
+
+#[cfg(test)]
+mod find_drive_tests {
+    use super::*;
+
+    #[test]
+    fn old_config_defaults_include_drives() {
+        let old = "[modes.find]\nenabled = true\nroots = [\"Desktop\"]\n";
+        let c: Config = toml::from_str(old).unwrap();
+        assert!(c.modes.find.include_drives);
+        let off: Config = toml::from_str("[modes.find]\ninclude_drives = false\n").unwrap();
+        assert!(!off.modes.find.include_drives);
     }
 }
