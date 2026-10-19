@@ -68,7 +68,26 @@ pub fn toggle(app: &AppHandle, reason: &str) {
         hide(app, &win);
         return;
     }
-    if let Err(err) = place(app, &win) {
+    show_window(app, &win, reason, t0);
+}
+
+/// True while the launcher is on screen.
+pub fn is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(LABEL)
+        .is_some_and(|w| w.is_visible().unwrap_or(false))
+}
+
+/// Shows the launcher on the monitor under the cursor; unlike `toggle` it never hides.
+pub fn show(app: &AppHandle, reason: &str) {
+    let Some(win) = app.get_webview_window(LABEL) else {
+        tracing::error!("launcher window missing");
+        return;
+    };
+    show_window(app, &win, reason, Instant::now());
+}
+
+fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) {
+    if let Err(err) = place(app, win) {
         tracing::warn!(%err, "positioning failed");
     }
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {

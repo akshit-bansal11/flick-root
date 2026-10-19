@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Item, Mode } from "../types";
-import { type Event, initialState, type KeyInput, reduce, type State } from "./reducer";
+import {
+  type Attachment,
+  type Event,
+  initialState,
+  type KeyInput,
+  reduce,
+  type State,
+} from "./reducer";
 
 const item = (id: string): Item => ({
   id,
@@ -375,5 +382,71 @@ describe("query state flags", () => {
       const s = reduce(withItems(initialState()), k("ArrowDown")).state;
       expect(reduce(s, k("Backspace")).effects).toEqual([]);
     });
+  });
+});
+
+describe("explain attachment", () => {
+  const att = (o: Partial<Attachment> = {}): Attachment => ({
+    preview: "some text",
+    length: 9,
+    sourceApp: "notepad.exe",
+    blocked: false,
+    reason: null,
+    ...o,
+  });
+  const captured = (attachment: Attachment | null, s = initialState()) =>
+    reduce(s, { type: "captured", attachment }).state;
+
+  it("captured opens Query mode with the text attached and sends nothing", () => {
+    const r = reduce(initialState(), { type: "captured", attachment: att() });
+    expect(r.state.mode).toBe("query");
+    expect(r.state.attachment?.preview).toBe("some text");
+    expect(r.effects).toEqual([]);
+  });
+
+  it("nothing selected opens empty Query mode with a notice", () => {
+    const s = captured(null);
+    expect(s.mode).toBe("query");
+    expect(s.attachment).toBeNull();
+    expect(s.notice).toBe("No text selected");
+  });
+
+  it("ignores a capture while Query mode is off", () => {
+    const s = initialState(["command", "find"]);
+    expect(captured(att(), s).attachment).toBeNull();
+  });
+
+  it("Enter sends the default question with the attached text", () => {
+    const r = reduce(captured(att()), k("Enter"));
+    expect(r.effects).toEqual([
+      { type: "ask", token: 1, text: "Explain this", attachment: "some text", effort: "fast" },
+    ]);
+  });
+
+  it("Enter sends the typed question when there is one", () => {
+    const s = { ...captured(att()), input: "why?" };
+    expect(reduce(s, k("Enter")).effects).toMatchObject([{ type: "ask", text: "why?" }]);
+  });
+
+  it("blocked text: Enter emits no ask effect", () => {
+    const s = { ...captured(att({ blocked: true, reason: "secret", preview: "" })), input: "x" };
+    const r = reduce(s, k("Enter"));
+    expect(r.effects).toEqual([]);
+    expect(r.state.query.status).toBe("idle");
+  });
+
+  it("remove clears the attachment", () => {
+    const s = reduce(captured(att()), { type: "removeAttachment" }).state;
+    expect(s.attachment).toBeNull();
+    expect(reduce(s, k("Enter")).effects).toEqual([]);
+  });
+
+  it("hidden and shown clear it", () => {
+    expect(reduce(captured(att()), { type: "hidden" }).state.attachment).toBeNull();
+    expect(reduce(captured(att()), { type: "shown" }).state.attachment).toBeNull();
+  });
+
+  it("switching mode clears it", () => {
+    expect(reduce(captured(att()), k("Tab")).state.attachment).toBeNull();
   });
 });

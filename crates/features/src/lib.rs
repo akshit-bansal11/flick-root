@@ -2,6 +2,7 @@
 
 pub mod ctx;
 pub mod error;
+pub mod explain;
 pub mod feature;
 pub mod frecency;
 pub mod math;
@@ -17,6 +18,7 @@ pub mod web;
 
 pub use ctx::{EventSink, FeatureCtx, TaskScope};
 pub use error::FeatureError;
+pub use explain::Explain;
 pub use feature::Feature;
 pub use nlfind::{NlFind, NlHost};
 pub use registry::{FeatureState, FeatureView, Registry};
@@ -39,6 +41,7 @@ pub fn builtin_features_with(media: media::Media) -> Vec<Arc<dyn Feature>> {
         Arc::new(web::Web),
         Arc::new(projects::Projects::default()),
         Arc::new(ports::Ports::default()),
+        Arc::new(explain::Explain),
         Arc::new(media),
     ]
 }
@@ -48,11 +51,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtins_are_seven_unique_and_enabled() {
+    fn builtins_are_eight_unique_and_enabled() {
         let f = builtin_features();
         let ids: std::collections::HashSet<_> = f.iter().map(|x| x.id()).collect();
-        assert_eq!(f.len(), 7);
-        assert_eq!(ids.len(), 7);
+        assert_eq!(f.len(), 8);
+        assert_eq!(ids.len(), 8);
         assert!(f.iter().all(|x| x.default_enabled()));
         assert!(
             f.iter()

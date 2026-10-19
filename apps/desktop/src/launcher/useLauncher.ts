@@ -54,7 +54,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           break;
         case "ask":
           ipc
-            .askStream({ text: e.text, effort: e.effort }, (event) =>
+            .askStream({ text: e.text, attachment: e.attachment, effort: e.effort }, (event) =>
               dispatch({ type: "ask", token: e.token, event }),
             )
             .then((id) => {
@@ -87,6 +87,21 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
         });
       }),
       ipc.onHidden(() => dispatch({ type: "hidden" })),
+      ipc.onExplainCaptured((c) =>
+        dispatch({
+          type: "captured",
+          attachment:
+            c.length === 0 && !c.blocked
+              ? null
+              : {
+                  preview: c.preview,
+                  length: c.length,
+                  sourceApp: c.source_app,
+                  blocked: c.blocked,
+                  reason: c.reason ?? null,
+                },
+        }),
+      ),
     ];
     dispatch({ type: "shown" });
     return () => {
@@ -126,13 +141,24 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     [dispatch],
   );
   const toggleEffort = useCallback(() => press("t", true), [press]);
+  const removeAttachment = useCallback(() => dispatch({ type: "removeAttachment" }), [dispatch]);
   const openSettings = useCallback((section: string) => ipc.openSettings(section).catch(warn), []);
 
   const openLink = useCallback((url: string) => ipc.openLink(url).catch(warn), []);
 
   const hide = useCallback(() => ipc.hideLauncher().catch(warn), []);
 
-  return { state, setText, activate, press, toggleEffort, openSettings, openLink, hide };
+  return {
+    state,
+    removeAttachment,
+    setText,
+    activate,
+    press,
+    toggleEffort,
+    openSettings,
+    openLink,
+    hide,
+  };
 }
 
 function warn(err: unknown) {

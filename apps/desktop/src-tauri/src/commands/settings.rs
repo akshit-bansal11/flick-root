@@ -88,7 +88,7 @@ pub async fn set_general(
         ));
     }
     if let Some(h) = &hotkey_explain {
-        hotkey::validate(h)?;
+        hotkey::sync_explain(&app, h)?;
     }
     if let Some(new) = &hotkey_launcher {
         hotkey::rebind_launcher(&app, new)?;
@@ -103,7 +103,6 @@ pub async fn set_general(
             if let Some(h) = hotkey_launcher {
                 c.general.hotkey = h;
             }
-            // ponytail: explain hotkey is stored only; its binding lands with the Explain feature.
             if let Some(h) = hotkey_explain {
                 c.general.explain_hotkey = h;
             }

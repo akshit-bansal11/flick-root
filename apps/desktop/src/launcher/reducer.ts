@@ -9,6 +9,18 @@ export interface KeyInput {
   hasSelection?: boolean;
 }
 
+/** Text captured by Explain this, shown before it is sent. */
+export interface Attachment {
+  preview: string;
+  length: number;
+  sourceApp: string;
+  blocked: boolean;
+  reason: string | null;
+}
+
+/** Question used when the user sends an attachment without typing one. */
+export const DEFAULT_QUESTION = "Explain this";
+
 export interface QueryState {
   status: "idle" | "streaming" | "done" | "error";
   text: string;
@@ -37,6 +49,9 @@ export interface State {
   armed: boolean;
   overlay: { firstRun: boolean };
   visible: boolean;
+  attachment: Attachment | null;
+  /** One muted line under the bar, for example "No text selected". */
+  notice: string | null;
 }
 
 export type Event =
@@ -47,6 +62,8 @@ export type Event =
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
   | { type: "enabledModes"; modes: Mode[] }
+  | { type: "captured"; attachment: Attachment | null }
+  | { type: "removeAttachment" }
   | { type: "shown" }
   | { type: "hidden" };
 
@@ -57,7 +74,7 @@ export type Effect =
   | { type: "kill"; itemId: string }
   | { type: "reveal"; itemId: string }
   | { type: "copyPath"; itemId: string }
-  | { type: "ask"; token: number; text: string; effort: Effort }
+  | { type: "ask"; token: number; text: string; attachment?: string; effort: Effort }
   | { type: "cancelAsk"; token: number }
   | { type: "nextProvider" }
   | { type: "hide" }
@@ -94,6 +111,8 @@ export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
   armed: false,
   overlay: { firstRun: false },
   visible: false,
+  attachment: null,
+  notice: null,
 });
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
@@ -112,6 +131,8 @@ function switchMode(s: State, mode: Mode, input: string): Result {
   const cleared: State = {
     ...s,
     items: [],
+    attachment: null,
+    notice: null,
     query: {
       ...s.query,
       status: "idle",
@@ -152,7 +173,10 @@ function move(s: State, delta: number): Result {
 
 function enter(s: State, k: KeyInput): Result {
   if (s.mode === "query") {
-    const text = s.input.trim();
+    const att = s.attachment;
+    // Blocked text is never sent; the Rust ask path refuses it as well.
+    if (att?.blocked) return out(s);
+    const text = s.input.trim() || (att ? DEFAULT_QUESTION : "");
     if (!text) return out(s);
     const token = s.askToken + 1;
     const cancel: Effect[] =
@@ -173,7 +197,7 @@ function enter(s: State, k: KeyInput): Result {
         },
       },
       ...cancel,
-      { type: "ask", token, text, effort: s.query.effort },
+      { type: "ask", token, text, attachment: att?.preview, effort: s.query.effort },
     );
   }
   return openSelected(s, k);
@@ -311,6 +335,22 @@ export function reduce(s: State, ev: Event): Result {
       return ask(s, ev.token, ev.event);
     case "outcome":
       return outcome(s, ev.commandId, ev.outcome);
+    case "captured":
+      return s.enabledModes.includes("query")
+        ? out({
+            ...s,
+            mode: "query",
+            input: "",
+            items: [],
+            selected: 0,
+            armed: false,
+            pendingConfirm: null,
+            attachment: ev.attachment,
+            notice: ev.attachment ? null : "No text selected",
+          })
+        : out(s);
+    case "removeAttachment":
+      return out({ ...s, attachment: null, notice: null });
     case "enabledModes":
       return out({ ...s, enabledModes: ev.modes });
     case "shown":

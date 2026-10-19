@@ -189,6 +189,15 @@ mod tests {
     }
 
     #[test]
+    fn refuses_a_plain_sk_key_in_the_attachment() {
+        let key = format!("sk-{}", "aB3xK9mQ".repeat(5));
+        assert!(matches!(
+            refusal("Explain this", Some(&key), false),
+            Some(AskEvent::Error { code, .. }) if code == "secret_blocked"
+        ));
+    }
+
+    #[test]
     fn query_gate() {
         assert!(check_enabled(true).is_ok());
         assert_eq!(check_enabled(false).unwrap_err().code, "mode_disabled");

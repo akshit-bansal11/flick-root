@@ -5,6 +5,7 @@ pub mod com;
 pub mod drives;
 pub mod error;
 pub mod explorer;
+pub mod foreground;
 pub mod media;
 pub mod ports;
 pub mod power;

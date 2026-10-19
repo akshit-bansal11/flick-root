@@ -10,6 +10,7 @@ vi.mock("../ipc", () => ({
   reportShown: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
+  onExplainCaptured: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 const KEY = "prefixes-overlay-seen";

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
-import type { Item } from "../types";
+import type { ExplainCaptured, Item } from "../types";
 import { Launcher } from "./Launcher";
 
 vi.mock("../ipc", () => ({
@@ -20,6 +20,7 @@ vi.mock("../ipc", () => ({
   openLink: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
+  onExplainCaptured: vi.fn(() => Promise.resolve(() => {})),
 }));
 
 const item = (id: string, title: string): Item => ({
@@ -105,5 +106,49 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Escape" });
     });
     expect(ipc.hideLauncher).toHaveBeenCalled();
+  });
+});
+
+describe("Launcher explain", () => {
+  async function capture(payload: ExplainCaptured) {
+    await mount();
+    const cb = vi.mocked(ipc.onExplainCaptured).mock.calls[0]?.[0];
+    act(() => cb?.(payload));
+  }
+
+  it("shows the captured text before anything is sent, and Remove drops it", async () => {
+    await capture({
+      preview: "hello world",
+      length: 11,
+      source_app: "notepad.exe",
+      blocked: false,
+    });
+    expect(screen.getByText("hello world")).toBeTruthy();
+    expect(screen.getByText(/notepad\.exe/)).toBeTruthy();
+    expect(ipc.askStream).not.toHaveBeenCalled();
+    act(() => {
+      fireEvent.click(screen.getByText("Remove"));
+    });
+    expect(screen.queryByText("hello world")).toBeNull();
+  });
+
+  it("blocked text shows why and Enter does not ask", async () => {
+    await capture({
+      preview: "",
+      length: 40,
+      source_app: "x.exe",
+      blocked: true,
+      reason: "looks like a secret",
+    });
+    expect(screen.getByRole("alert").textContent).toContain("looks like a secret");
+    act(() => {
+      fireEvent.keyDown(window, { key: "Enter" });
+    });
+    expect(ipc.askStream).not.toHaveBeenCalled();
+  });
+
+  it("nothing selected shows a hint", async () => {
+    await capture({ preview: "", length: 0, source_app: "x.exe", blocked: false });
+    expect(screen.getByText("No text selected")).toBeTruthy();
   });
 });

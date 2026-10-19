@@ -277,6 +277,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
 
 /// Spawns background startup work; returns immediately.
 pub fn start(app: &AppHandle) {
+    let handle = app.clone();
     let state: Arc<AppState> = Arc::clone(&*app.state::<Arc<AppState>>());
     let s = state.clone();
     tauri::async_runtime::spawn(async move {
@@ -289,6 +290,9 @@ pub fn start(app: &AppHandle) {
             .await;
         let cfg = s.config.load_full();
         s.registry.apply_config(&cfg, &s.ctx).await;
+        if let Err(err) = crate::hotkey::sync_explain(&handle, &cfg.general.explain_hotkey) {
+            tracing::warn!(%err.message, "explain hotkey not bound");
+        }
     });
     let s = state.clone();
     tauri::async_runtime::spawn(async move {

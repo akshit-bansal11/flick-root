@@ -78,3 +78,12 @@ export interface ShownPayload {
   shownId: number;
   reason: string;
 }
+
+/** `explain://captured` payload (BSD 5); `preview` is at most 2,000 characters. */
+export interface ExplainCaptured {
+  preview: string;
+  length: number;
+  source_app: string;
+  blocked: boolean;
+  reason?: string | null;
+}

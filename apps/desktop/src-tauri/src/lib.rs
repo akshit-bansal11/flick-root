@@ -2,6 +2,7 @@
 pub mod autostart;
 mod commands;
 mod error;
+mod explain;
 mod hotkey;
 mod icons;
 mod logging;

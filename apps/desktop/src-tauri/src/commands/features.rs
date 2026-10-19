@@ -103,6 +103,10 @@ pub async fn set_feature_enabled(
     persist(&state, &id, cfg).await?;
     let v = view(&state, &id).await?;
     changed(&app, &v);
+    if id == "explain" {
+        let accel = state.config.load().general.explain_hotkey.clone();
+        crate::hotkey::sync_explain(&app, &accel)?;
+    }
     if enabled && v.status == FeatureState::Failed {
         return Err(CommandError::new(
             "start_failed",

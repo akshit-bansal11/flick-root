@@ -1,7 +1,8 @@
 //! Global hotkey registration (Rust-side only).
+use features::explain;
 use serde_json::json;
 use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use std::sync::Mutex;
 
@@ -14,8 +15,16 @@ pub const DEFAULT: &str = "Alt+Space";
 /// Builds the global-shortcut plugin; any registered shortcut press toggles the launcher.
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri_plugin_global_shortcut::Builder::new()
-        .with_handler(|app, _shortcut, event| {
-            if event.state() == ShortcutState::Pressed {
+        .with_handler(|app, shortcut, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            let is_explain = explain_active()
+                .and_then(|a| a.parse::<Shortcut>().ok())
+                .is_some_and(|s| s == *shortcut);
+            if is_explain {
+                crate::explain::on_hotkey(app);
+            } else {
                 window::toggle(app, "hotkey");
             }
         })
@@ -76,6 +85,37 @@ pub fn rebind_launcher(app: &AppHandle, new: &str) -> Result<(), CommandError> {
         tracing::warn!(%err, "unregistering old hotkey failed");
     }
     *ACTIVE.lock().unwrap_or_else(|p| p.into_inner()) = Some(new.to_owned());
+    Ok(())
+}
+
+/// The Explain accelerator this app holds right now; `None` while the feature is off.
+static EXPLAIN: Mutex<Option<String>> = Mutex::new(None);
+
+fn explain_active() -> Option<String> {
+    EXPLAIN.lock().unwrap_or_else(|p| p.into_inner()).clone()
+}
+
+/// Makes the Explain binding match the feature: `accelerator` while the feature runs, none when
+/// it is off. A no-op when already right; on failure the previous binding stays.
+pub fn sync_explain(app: &AppHandle, accelerator: &str) -> Result<(), CommandError> {
+    let want = explain::is_running().then_some(accelerator);
+    if let Some(w) = want {
+        validate(w)?;
+    }
+    let prev = explain_active();
+    if prev.as_deref() == want {
+        return Ok(());
+    }
+    if let Some(w) = want {
+        register(app, "explain", w)
+            .map_err(|e| CommandError::new("hotkey_conflict", format!("{e:#}")))?;
+    }
+    if let Some(p) = prev
+        && let Err(err) = app.global_shortcut().unregister(p.as_str())
+    {
+        tracing::warn!(%err, "unregistering old explain hotkey failed");
+    }
+    *EXPLAIN.lock().unwrap_or_else(|p| p.into_inner()) = want.map(str::to_owned);
     Ok(())
 }
 
