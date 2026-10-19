@@ -17,7 +17,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 /// Everything except RFC 3986 unreserved characters is escaped; spaces become `%20`.
-const QUERY_SET: &AsciiSet = &NON_ALPHANUMERIC
+pub(crate) const QUERY_SET: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'_')
     .remove(b'.')
