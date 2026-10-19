@@ -61,7 +61,10 @@ export function Launcher() {
           )}
         </div>
         {state.mode === "find" && state.items.length > 0 && <Actions onPress={press} />}
-        <Footer mode={state.mode} />
+        <Footer
+          mode={state.mode}
+          canKill={state.armed && state.items[state.selected]?.kind === "process"}
+        />
       </div>
     </>
   );

@@ -33,6 +33,8 @@ export interface State {
   selected: number;
   query: QueryState;
   pendingConfirm: { commandId: string; token: string } | null;
+  /** True once an arrow key moved the selection; only then does Backspace kill a process row. */
+  armed: boolean;
   overlay: { firstRun: boolean };
   visible: boolean;
 }
@@ -51,7 +53,8 @@ export type Event =
 export type Effect =
   | { type: "search"; seq: number; mode: Mode; text: string }
   | { type: "launch"; itemId: string; admin: boolean }
-  | { type: "confirm"; commandId: string; token: string }
+  | { type: "confirm"; commandId: string; token: string; kill: boolean }
+  | { type: "kill"; itemId: string }
   | { type: "reveal"; itemId: string }
   | { type: "copyPath"; itemId: string }
   | { type: "ask"; token: number; text: string; effort: Effort }
@@ -88,6 +91,7 @@ export const initialState = (enabledModes: Mode[] = MODE_ORDER): State => ({
     reasoning: true,
   },
   pendingConfirm: null,
+  armed: false,
   overlay: { firstRun: false },
   visible: false,
 });
@@ -96,7 +100,7 @@ const out = (state: State, ...effects: Effect[]): Result => ({ state, effects })
 
 /** Set mode and input; Command and Find bump seq and search, Query never searches. */
 function search(s: State, mode: Mode, input: string): Result {
-  const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null };
+  const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null, armed: false };
   if (mode === "query") return out({ ...next, items: [] });
   const seq = s.seq + 1;
   return out({ ...next, seq }, { type: "search", seq, mode, text: input });
@@ -143,7 +147,7 @@ function textChange(s: State, text: string): Result {
 function move(s: State, delta: number): Result {
   const n = s.items.length;
   if (n === 0) return out(s);
-  return out({ ...s, selected: (s.selected + delta + n) % n });
+  return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
 
 function enter(s: State, k: KeyInput): Result {
@@ -187,7 +191,12 @@ function openSelected(s: State, k: Pick<KeyInput, "ctrl" | "shift">): Result {
   if (pending && pending.commandId === item.id) {
     return out(
       { ...s, pendingConfirm: null },
-      { type: "confirm", commandId: item.id, token: pending.token },
+      {
+        type: "confirm",
+        commandId: item.id,
+        token: pending.token,
+        kill: item.kind === "process",
+      },
     );
   }
   return out(s, { type: "launch", itemId: item.id, admin: false });
@@ -216,6 +225,13 @@ function key(s: State, k: KeyInput): Result {
       return cycle(s, k.shift ? -1 : 1);
     case "Escape":
       return onEscape(s);
+    case "Backspace": {
+      // Edits text until the user arrowed to a row; then it asks to end that process.
+      const item = s.items[s.selected];
+      return s.armed && item?.kind === "process"
+        ? out(s, { type: "kill", itemId: item.id })
+        : out(s);
+    }
     default:
       break;
   }
@@ -267,7 +283,7 @@ function outcome(s: State, commandId: string, o: Outcome): Result {
     case "needsConfirm":
       return out({ ...s, pendingConfirm: { commandId, token: o.token } });
     case "showItems":
-      return out({ ...s, items: o.items, selected: 0, pendingConfirm: null });
+      return out({ ...s, items: o.items, selected: 0, pendingConfirm: null, armed: false });
     case "hideLauncher":
       return out({ ...s, pendingConfirm: null }, { type: "hide" });
     default:
@@ -290,7 +306,7 @@ export function reduce(s: State, ev: Event): Result {
       return textChange(s, ev.text);
     case "results":
       if (ev.seq !== s.seq) return out(s);
-      return out({ ...s, items: ev.items, selected: 0 });
+      return out({ ...s, items: ev.items, selected: 0, armed: false });
     case "ask":
       return ask(s, ev.token, ev.event);
     case "outcome":

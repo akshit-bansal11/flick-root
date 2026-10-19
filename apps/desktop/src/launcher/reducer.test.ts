@@ -281,7 +281,7 @@ describe("reducer", () => {
       outcome: { type: "needsConfirm", token: "t", expiresMs: 3000 },
     }).state;
     const r = reduce(s, k("Enter"));
-    expect(r.effects).toEqual([{ type: "confirm", commandId: "i0", token: "t" }]);
+    expect(r.effects).toEqual([{ type: "confirm", commandId: "i0", token: "t", kill: false }]);
     expect(r.state.pendingConfirm).toBeNull();
   });
 
@@ -296,7 +296,7 @@ describe("reducer", () => {
       outcome: { type: "needsConfirm", token: "t", expiresMs: 3000 },
     }).state;
     const second = reduce(s, { type: "activate", index: 1 });
-    expect(second.effects).toEqual([{ type: "confirm", commandId: "i1", token: "t" }]);
+    expect(second.effects).toEqual([{ type: "confirm", commandId: "i1", token: "t", kill: false }]);
   });
 
   it("activate with ctrl reveals the clicked row", () => {
@@ -342,5 +342,38 @@ describe("query state flags", () => {
   it("error stores errorCode", () => {
     const e = ask(streaming(), { type: "error", code: "no_provider", message: "x" });
     expect(e.errorCode).toBe("no_provider");
+  });
+
+  describe("Backspace kill", () => {
+    const procs = (): State => ({
+      ...initialState(),
+      items: [
+        { ...item("p0"), kind: "process" },
+        { ...item("p1"), kind: "process" },
+      ],
+    });
+
+    it("edits text until an arrow moved the selection", () => {
+      expect(reduce(procs(), k("Backspace")).effects).toEqual([]);
+    });
+
+    it("after an arrow it asks to kill, then Enter confirms the kill", () => {
+      const armed = reduce(procs(), k("ArrowDown")).state;
+      const r = reduce(armed, k("Backspace"));
+      expect(r.effects).toEqual([{ type: "kill", itemId: "p1" }]);
+      const pending = reduce(r.state, {
+        type: "outcome",
+        commandId: "p1",
+        outcome: { type: "needsConfirm", token: "t", expiresMs: 3000 },
+      }).state;
+      expect(reduce(pending, k("Enter")).effects).toEqual([
+        { type: "confirm", commandId: "p1", token: "t", kill: true },
+      ]);
+    });
+
+    it("ignores non-process rows", () => {
+      const s = reduce(withItems(initialState()), k("ArrowDown")).state;
+      expect(reduce(s, k("Backspace")).effects).toEqual([]);
+    });
   });
 });

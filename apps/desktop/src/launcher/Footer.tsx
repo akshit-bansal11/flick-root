@@ -7,7 +7,8 @@ const KEYS: Record<Mode, string[]> = {
   query: ["↵ ask", "Ctrl T effort", "Ctrl P provider", "Tab mode"],
 };
 
-export function Footer({ mode }: { mode: Mode }) {
+export function Footer({ mode, canKill = false }: { mode: Mode; canKill?: boolean }) {
+  const keys = canKill ? ["⌫ kill", ...KEYS[mode]] : KEYS[mode];
   return (
     <div className="foot">
       <span className="brand">
@@ -15,7 +16,7 @@ export function Footer({ mode }: { mode: Mode }) {
         {APP_DISPLAY_NAME}
       </span>
       <span className="keys">
-        {KEYS[mode].map((k) => (
+        {keys.map((k) => (
           <span key={k}>{k}</span>
         ))}
       </span>

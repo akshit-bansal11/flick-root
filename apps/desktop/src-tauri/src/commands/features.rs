@@ -196,6 +196,7 @@ pub async fn run_system_command(
     state: State<'_, Arc<AppState>>,
     command_id: String,
     confirm_token: Option<String>,
+    kill: Option<bool>,
 ) -> Result<Outcome, CommandError> {
     let it = state
         .last_results
@@ -209,7 +210,11 @@ pub async fn run_system_command(
         .await
         .ok_or_else(|| CommandError::new("unknown_feature", "no feature for that result"))?;
     let action = Action {
-        kind: ActionKind::Primary,
+        kind: if kill == Some(true) {
+            ActionKind::Kill
+        } else {
+            ActionKind::Primary
+        },
         confirm_token,
     };
     f.execute(&it, action).await.map_err(map_err)

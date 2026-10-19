@@ -16,8 +16,8 @@ export const reveal = (itemId: string) => invoke<void>("reveal", { itemId });
 
 export const copyPath = (itemId: string) => invoke<void>("copy_path", { itemId });
 
-export const runSystemCommand = (commandId: string, confirmToken?: string) =>
-  invoke<Outcome>("run_system_command", { commandId, confirmToken });
+export const runSystemCommand = (commandId: string, confirmToken?: string, kill = false) =>
+  invoke<Outcome>("run_system_command", { commandId, confirmToken, kill });
 
 export function askStream(req: AskRequest, onEvent: (e: AskEvent) => void): Promise<string> {
   // One Channel per call, so only this ask's events reach onEvent; the caller tags them with its token.

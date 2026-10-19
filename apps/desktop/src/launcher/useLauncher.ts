@@ -3,7 +3,7 @@ import * as ipc from "../ipc";
 import type { Outcome } from "../types";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
-const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"]);
+const HANDLED = new Set(["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape", "Backspace"]);
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
 export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
@@ -35,7 +35,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           outcome(e.itemId, ipc.launch(e.itemId, e.admin));
           break;
         case "confirm":
-          outcome(e.commandId, ipc.runSystemCommand(e.commandId, e.token));
+          outcome(e.commandId, ipc.runSystemCommand(e.commandId, e.token, e.kill));
+          break;
+        case "kill":
+          outcome(e.itemId, ipc.runSystemCommand(e.itemId, undefined, true));
           break;
         case "reveal":
           ipc.reveal(e.itemId).catch(warn);

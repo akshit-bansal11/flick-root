@@ -6,6 +6,7 @@ pub mod feature;
 pub mod frecency;
 pub mod math;
 pub mod nlfind;
+pub mod ports;
 pub mod projects;
 pub mod registry;
 pub mod schema;
@@ -31,6 +32,7 @@ pub fn builtin_features() -> Vec<Arc<dyn Feature>> {
         Arc::new(syscmd::SysCmd::default()),
         Arc::new(web::Web),
         Arc::new(projects::Projects::default()),
+        Arc::new(ports::Ports::default()),
     ]
 }
 
@@ -39,14 +41,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtins_are_five_unique_enabled_v001() {
+    fn builtins_are_six_unique_and_enabled() {
         let f = builtin_features();
         let ids: std::collections::HashSet<_> = f.iter().map(|x| x.id()).collect();
-        assert_eq!(f.len(), 5);
-        assert_eq!(ids.len(), 5);
+        assert_eq!(f.len(), 6);
+        assert_eq!(ids.len(), 6);
+        assert!(f.iter().all(|x| x.default_enabled()));
         assert!(
             f.iter()
-                .all(|x| x.default_enabled() && x.version_tag() == "v0.0.1")
+                .any(|x| x.id() == "ports" && x.version_tag() == "v0.1.0")
         );
     }
 }
