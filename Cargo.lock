@@ -1039,7 +1039,7 @@ checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
 name = "decision"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "desktop-shell"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1447,7 +1447,7 @@ dependencies = [
 
 [[package]]
 name = "features"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -2438,7 +2438,7 @@ dependencies = [
 
 [[package]]
 name = "index-apps"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arc-swap",
  "launcher-core",
@@ -2454,7 +2454,7 @@ dependencies = [
 
 [[package]]
 name = "index-files"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arc-swap",
  "criterion",
@@ -2779,7 +2779,7 @@ dependencies = [
 
 [[package]]
 name = "launcher-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "criterion",
  "nucleo-matcher",
@@ -3905,7 +3905,7 @@ dependencies = [
 
 [[package]]
 name = "providers"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -6070,7 +6070,7 @@ checksum = "a28ac98ddc8b9274cb41bb4d9d4d5c425b6020c50c46f25559911905610b4a88"
 
 [[package]]
 name = "win"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "thiserror 2.0.21",
  "windows",
