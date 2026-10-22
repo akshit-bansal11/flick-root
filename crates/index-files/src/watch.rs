@@ -501,6 +501,7 @@ mod tests {
             index: None,
             busy: Arc::new(AtomicBool::new(false)),
             stale: Arc::new(AtomicBool::new(false)),
+            on_program: None,
         }
     }
 
