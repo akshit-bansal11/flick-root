@@ -105,7 +105,7 @@ Ask uses the thinking mode you chose first (see [thinking modes](docs/features/t
 - All network calls are made by the Rust side. The WebView makes no network calls, and its Content Security Policy blocks remote scripts, frames and images.
 - Model output is untrusted. It is rendered as sanitized Markdown with raw HTML off, and it cannot trigger any action by itself.
 - Text that looks like a secret is blocked from being sent to a model.
-- Update check: at most once a day Flick asks api.github.com for the latest release version. Turn it off in Settings › General.
+- Update check: at most once a day Flick asks api.github.com for the latest release version. Turn it off in Settings › General. Install downloads the installer from GitHub, checks its signature against the key built into Flick, and runs it.
 - No telemetry, and no network calls on the keystroke path.
 
 See [ADR-011](docs/adr/ADR-011-secret-security.md) for the full rules.

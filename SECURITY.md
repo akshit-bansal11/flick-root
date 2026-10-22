@@ -19,6 +19,7 @@ The rules below come from [ADR-011](docs/adr/ADR-011-secret-security.md). They l
 - **Host binding.** A key is bound to the host it was entered for. It is sent only over HTTPS to that host. Plain HTTP is allowed only for `localhost` and `127.0.0.1`. Authenticated requests do not follow redirects. Changing a provider's host removes the stored key.
 - **Network location.** All network calls are made by the Rust side. The WebView makes no network calls, and its Content Security Policy blocks remote scripts, frames and images.
 - **Redaction.** Logs and the panic hook mask key-like patterns and every stored secret value.
+- **Signed updates.** Updates are signed with the maintainer's updater key (minisign, via Tauri). Flick refuses an update whose signature does not match the key built into it. This is separate from Windows code signing.
 - **Untrusted output.** Model output is rendered as sanitized Markdown with raw HTML off and no remote images. It cannot trigger any action by itself.
 - **Secret-looking text.** Text that looks like a secret is blocked from being sent to a model.
 - **Warning.** Adding a key shows a risk warning, and saving requires confirmation.

@@ -35,6 +35,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -42,5 +43,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhBOTk2NzMyNzJDNjYzQzEKUldUQlk4WnlNbWVaaXNkMmMxb0U2ejAzdFpWTWJyZ2FPRXZzbWFPVVU1ZHdRQ3RGN3J1L2hoeEYK",
+      "endpoints": [
+        "https://github.com/akshit-bansal11/flick/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

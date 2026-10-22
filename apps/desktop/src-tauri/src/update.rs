@@ -13,6 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::menu::MenuItem;
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_updater::UpdaterExt;
 
 const STALE_SECS: i64 = 24 * 60 * 60;
 const STARTUP_DELAY: Duration = Duration::from_secs(20);
@@ -73,18 +74,50 @@ pub fn check_if_stale(app: &AppHandle) {
 pub fn on_tray(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let known = app
-            .try_state::<UpdateState>()
-            .and_then(|s| s.known.lock().clone());
-        match known {
-            Some(f) => {
-                if let Err(err) = crate::commands::launch::open_link(f.url).await {
-                    tracing::warn!(?err, "opening release page failed");
-                }
+        let Some(st) = app.try_state::<UpdateState>() else {
+            return;
+        };
+        let known = st.known.lock().clone();
+        let Some(f) = known else {
+            run(&app, true).await;
+            return;
+        };
+        // Single-flight: a second click while downloading does nothing.
+        let Some(_guard) = st.busy.try_begin() else {
+            return;
+        };
+        toast(
+            &app,
+            format!("Downloading {APP_DISPLAY_NAME} {}…", f.version),
+            "It restarts by itself when the update is installed.",
+        );
+        if let Err(err) = install(&app).await {
+            tracing::warn!(?err, "update install failed");
+            toast(
+                &app,
+                APP_DISPLAY_NAME.to_string(),
+                "Couldn't install the update. Opening the download page.",
+            );
+            if let Err(err) = crate::commands::launch::open_link(f.url).await {
+                tracing::warn!(?err, "opening release page failed");
             }
-            None => run(&app, true).await,
         }
     });
+}
+
+/// Downloads, verifies and installs the signed update. On Windows the app exits (after the same
+/// shutdown as a normal quit) and the passive installer relaunches it, so success never returns.
+async fn install(app: &AppHandle) -> anyhow::Result<()> {
+    let handle = app.clone();
+    let updater = app
+        .updater_builder()
+        .on_before_exit(move || crate::state::shutdown(&handle))
+        .build()?;
+    let Some(update) = updater.check().await? else {
+        anyhow::bail!("no signed update published yet");
+    };
+    update.download_and_install(|_, _| {}, || {}).await?;
+    Ok(())
 }
 
 fn path() -> Option<PathBuf> {
@@ -223,7 +256,7 @@ async fn run(app: &AppHandle, manual: bool) {
             let title = format!("{APP_DISPLAY_NAME} {} is available", f.version);
             if let Err(err) = st
                 .item
-                .set_text(format!("Download {APP_DISPLAY_NAME} {}", f.version))
+                .set_text(format!("Install {APP_DISPLAY_NAME} {}", f.version))
             {
                 tracing::warn!(%err, "tray text update failed");
             }
@@ -231,7 +264,7 @@ async fn run(app: &AppHandle, manual: bool) {
                 toast(
                     app,
                     title,
-                    "Open the tray menu and choose Download to get it.",
+                    "Open the tray menu and choose Install to update.",
                 );
                 stored.notified_version = Some(f.version.clone());
             }

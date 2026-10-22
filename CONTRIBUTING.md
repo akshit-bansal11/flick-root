@@ -55,6 +55,8 @@ pnpm --filter web build
 
 CI runs the same gates on every pull request, split into jobs that run only when their files changed: `rust` (format, clippy, tests, cargo deny, cargo audit) for `crates/`, `apps/desktop/src-tauri/` and the Cargo files; `js` (typecheck, lint, JS tests, pnpm audit) for the desktop UI and any JS, TS, JSON or CSS file; `web` (the web build) for `apps/web/`. A change to `ci.yml` itself, or a manual run (`gh workflow run ci.yml`), runs every job.
 
+Releases (`release.yml`) need the repo secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to sign the updater artifacts.
+
 ## Code rules
 
 Rust:
