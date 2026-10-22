@@ -55,13 +55,14 @@ fn watcher_lifecycle() {
     ix.replace(
         scan(
             &roots,
+            &index_files::SkipList::default(),
             &Parallelism::RayonNewPool(2),
             &AtomicBool::new(false),
             |_| {},
         )
         .unwrap(),
     );
-    let w = FileIndex::watch(&roots).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
     let ov = w.overlay();
     let has = |h: &[FileHit]| !h.is_empty();
     let none = |h: &[FileHit]| h.is_empty();
@@ -129,6 +130,7 @@ fn root(id: u8, path: &Path) -> Root {
 fn scan_of(roots: &[Root]) -> index_files::FileStore {
     scan(
         roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(false),
         |_| {},
@@ -244,7 +246,7 @@ fn missing_root_is_skipped_and_the_rest_are_watched() {
     let roots = vec![root(0, &d.path().join("missing")), root(1, &live)];
     let ix = FileIndex::new();
     ix.replace(scan_of(&roots[1..]));
-    let w = FileIndex::watch(&roots).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
     assert_eq!(w.watched(), &roots[1..]);
     assert_eq!(w.failed().len(), 1);
     assert!(!w.is_stale());
@@ -252,5 +254,29 @@ fn missing_root_is_skipped_and_the_rest_are_watched() {
     fs::write(live.join("walrus_new.txt"), "x").unwrap();
     assert!(wait(&ix, &ov, "walrus_new", |h| !h.is_empty()));
 
-    assert!(FileIndex::watch(&roots[..1]).is_err(), "no root watchable");
+    assert!(
+        FileIndex::watch(&roots[..1], &index_files::SkipList::default()).is_err(),
+        "no root watchable"
+    );
+}
+
+#[test]
+fn watcher_ignores_creates_under_excluded_folders() {
+    let d = tempfile::tempdir().unwrap();
+    let (skipped, kept) = (d.path().join("skipme"), d.path().join("kept"));
+    fs::create_dir_all(&skipped).unwrap();
+    fs::create_dir_all(&kept).unwrap();
+    let roots = vec![root(0, d.path())];
+    let skip = index_files::SkipList::new(&[skipped.to_string_lossy().into_owned()]);
+    let ix = FileIndex::new();
+    ix.replace(scan_of(&roots));
+    let w = FileIndex::watch(&roots, &skip).unwrap();
+    let ov = w.overlay();
+    fs::write(skipped.join("quokka_hidden.txt"), "x").unwrap();
+    fs::write(kept.join("quokka_sentinel.txt"), "x").unwrap();
+    assert!(wait(&ix, &ov, "quokka_sentinel", |h| !h.is_empty()));
+    assert!(
+        ix.find(&ov, &q("quokka_hidden")).is_empty(),
+        "excluded folder content stays out"
+    );
 }

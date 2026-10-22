@@ -6,7 +6,8 @@
 use crate::error::FilesError;
 use crate::scan::Root;
 use crate::skip::should_skip;
-use crate::store::{FileIndex, FileStore, NO_PARENT, StoreBuilder};
+use crate::skiplist::SkipList;
+use crate::store::{FileIndex, FileStore, MAX_FILES, NO_PARENT, StoreBuilder};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::{HashMap, HashSet};
@@ -137,8 +138,17 @@ impl Overlay {
     /// Record that `path` was created or changed (exists on disk) or deleted (does not).
     /// A directory that appears is walked so its children are recorded too.
     pub fn apply_path(&self, roots: &[Root], path: &Path) {
+        self.apply_path_with(roots, &SkipList::default(), MAX_FILES, path);
+    }
+
+    /// Like [`Overlay::apply_path`], but a path under a directory `skip` excludes is not
+    /// added, and at most `room` entries are added (the store's headroom below [`MAX_FILES`]).
+    /// Removals are always recorded.
+    pub fn apply_path_with(&self, roots: &[Root], skip: &SkipList, room: usize, path: &Path) {
         let md = std::fs::metadata(path).ok();
-        let new = md.as_ref().map(|m| collect_added(roots, path, m));
+        let new = md
+            .as_ref()
+            .map(|m| collect_added(roots, skip, room, path, m));
         let track_removal = md.is_none() && removal_relevant(roots, path);
         let mut g = self.write();
         g.added.retain(|a| !a.path.starts_with(path));
@@ -177,8 +187,18 @@ fn added_of(root: u8, path: PathBuf, name: &OsStr, md: &std::fs::Metadata) -> Ad
 }
 
 /// The entry for `path` plus, for a directory, everything indexable beneath it.
-fn collect_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Vec<Added> {
-    let Some(first) = make_added(roots, path, md) else {
+fn collect_added(
+    roots: &[Root],
+    skip: &SkipList,
+    room: usize,
+    path: &Path,
+    md: &std::fs::Metadata,
+) -> Vec<Added> {
+    let cap = room.min(WALK_CAP);
+    if cap == 0 {
+        return Vec::new();
+    }
+    let Some(first) = make_added(roots, skip, path, md) else {
         return Vec::new();
     };
     let root = first.root;
@@ -195,10 +215,13 @@ fn collect_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Vec<Add
                 continue;
             }
             if cmd.is_dir() {
+                if skip.excludes_dir(&e.path()) {
+                    continue;
+                }
                 stack.push(e.path());
             }
             out.push(added_of(root, e.path(), &name, &cmd));
-            if out.len() >= WALK_CAP {
+            if out.len() >= cap {
                 return out; // ponytail: huge moves are truncated; the next scan completes them
             }
         }
@@ -206,11 +229,21 @@ fn collect_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Vec<Add
     out
 }
 
-fn make_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Option<Added> {
+fn make_added(
+    roots: &[Root],
+    skip: &SkipList,
+    path: &Path,
+    md: &std::fs::Metadata,
+) -> Option<Added> {
     let root = roots.iter().find(|r| path.starts_with(&r.path))?;
     let rel = path.strip_prefix(&root.path).ok()?;
     let name = rel.file_name()?;
     if should_skip(name, md.file_attributes(), md.is_dir()) {
+        return None;
+    }
+    // A directory is excluded itself; a file only through the folders above it.
+    let from = usize::from(!md.is_dir());
+    if path.ancestors().skip(from).any(|a| skip.excludes_dir(a)) {
         return None;
     }
     // Every ancestor below the root must itself be indexable (name and hidden/system attributes).
@@ -230,6 +263,7 @@ fn make_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Option<Add
 struct Sink {
     overlay: Arc<Overlay>,
     roots: Vec<Root>,
+    skip: SkipList,
     index: Option<Arc<FileIndex>>,
     busy: Arc<AtomicBool>,
     stale: Arc<AtomicBool>,
@@ -257,7 +291,10 @@ impl Sink {
             return;
         }
         for p in &ev.paths {
-            self.overlay.apply_path(&self.roots, p);
+            let stored = self.index.as_ref().map_or(0, |ix| ix.load().len());
+            let room = MAX_FILES.saturating_sub(stored + self.overlay.read().added.len());
+            self.overlay
+                .apply_path_with(&self.roots, &self.skip, room, p);
         }
         if let Some(ix) = &self.index
             && self.overlay.len() > COMPACT_AT
@@ -295,12 +332,17 @@ impl WatchHandle {
     /// on a background thread once it passes [`COMPACT_AT`] entries. A root that cannot be
     /// watched (drive gone) is skipped and listed in [`WatchHandle::failed`]; this errors
     /// only when roots were given and none could be watched.
-    pub fn start(roots: &[Root], index: Option<Arc<FileIndex>>) -> Result<Self, FilesError> {
+    pub fn start(
+        roots: &[Root],
+        skip: &SkipList,
+        index: Option<Arc<FileIndex>>,
+    ) -> Result<Self, FilesError> {
         let overlay = Arc::new(Overlay::new());
         let stale = Arc::new(AtomicBool::new(false));
         let sink = Sink {
             overlay: Arc::clone(&overlay),
             roots: roots.to_vec(),
+            skip: skip.clone(),
             index,
             busy: Arc::new(AtomicBool::new(false)),
             stale: Arc::clone(&stale),
@@ -408,6 +450,7 @@ mod tests {
         Sink {
             overlay: Arc::new(Overlay::new()),
             roots: Vec::new(),
+            skip: SkipList::default(),
             index: None,
             busy: Arc::new(AtomicBool::new(false)),
             stale: Arc::new(AtomicBool::new(false)),

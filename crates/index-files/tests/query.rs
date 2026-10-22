@@ -40,6 +40,7 @@ fn text_ext_date_filters() {
     let roots = setup(d.path());
     let s = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(false),
         |_| {},
@@ -82,6 +83,7 @@ fn overlay_create_and_delete() {
     let roots = setup(d.path());
     let s = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(false),
         |_| {},
@@ -89,7 +91,7 @@ fn overlay_create_and_delete() {
     .unwrap();
     let ix = FileIndex::new();
     ix.replace(s);
-    let w = FileIndex::watch(&roots).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
     let ov = w.overlay();
     let poll = |want: bool, text: &str| {
         let end = Instant::now() + Duration::from_secs(2);

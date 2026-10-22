@@ -15,6 +15,15 @@ use std::sync::Arc;
 /// Parent index marking a root entry.
 pub const NO_PARENT: u32 = u32::MAX;
 
+/// Most entries a store holds, so the store stays within 64 MB (67,108,864 bytes).
+///
+/// Bytes per entry: the [`Entry`] struct is 4 (name_off), 2 (name_len), 1 (is_dir), 1 (root),
+/// 4 (parent) and 4 (modified_min), 16 bytes in all. The shared name arena adds the file
+/// name, about 24 bytes on average (UTF-8, no terminator). That is 40 bytes per entry, and
+/// 67,108,864 / 40 = 1,677,721 entries; 1,600,000 leaves about 4% headroom
+/// (1,600,000 x 40 = 64,000,000 bytes).
+pub const MAX_FILES: usize = 1_600_000;
+
 /// One indexed file or directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Entry {
@@ -70,6 +79,16 @@ impl StoreBuilder {
             modified_min,
         });
         Some(idx)
+    }
+
+    /// Entries pushed so far.
+    pub fn len(&self) -> usize {
+        self.store.entries.len()
+    }
+
+    /// True when nothing was pushed.
+    pub fn is_empty(&self) -> bool {
+        self.store.entries.is_empty()
     }
 
     /// Finish with the root table.

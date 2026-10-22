@@ -32,6 +32,7 @@ fn skips_and_keeps() {
     }];
     let s = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(false),
         |_| {},
@@ -58,6 +59,7 @@ fn cancelled() {
     }];
     let r = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(true),
         |_| {},
@@ -77,6 +79,7 @@ fn single_thread_pool_still_finds_files() {
     }];
     let s = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(1),
         &AtomicBool::new(false),
         |_| {},
@@ -107,6 +110,7 @@ fn hidden_system_root_is_walked() {
     }];
     let s = scan(
         &roots,
+        &index_files::SkipList::default(),
         &Parallelism::RayonNewPool(2),
         &AtomicBool::new(false),
         |_| {},
@@ -114,4 +118,66 @@ fn hidden_system_root_is_walked() {
     assert!(attrib(["-h", "-s"]));
     let s = s.unwrap();
     assert!((0..s.len()).any(|i| s.name(i) == "b.txt"));
+}
+
+fn root_of(p: &std::path::Path) -> [Root; 1] {
+    [Root {
+        id: 0,
+        path: p.to_path_buf(),
+        label: "t".into(),
+    }]
+}
+
+#[test]
+fn excluded_path_and_glob_are_not_indexed() {
+    let d = tempfile::tempdir().unwrap();
+    let p = d.path();
+    for dir in ["keep", "games/deep", "a/scratch_cache/x"] {
+        fs::create_dir_all(p.join(dir)).unwrap();
+    }
+    for f in ["keep/k.txt", "games/deep/g.txt", "a/scratch_cache/x/c.txt"] {
+        fs::write(p.join(f), "x").unwrap();
+    }
+    let skip = index_files::SkipList::new(&[
+        p.join("games").to_string_lossy().into_owned(),
+        "*_cache".to_string(),
+    ]);
+    let s = scan(
+        &root_of(p),
+        &skip,
+        &Parallelism::RayonNewPool(2),
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    let names: Vec<&str> = (0..s.len()).map(|i| s.name(i)).collect();
+    assert!(names.contains(&"k.txt"));
+    for gone in ["games", "g.txt", "scratch_cache", "c.txt"] {
+        assert!(!names.contains(&gone), "{gone} must not be indexed");
+    }
+}
+
+#[test]
+fn cap_stops_the_walk_and_sets_the_flag() {
+    let d = tempfile::tempdir().unwrap();
+    for i in 0..10 {
+        fs::write(d.path().join(format!("f{i}.txt")), "x").unwrap();
+    }
+    let run = |max| {
+        index_files::scan_capped(
+            &root_of(d.path()),
+            &index_files::SkipList::default(),
+            max,
+            &Parallelism::Serial,
+            &AtomicBool::new(false),
+            |_| {},
+        )
+        .unwrap()
+    };
+    let (s, capped) = run(4);
+    assert!(capped);
+    assert_eq!(s.len(), 4);
+    let (s, capped) = run(11);
+    assert!(!capped, "root plus ten files fit exactly");
+    assert_eq!(s.len(), 11);
 }

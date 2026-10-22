@@ -11,7 +11,7 @@ use index_files::drives;
 use index_files::programs::unix_now;
 use index_files::{
     FileIndex, FilesError, Overlay, ProgramCache, ProgramFile, Root, SkipList, WatchHandle,
-    default_roots, scan, snapshot,
+    default_roots, snapshot,
 };
 use launcher_core::config::{Config, config_path, local_data_dir};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -246,11 +246,14 @@ pub fn plan_refresh(
         plan.find_reconcile =
             last.find_stale || (!last.opened && old(last.find_snapshot, FIND_MAX_AGE));
         if !plan.find_reconcile {
-            // Find keeps fixed drives only until the entry cap lands (F8.14).
+            // Fixed and removable drives, like roots_for.
             let want: Vec<char> = if cfg.find_drives {
                 drives
                     .iter()
-                    .filter(|d| d.2 == DriveKind::Fixed && Some(d.0) != cfg.system)
+                    .filter(|d| {
+                        matches!(d.2, DriveKind::Fixed | DriveKind::Removable)
+                            && Some(d.0) != cfg.system
+                    })
                     .map(|d| d.0)
                     .collect()
             } else {
@@ -535,11 +538,16 @@ fn roots_for(cfg: &Config) -> Vec<Root> {
         .filter(|r| find.roots.iter().any(|n| n.eq_ignore_ascii_case(&r.label)))
         .collect();
     // Runs on the blocking pool: GetDriveTypeW can stall on network or optical drives.
-    // Find keeps fixed drives only until the entry cap lands (F8.14).
+    // Fixed and removable drives; network and optical stay out. MAX_FILES bounds the store.
     let drive_list: Vec<char> = if find.include_drives {
         win::drives::indexable_drives()
             .into_iter()
-            .filter(|d| d.kind == win::drives::DriveKind::Fixed)
+            .filter(|d| {
+                matches!(
+                    d.kind,
+                    win::drives::DriveKind::Fixed | win::drives::DriveKind::Removable
+                )
+            })
             .map(|d| d.letter)
             .collect()
     } else {
@@ -940,7 +948,7 @@ fn filter_programs(st: &AppState) -> Result<usize, FilesError> {
 }
 
 /// Drops from the Find store the subtrees of the newly added drive or folder entries (no I/O).
-/// ponytail: name patterns are not applied to Find until F8.14 teaches its scan the skip list.
+/// Name patterns need no pass here: the Find scan and watcher apply the skip list themselves.
 fn filter_find(st: &AppState, added: &[String]) {
     if !st.config.load().modes.find.enabled {
         return;
@@ -1034,7 +1042,8 @@ fn watch_roots(
     roots: &[Root],
 ) -> Result<(), FilesError> {
     *watch = None; // the old watcher stops before the new one starts
-    let handle = st.files.watch_auto(roots)?;
+    let skip = SkipList::new(&st.config.load().apps.skip);
+    let handle = st.files.watch_auto(roots, &skip)?;
     for (root, why) in handle.failed() {
         tracing::warn!(root = %root.path.display(), why, "find root not watched");
     }
@@ -1118,7 +1127,22 @@ async fn find_full(s: &Arc<AppState>, supersede: bool) {
         let store = {
             let pool = scan_pool();
             let _bg = win::thread::BackgroundGuard::new();
-            scan(&roots, &pool, &cancel, |_| {})?
+            let skip = SkipList::new(&st.config.load().apps.skip);
+            let (store, capped) = index_files::scan_capped(
+                &roots,
+                &skip,
+                index_files::MAX_FILES,
+                &pool,
+                &cancel,
+                |_| {},
+            )?;
+            if capped {
+                tracing::warn!(
+                    max = index_files::MAX_FILES,
+                    "find scan stopped at the entry cap; the index is incomplete"
+                );
+            }
+            store
         };
         tracing::info!(
             files = store.len(),
@@ -1166,7 +1190,18 @@ async fn find_drive_roots(s: &Arc<AppState>, add: Vec<char>, drop_roots: Vec<cha
                     path: PathBuf::from(format!("{l}:\\")),
                     label: format!("{l}:"),
                 };
-                let store = scan(std::slice::from_ref(&root), &pool, &cancel, |_| {})?;
+                let skip = SkipList::new(&st.config.load().apps.skip);
+                let (store, capped) = index_files::scan_capped(
+                    std::slice::from_ref(&root),
+                    &skip,
+                    index_files::MAX_FILES,
+                    &pool,
+                    &cancel,
+                    |_| {},
+                )?;
+                if capped {
+                    tracing::warn!(drive = %l, "find scan stopped at the entry cap");
+                }
                 scanned.push((root, store));
             }
         }
@@ -1371,6 +1406,7 @@ mod tests {
                 RefreshPlan {
                     program_roots: vec!['E'],
                     programs_republish: true,
+                    find_roots_add: vec!['E'],
                     ..RefreshPlan::default()
                 },
             ),

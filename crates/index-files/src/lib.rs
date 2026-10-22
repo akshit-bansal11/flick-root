@@ -16,21 +16,26 @@ pub mod watch;
 pub use error::FilesError;
 pub use programs::{PROGRAM_EXTS, ProgramCache, ProgramFile, ScannedRoot, scan_root};
 pub use query::{FileHit, FindQuery, query};
-pub use scan::{Parallelism, Root, default_roots, scan};
+pub use scan::{Parallelism, Root, default_roots, scan, scan_capped};
 pub use skiplist::SkipList;
-pub use store::{FileIndex, FileStore, StoreBuilder};
+pub use store::{FileIndex, FileStore, MAX_FILES, StoreBuilder};
 pub use watch::{Overlay, WatchHandle};
 
 impl FileIndex {
-    /// Start watching `roots`; the handle's overlay feeds [`FileIndex::find`].
-    pub fn watch(roots: &[Root]) -> Result<WatchHandle, FilesError> {
-        WatchHandle::start(roots, None)
+    /// Start watching `roots`; the handle's overlay feeds [`FileIndex::find`]. Changes under a
+    /// directory `skip` excludes are ignored.
+    pub fn watch(roots: &[Root], skip: &SkipList) -> Result<WatchHandle, FilesError> {
+        WatchHandle::start(roots, skip, None)
     }
 
     /// Like [`FileIndex::watch`], but compacts into this index in the background when the
     /// overlay grows past [`watch::COMPACT_AT`].
-    pub fn watch_auto(self: &Arc<Self>, roots: &[Root]) -> Result<WatchHandle, FilesError> {
-        WatchHandle::start(roots, Some(Arc::clone(self)))
+    pub fn watch_auto(
+        self: &Arc<Self>,
+        roots: &[Root],
+        skip: &SkipList,
+    ) -> Result<WatchHandle, FilesError> {
+        WatchHandle::start(roots, skip, Some(Arc::clone(self)))
     }
 
     /// Query the current store merged with `overlay`.
