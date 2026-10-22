@@ -258,15 +258,9 @@ body,
   box-shadow: none;
 }
 
-.hint-desc,
-.hint-note {
+.hint-desc {
   min-width: 0;
   color: var(--l-muted);
-}
-
-.hint-note {
-  margin: 0;
-  padding: var(--l-sp-3) var(--l-sp-5);
 }
 
 /* Glass keycap. No backdrop-filter: a footer and a shortcut list hold many per frame.

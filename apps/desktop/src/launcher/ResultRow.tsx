@@ -32,6 +32,8 @@ export function primaryLabel(item: Item): string {
 }
 
 export function ResultRow({ item, id, index, selected, order, query, onActivate }: Props) {
+  // Search-instead rows (source "ui") are a title and a glyph tile only.
+  const fallback = item.source === "ui";
   return (
     <div
       id={id}
@@ -52,9 +54,9 @@ export function ResultRow({ item, id, index, selected, order, query, onActivate 
             s.hit ? <b key={s.at}>{s.text}</b> : <span key={s.at}>{s.text}</span>,
           )}
         </span>
-        <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>
+        {!fallback && <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>}
       </span>
-      {selected ? (
+      {fallback && !selected ? null : selected ? (
         <span className="row-act" aria-hidden="true">
           <Keycaps caps={["↵"]} />
           {primaryLabel(item)}

@@ -17,10 +17,12 @@ interface Props {
   items: Item[];
   selected: number;
   query: string;
+  /** True while a search is in flight; the empty state waits for its results. */
+  pending?: boolean;
   onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
 }
 
-export function Results({ items, selected, query, onActivate }: Props) {
+export function Results({ items, selected, query, pending = false, onActivate }: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
   const list = useRef<HTMLDivElement>(null);
@@ -56,7 +58,9 @@ export function Results({ items, selected, query, onActivate }: Props) {
           );
         })}
       </div>
-      {items.length === 0 && query.trim() !== "" && <div className="empty">No matches</div>}
+      {items.length === 0 && !pending && query.trim() !== "" && (
+        <div className="empty">No matches</div>
+      )}
     </>
   );
 }
@@ -64,14 +68,11 @@ export function Results({ items, selected, query, onActivate }: Props) {
 interface HintProps {
   modes: Exclude<LaunchMode, "none">[];
   selected: number;
-  /** True once the user typed text that matched no prefix. */
-  typed: boolean;
   onEnter: (mode: LaunchMode) => void;
 }
 
 /** Prefix cheat sheet shown in the default state; each row enters its mode. */
-export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
-  const prefixes = modes.map((m) => MODES[m].prefix).join(" ");
+export function PrefixHints({ modes, selected, onEnter }: HintProps) {
   const list = useRef<HTMLDivElement>(null);
   const lens = useRef<HTMLDivElement>(null);
   useLens(list, lens, modes[selected] ? hintId(selected) : undefined, modes);
@@ -101,7 +102,6 @@ export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
           <Keycaps caps={caps(`go:${m}`)} />
         </button>
       ))}
-      {typed && <p className="hint-note">Start with {prefixes} to search</p>}
     </div>
   );
 }

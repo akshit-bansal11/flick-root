@@ -3,12 +3,13 @@ import { cancelsDefault } from "../launcher/keys";
 import { type Effect, type Event, initialState, reduce, type State } from "../launcher/reducer";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
-import { createDemoRunner, tourEventOf } from "./demo";
+import { createDemoRunner, DEMO_WEB_TITLE, tourEventOf } from "./demo";
 import type { TourEvent } from "./steps";
 
 const TOAST_MS = 1800;
 
-const fresh = (): State => reduce(initialState(), { type: "shown" }).state;
+const fresh = (): State =>
+  reduce(initialState(null, DEMO_WEB_TITLE), { type: "shown" }).state;
 
 /**
  * The real reducer driven by the demo runner. Same wiring as useLauncher, but effects only

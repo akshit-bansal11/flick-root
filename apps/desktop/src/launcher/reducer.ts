@@ -37,6 +37,8 @@ export interface State {
   enabledSources: string[] | null;
   /** Title of the first web shortcut (launcher://shown); null when the web feature is off. */
   webTitle: string | null;
+  /** True from a search effect until its results arrive; the empty state waits for it. */
+  pending: boolean;
   input: string;
   seq: number;
   /** Id of the current ask; events carrying another token are stale and ignored. */
@@ -194,6 +196,7 @@ export const initialState = (
   mode: "none",
   enabledSources,
   webTitle,
+  pending: false,
   input: "",
   seq: 0,
   askToken: 0,
@@ -225,13 +228,27 @@ const out = (state: State, ...effects: Effect[]): Result => ({ state, effects })
 
 /** Set mode and input; every mode but query searches (none only for non-blank text). */
 function search(s: State, mode: LaunchMode, input: string): Result {
-  const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null, armed: false };
+  const next: State = {
+    ...s,
+    mode,
+    input,
+    selected: 0,
+    pendingConfirm: null,
+    armed: false,
+    pending: false,
+  };
   if (mode === "query" || (mode === "none" && input.trim() === "")) {
     return out({ ...next, items: [] });
   }
   const { wire, sources } = mode === "none" ? PLAIN_SEARCH : MODES[mode];
   const seq = s.seq + 1;
-  return out({ ...next, seq }, { type: "search", seq, mode: wire, text: input, sources });
+  // Plain text shows the fallback rows at once, under the previous results until new ones land.
+  const kept = s.mode === "none" ? s.items.filter((i) => i.source !== "ui") : [];
+  const items = mode === "none" ? [...kept, ...fallbackRows(next)] : next.items;
+  return out(
+    { ...next, items, seq, pending: true },
+    { type: "search", seq, mode: wire, text: input, sources },
+  );
 }
 
 function switchMode(s: State, mode: LaunchMode, input: string): Result {
@@ -575,6 +592,7 @@ export function reduce(s: State, ev: Event): Result {
         items: s.mode === "none" ? [...ev.items, ...fallbackRows(s)] : ev.items,
         selected: 0,
         armed: false,
+        pending: false,
       });
     case "ask":
       return ask(s, ev.token, ev.event);

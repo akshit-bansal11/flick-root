@@ -5,9 +5,9 @@ import type { LaunchMode } from "../types";
 import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
 
-const NONE_PLACEHOLDER = `Type ${Object.values(MODES)
+const NONE_PLACEHOLDER = `Search apps and commands, or type ${Object.values(MODES)
   .map((m) => m.prefix)
-  .join(" ")} to start`;
+  .join(" ")}`;
 
 interface Props {
   mode: LaunchMode;

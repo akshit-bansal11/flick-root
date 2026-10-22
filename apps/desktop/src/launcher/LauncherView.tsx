@@ -42,12 +42,18 @@ export function LauncherView({
 }: LauncherViewProps) {
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
-  const none = state.mode === "none";
+  // The prefix list is none mode with a blank field; with text it is the plain search list.
+  const prefixList = state.mode === "none" && state.input.trim() === "";
+  const plain = state.mode === "none" && !prefixList;
   const selected = state.items[state.selected];
   const pathItem = selected?.id.startsWith("file:") ?? false;
   const hints = availableModes(state.enabledSources);
-  const hasList = none ? hints.length > 0 : state.items.length > 0;
-  const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
+  const hasList = prefixList ? hints.length > 0 : state.items.length > 0;
+  const activeId = !hasList
+    ? undefined
+    : prefixList
+      ? hintId(state.selected)
+      : optionId(state.selected);
 
   return (
     <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
@@ -55,7 +61,7 @@ export function LauncherView({
       <InputBar
         mode={state.mode}
         value={state.input}
-        listId={none ? HINTS_ID : LISTBOX_ID}
+        listId={prefixList ? HINTS_ID : LISTBOX_ID}
         activeId={activeId}
         onChange={setText}
         inputRef={inputRef}
@@ -90,18 +96,14 @@ export function LauncherView({
             onOpenSettings={() => openSettings("providers")}
             onOpenLink={openLink}
           />
-        ) : none ? (
-          <PrefixHints
-            modes={hints}
-            selected={state.selected}
-            typed={state.input !== ""}
-            onEnter={enterMode}
-          />
+        ) : prefixList ? (
+          <PrefixHints modes={hints} selected={state.selected} onEnter={enterMode} />
         ) : (
           <Results
             items={state.items}
             selected={state.selected}
             query={state.input}
+            pending={state.pending}
             onActivate={activate}
           />
         )}
@@ -112,6 +114,7 @@ export function LauncherView({
       <Footer
         mode={state.mode}
         modes={hints}
+        typed={plain}
         copied={state.copied}
         copyFailed={state.copyFailed}
         ctx={{

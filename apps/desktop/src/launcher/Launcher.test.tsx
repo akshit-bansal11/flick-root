@@ -90,7 +90,10 @@ const type = (text: string) =>
 describe("Launcher", () => {
   it("starts in none mode with four prefix hint rows and no search", async () => {
     await mount();
-    expect(screen.getByPlaceholderText("Type / > = ? @ to start")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText("Search apps and commands, or type / > = ? @"),
+    ).toBeTruthy();
+    expect(screen.getByText("Type without a prefix to search apps and commands")).toBeTruthy();
     expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(5);
     expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
     expect(screen.getByText("commands")).toBeTruthy();
@@ -152,11 +155,49 @@ describe("Launcher", () => {
     expect(screen.queryByText("commands")).toBeNull();
   });
 
-  it("plain text keeps the hints and shows a muted line", async () => {
+  it("plain text searches apps and features and lists the Search instead rows", async () => {
+    vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+      cb({
+        shownId: 1,
+        reason: "hotkey",
+        sources: ["apps", "files", "ask"],
+        webTitle: "Google",
+        appearance: { theme: "glass", glass: 90, scheme: "dark" },
+      });
+      return Promise.resolve(() => {});
+    });
     await mount();
     await type("abc");
-    expect(screen.getByText("Start with / > = ? @ to search")).toBeTruthy();
-    expect(ipc.search).not.toHaveBeenCalled();
+    expect(ipc.search).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "command", sources: ["apps", "features"], text: "abc" }),
+    );
+    expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
+    expect(screen.getByText("Search instead")).toBeTruthy();
+    const titles = [...document.querySelectorAll(".row-title")].map((t) => t.textContent);
+    expect(titles.slice(-3)).toEqual([
+      "Find files named “abc”",
+      "Search Google for “abc”",
+      "Ask your AI: “abc”",
+    ]);
+    expect(document.querySelectorAll(".row .tile-glyph")).toHaveLength(3);
+    const rows = [...document.querySelectorAll(".row")].slice(-3);
+    expect(rows.every((r) => r.querySelector(".row-sub") === null)).toBe(true);
+    expect(rows.every((r) => r.querySelector(".row-meta") === null)).toBe(true);
+    expect(screen.queryByText("No matches")).toBeNull();
+  });
+
+  it("Enter on the Find row enters Open carrying the text", async () => {
+    await mount();
+    await type("abc");
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+    });
+    act(() => {
+      fireEvent.keyDown(window, { key: "Enter" });
+    });
+    expect(screen.getByTestId("mode-chip").textContent).toContain("Open");
+    expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("abc");
   });
 
   it("typing a prefix shows a chip, the placeholder and searches with sources", async () => {

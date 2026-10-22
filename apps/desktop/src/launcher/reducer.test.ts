@@ -113,6 +113,15 @@ describe("reducer", () => {
       expect(groupLabel(s.items[1] ?? item("none"))).toBe("Search instead");
     });
 
+    it("show at once while the search is pending, then keep after results", () => {
+      const typed = reduce(initialState(live, "Google"), { type: "text", text: "cats" }).state;
+      expect(typed.pending).toBe(true);
+      expect(typed.items.map((i) => i.id)).toEqual(["ui:find", "ui:web", "ui:ask"]);
+      const done = reduce(typed, { type: "results", seq: typed.seq, items: [] }).state;
+      expect(done.pending).toBe(false);
+      expect(done.items.map((i) => i.id)).toEqual(["ui:find", "ui:web", "ui:ask"]);
+    });
+
     it("drop the Web row without a web title and the Ask row without a live ask", () => {
       expect(plain(live, null).items.map((i) => i.id)).toEqual(["app:cats", "ui:find", "ui:ask"]);
       expect(plain(["apps", "syscmd"], "Google").items.map((i) => i.id)).toEqual([
