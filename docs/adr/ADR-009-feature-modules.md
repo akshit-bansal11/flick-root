@@ -17,17 +17,17 @@ Flick ships several optional features (app and file search, math, projects, syst
 - Config shape: `[features.<id>] enabled = true`, plus that feature's options.
 - Each feature's options page is generated from its `settings_schema()`.
 
-In v0.0.1:
+Current state:
 
-- The trait also has `version_tag()`, `description()` and `modes()`, which the Features page uses. These are additions to the KICKOFF list, not replacements.
+- The trait also has `version_tag()`, `description()` and `modes()`, which the Features page uses. These are additions to the base trait.
 - `start` takes `FeatureCtx` and returns `Result<(), FeatureError>`. A failed start shuts down its child scope, and the feature is skipped by `query_all` (`crates/features/src/registry.rs`).
 - Background work is spawned only through `ctx.tasks`.
-- Known gaps: the Web and Math features keep some state in module-level statics because the registration code builds them as unit values. The followups say to move that state into the struct, and `Frecency::clear_history()` does not yet notify the frecency feature's in-memory maps (open followups).
+- Known gaps: the Web and Math features keep some state in module-level statics because the registration code builds them as unit values. Moving that state into the struct is planned, and `Frecency::clear_history()` does not yet notify the frecency feature's in-memory maps.
 
 ## Alternatives
 
 - Compile-time feature flags. Rejected: the user toggles features at runtime, with no restart.
-- A plugin system with dynamic loading. Not needed for v0.0.1: the features are built in.
+- A plugin system with dynamic loading. Not needed: the features are built in.
 - A hand-written settings page per feature. Rejected: the schema-driven page removes that work for each new feature.
 
 ## Consequences

@@ -4,15 +4,15 @@
   "files": {
     "includes": [
       "**",
+      "!.agent",
+      "!docs/spec/design-lab.html",
       "!**/target",
       "!**/node_modules",
       "!**/.next",
       "!**/dist",
       "!apps/desktop/src-tauri/gen",
       "!apps/web/next-env.d.ts",
-      "!apps/web/public",
-      "!.agent",
-      "!docs/spec/design-lab.html"
+      "!apps/web/public"
     ]
   },
   "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

@@ -1,4 +1,4 @@
-//! Inline math, units, time zones and ECB currency rates (F02).
+//! Inline math, units, time zones and ECB currency rates.
 //!
 //! Contract: the item's `payload.value` is the plain result text. On `CopyResult` the
 //! shell copies `payload.value` to the clipboard; `execute` only answers `Outcome::Copied`.

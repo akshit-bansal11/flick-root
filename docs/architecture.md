@@ -25,7 +25,7 @@ flowchart TD
     PR["providers"]
     FE["features"]
     WI["win"]
-    DE["decision (planned v0.1.0)"]
+    DE["decision"]
   end
   subgraph OS["OS and services"]
     APPS["AppsFolder / ShellExecute"]
@@ -68,7 +68,7 @@ Node count: 21 (3 UI, 5 shell, 7 crates including planned decision, 6 OS/service
 | `index-apps` | AppsFolder enumeration, filters, launch (normal, runas, reveal), icon extraction, app cache | Yes (SAFETY comments) |
 | `index-files` | File index: scan, skip rules, filesystem watcher, snapshot persistence, query for Find mode | No |
 | `providers` | Provider trait, OpenAI-compatible and Anthropic clients, presets, local detection, fallback order, cancellation, secret store (ADR-011) | No |
-| `decision` | Planned for v0.1.0: NL parser, /v1/systemone client for Laya, Kev and Jev, LLM picker with strict JSON parsing | No |
+| `decision` | NL parser, /v1/systemone client for Laya, Kev and Jev, LLM picker with strict JSON parsing | No |
 | `features` | Feature trait, registry, settings schema, start/stop lifecycle (`TaskScope`), frecency, math, projects and other feature modules | No |
 | `win` | Win32 and WinRT wrappers: power, session, recycle bin, Explorer restart, radios, media session, port tables, UI Automation | Yes (SAFETY comments) |
 
@@ -142,12 +142,10 @@ The paths below come from `crates/launcher-core/src/config.rs`. The app director
 - [ADR-002 App index](adr/ADR-002-app-index.md)
 - [ADR-003 File index](adr/ADR-003-file-index.md)
 - [ADR-004 Matching](adr/ADR-004-matching.md)
-- [ADR-005 Natural-language finder](adr/ADR-005-natural-language-finder.md) (planned, v0.1.0)
+- [ADR-005 Natural-language finder](adr/ADR-005-natural-language-finder.md)
 - [ADR-006 Providers](adr/ADR-006-providers.md)
 - [ADR-007 Storage and secrets](adr/ADR-007-storage-and-secrets.md)
 - [ADR-008 Repo and web](adr/ADR-008-repo-and-web.md)
 - [ADR-009 Feature modules](adr/ADR-009-feature-modules.md)
-- [ADR-010 Integrations](adr/ADR-010-integrations.md) (planned, v0.1.0)
+- [ADR-010 Integrations](adr/ADR-010-integrations.md)
 - [ADR-011 Secret security](adr/ADR-011-secret-security.md)
-
-Parts marked planned or v0.1.0 are not implemented yet, including the `decision` crate and the ADR-005 finder.

@@ -1,4 +1,4 @@
-//! Shared decision-engine types (BSD section 2). No trait impls or network code yet.
+//! Shared decision-engine types. No trait impls or network code yet.
 
 use serde::{Deserialize, Serialize};
 

@@ -1,4 +1,4 @@
-//! Error type returned by every Tauri command (`{ code, message }`, BSD section 4).
+//! Error type returned by every Tauri command (`{ code, message }`).
 use std::fmt;
 
 /// Serializable command error. `message` must never contain secrets, key

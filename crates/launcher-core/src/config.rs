@@ -1,4 +1,4 @@
-//! `config.toml` model (BSD section 6.1). No secret is ever stored here.
+//! `config.toml` model. No secret is ever stored here.
 
 use crate::{brand, error::CoreError};
 use serde::{Deserialize, Serialize};
@@ -777,7 +777,7 @@ pub fn config_path() -> Result<PathBuf, CoreError> {
     env_dir("APPDATA").map(|d| d.join("config.toml"))
 }
 
-/// `%LOCALAPPDATA%\<APP_DISPLAY_NAME>`, parent of `cache\`, `data\` and `logs\` (BSD section 6.3).
+/// `%LOCALAPPDATA%\<APP_DISPLAY_NAME>`, parent of `cache\`, `data\` and `logs\`.
 pub fn local_data_dir() -> Result<PathBuf, CoreError> {
     env_dir("LOCALAPPDATA")
 }

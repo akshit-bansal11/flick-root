@@ -18,12 +18,12 @@ Query mode sends a question to a language model. Flick is a wrapper: it bundles 
 - Deltas stream to the UI through `tauri::ipc::Channel`. Esc aborts the request.
 - System prompt: answer directly and briefly, markdown allowed, `max_tokens` 1024.
 
-In v0.0.1:
+Current state:
 
 - Preset list matches the order above (`crates/providers/src/presets.rs`, `PRESETS: [Preset; 8]`), with `default_enabled()` returning false for every preset.
-- Think uses Anthropic adaptive thinking with `output_config.effort` set to `high`. Fast sends no thinking control (per the build log, LOG.md T2.4).
+- Think uses Anthropic adaptive thinking with `output_config.effort` set to `high`. Fast sends no thinking control.
 - The OpenAI-format `Bearer` header string is wrapped in `zeroize::Zeroizing`; the Anthropic `x-api-key` header borrows the secret directly. `HeaderValue` still copies the bytes, which cannot be zeroized.
-- Outbound HTTP for providers uses `reqwest` 0.13 with the `native-tls` feature (SChannel on Windows). reqwest 0.13 has no `rustls-tls` feature, so the TRD's rustls choice was replaced (LOG.md, 2026-10-19 decision).
+- Outbound HTTP for providers uses `reqwest` 0.13 with the `native-tls` feature (SChannel on Windows). reqwest 0.13 has no `rustls-tls` feature, so rustls is not used.
 
 ## Alternatives
 

@@ -1,4 +1,4 @@
-//! Provider list, probing and configuration commands (BSD section 4).
+//! Provider list, probing and configuration commands.
 use super::blocking;
 use crate::error::CommandError;
 use crate::state::AppState;

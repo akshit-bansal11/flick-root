@@ -1,4 +1,4 @@
-//! Feature registry and lifecycle state machine (BSD section 3).
+//! Feature registry and lifecycle state machine.
 
 use crate::ctx::{FeatureCtx, TaskScope};
 use crate::error::FeatureError;

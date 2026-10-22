@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::{Host, Url};
 
-/// Connect timeout for every client (AFD section 6).
+/// Connect timeout for every client.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
 fn build(policy: reqwest::redirect::Policy) -> Result<reqwest::Client, ProviderError> {

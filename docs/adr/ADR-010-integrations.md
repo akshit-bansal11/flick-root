@@ -1,6 +1,6 @@
 # ADR-010: Integrations
 
-Status: Accepted; implemented in v0.1.0 (`crates/features/src/media/`, `crates/features/src/capture/`)
+Status: Accepted; implemented (`crates/features/src/media/`, `crates/features/src/capture/`)
 
 ## Context
 
@@ -26,8 +26,6 @@ Quick capture:
 
 - Targets: Obsidian vault (append to today's daily note, or a chosen file, by writing the Markdown file directly; no plugin), plain Markdown file, Notion (internal integration token plus database ID, with parsed fields mapped to properties), and webhook (POST JSON to a URL).
 - Parse "log 250 lunch" style input locally. Ask the Query provider only when the format is unclear.
-
-Through v0.0.1 none of this was implemented. It shipped in v0.1.0.
 
 ## Alternatives
 

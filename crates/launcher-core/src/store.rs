@@ -1,4 +1,4 @@
-//! SQLite store (BSD section 6.2): frecency, prefix learning, NL cache and rate cache.
+//! SQLite store: frecency, prefix learning, NL cache and rate cache.
 //!
 //! One dedicated std thread owns the write connection and receives [`WriteMsg`] over an mpsc
 //! channel; reads use a separate query-only connection behind a mutex. All methods are

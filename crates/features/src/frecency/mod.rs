@@ -1,4 +1,4 @@
-//! Frecency ranking (F01): a rank boost from how often and how recently an item was run, plus
+//! Frecency ranking: a rank boost from how often and how recently an item was run, plus
 //! per-prefix learning. Off means pure match order, because the registry stops calling the hooks.
 //!
 //! Formula: the store keeps one aggregate `score` per item as of `last_used_ms`, where each launch

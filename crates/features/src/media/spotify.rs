@@ -29,7 +29,7 @@ pub const ACCOUNTS_HOST: &str = "accounts.spotify.com";
 pub const YOUTUBE_HOST: &str = "www.googleapis.com";
 const ACCOUNTS_BASE: &str = "https://accounts.spotify.com";
 const API_BASE: &str = "https://api.spotify.com/v1";
-/// Request timeout (BSD External API table).
+/// Request timeout.
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// How long the browser has to come back.
 const CONNECT_WAIT: Duration = Duration::from_secs(180);

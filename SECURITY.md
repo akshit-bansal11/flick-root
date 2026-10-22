@@ -31,7 +31,7 @@ No storage is completely safe. The following risks remain and are accepted:
 - Malware running as your Windows user can read Credential Manager, and read keys from memory while Flick uses them.
 - A provider breach, or a compromised provider account, can expose a key.
 - Some copies of a key exist inside the HTTP library while a request is built and cannot be zeroized.
-- Some CSP and redirect-policy deviations are recorded as open gaps in ADR-011 and `docs/followups.md`.
+- Some CSP and redirect-policy deviations are recorded as open gaps in ADR-011.
 
 Keep provider keys dedicated to Flick, set a usage limit at the provider, and revoke a key there if you think it leaked.
 

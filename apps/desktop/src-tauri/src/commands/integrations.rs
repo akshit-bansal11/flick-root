@@ -1,4 +1,4 @@
-//! Integration settings (ADR-010, BSD section 3). Secrets are write-only through
+//! Integration settings (ADR-010). Secrets are write-only through
 //! `set_secret`; this module only reports `present` flags and non-secret config.
 use super::blocking;
 use crate::error::CommandError;

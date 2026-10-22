@@ -1,4 +1,4 @@
-//! Decision-engine list, probe and configuration commands (BSD section 4, ADR-005).
+//! Decision-engine list, probe and configuration commands (ADR-005).
 use super::blocking;
 use crate::error::CommandError;
 use crate::state::AppState;

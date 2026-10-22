@@ -1,4 +1,4 @@
-//! F03 System commands with the double-Enter guard (KICKOFF 1.3, BSD sections 2 and 5).
+//! System commands with the double-Enter guard.
 
 use crate::ctx::{EventSink, FeatureCtx, TaskScope};
 use crate::error::FeatureError;

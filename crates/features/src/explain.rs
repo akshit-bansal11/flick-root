@@ -1,5 +1,5 @@
-//! F09 Explain this: a second hotkey captures the selected text and opens Query mode with it
-//! attached (KICKOFF 1.3). The feature holds no query rows; it only gates the hotkey. The shell
+//! Explain this: a second hotkey captures the selected text and opens Query mode with it
+//! attached. The feature holds no query rows; it only gates the hotkey. The shell
 //! binds the hotkey while [`is_running`] is true. The captured text is analysed here so it can be
 //! shown before anything is sent, and secret-looking text is blocked.
 
@@ -23,7 +23,7 @@ pub fn is_running() -> bool {
     RUNNING.load(Ordering::Acquire)
 }
 
-/// Payload of the `explain://captured` event (BSD 5).
+/// Payload of the `explain://captured` event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Captured {
     /// The text the user will see, at most [`PREVIEW_CHARS`] characters; empty when blocked.
@@ -70,7 +70,7 @@ impl Feature for Explain {
         "Explain this"
     }
     fn version_tag(&self) -> &'static str {
-        "v0.1.0"
+        "v0.0.1"
     }
     fn description(&self) -> &'static str {
         "A second hotkey sends the selected text to Query mode. You see it before anything is sent."

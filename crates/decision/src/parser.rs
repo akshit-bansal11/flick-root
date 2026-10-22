@@ -1,4 +1,4 @@
-//! Stage 1 of ADR-005: offline natural-language parser (FR-F06-01, FR-F06-02).
+//! Stage 1 of ADR-005: offline natural-language parser.
 
 use chrono::{Datelike, Duration, NaiveDate, Weekday};
 

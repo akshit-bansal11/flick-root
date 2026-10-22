@@ -4,7 +4,7 @@ Flick is a free, open-source, keyboard-first launcher for Windows. Commands, app
 
 ## Status
 
-Flick is at v0.2.1. Built so far:
+Flick is at v0.0.1. Features:
 
 - Apps (`!`): fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them, plus programs found on your drives.
 - Commands (`>`): system commands, math, units, web shortcuts, ports, media, capture.
@@ -12,16 +12,13 @@ Flick is at v0.2.1. Built so far:
 - Ask (`?`): streams an answer from the provider and model you pick, with Fast/Think, thinking modes and provider fallback.
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
 - Settings window (General, Appearance, Features, AI providers, About), first run with a welcome screen, and an interactive tour.
-
-Added in v0.1.0: Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
-
-Added in v0.2.0: prefix-only modes, programs on all drives, thinking modes, a liquid glass launcher with six themes, and the tutorial.
-
-Changed in v0.2.1: one shortcut table for the launcher and Settings (below), a welcome screen and an interactive tour in its own window, and stricter program matching.
+- Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
+- Programs on all drives, thinking modes, and a liquid glass launcher with six themes.
+- One shortcut table for the launcher and Settings (below), an interactive tour in its own window, and a tutorial.
 
 ## Install
 
-Download the installer from the GitHub Releases page of [akshit-bansal11/flick](https://github.com/akshit-bansal11/flick/releases) once a release is published. The repository is currently private.
+Download the installer from the GitHub Releases page of [akshit-bansal11/flick](https://github.com/akshit-bansal11/flick/releases) once a release is published.
 
 The installer is unsigned, so Windows SmartScreen shows "Windows protected your PC". Choose **More info**, then **Run anyway**. Each release publishes SHA-256 checksums so you can verify the download.
 

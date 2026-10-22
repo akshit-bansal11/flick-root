@@ -1,4 +1,4 @@
-//! Feature error type (BSD section 10).
+//! Feature error type.
 
 /// Errors a feature or the registry can return.
 #[derive(thiserror::Error, Debug)]

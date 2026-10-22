@@ -12,10 +12,10 @@ Flick has a desktop app, several Rust crates, a TypeScript UI, and a public land
 - The landing and docs site is `apps/web`, built with the current stable Next.js (App Router), Tailwind and Framer Motion.
 - The site deploys on Vercel. A custom subdomain is added later.
 
-In v0.0.1:
+Current state:
 
 - `apps/web` exists as a scaffold. Deployment is pending; no production URL is claimed in this ADR.
-- Commands: `pnpm --filter web dev` and `pnpm --filter web build` (CLAUDE.md).
+- Commands: `pnpm --filter web dev` and `pnpm --filter web build`.
 - The dependency list for `apps/web` is not verified in this ADR. Check `apps/web/package.json` before relying on it.
 
 ## Alternatives

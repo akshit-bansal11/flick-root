@@ -24,15 +24,15 @@ Flick handles provider keys, OAuth tokens, webhook secrets and similar credentia
 >
 > [ ] I understand the risk and have set a usage limit.
 
-In v0.0.1:
+Current state:
 
 - The warning text above is the text in `apps/desktop/src/settings/AddKeyDialog.tsx`, with the checkbox label "I understand the risk and have set a usage limit.". The product name in the warning comes from `APP_DISPLAY_NAME` in `apps/desktop/src/brand.ts`; the Rust brand constants live in `crates/launcher-core/src/brand.rs`, and the bundle name in `tauri.conf.json` (`productName`).
 - `set_secret` also takes `acknowledged: bool` and rejects `false` (`apps/desktop/src-tauri/src/commands/secrets.rs`), so the rule holds even if the UI is wrong.
-- The shipped CSP in `apps/desktop/src-tauri/tauri.conf.json` is: `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'`. Two directives go beyond rule 3: `style-src 'self' 'unsafe-inline'` and `font-src 'self'`. This is a known deviation. An open followup asks whether `'unsafe-inline'` is needed, since React style props go through CSSOM and are not blocked by CSP.
-- Rule 5 in v0.0.1: the `Bearer` header string in `openai_compat.rs` is wrapped in `Zeroizing`, and the Anthropic header borrows the secret without an intermediate `String`. The copy inside reqwest's `HeaderValue` cannot be zeroized; that residual copy is accepted.
-- Rule 6 in v0.0.1: authenticated provider clients use `redirect::Policy::none()`. The shared `ctx.http` client in `apps/desktop/src-tauri/src/state.rs` is used only for unauthenticated fetches (the ECB rates file), so rule 6 does not apply to it; it still uses the default redirect policy and no connect timeout, and an open followup moves it to `providers::http::plain_client()`.
-- Rule 7 gap: the panic hook is not tested from outside the process; the unit test covers only the panic text redaction (open followup, T5.10).
-- Rule 8 is implemented by a Rust check that blocks AWS, GitHub, `sk-`, Slack, JWT and PEM patterns, and high-entropy tokens of 32 or more characters (`docs/spec/02-TRD.md` section 7.5).
+- The shipped CSP in `apps/desktop/src-tauri/tauri.conf.json` is: `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'`. Two directives go beyond rule 3: `style-src 'self' 'unsafe-inline'` and `font-src 'self'`. This is a known deviation. Whether `'unsafe-inline'` is needed is open, since React style props go through CSSOM and are not blocked by CSP.
+- Rule 5: the `Bearer` header string in `openai_compat.rs` is wrapped in `Zeroizing`, and the Anthropic header borrows the secret without an intermediate `String`. The copy inside reqwest's `HeaderValue` cannot be zeroized; that residual copy is accepted.
+- Rule 6: authenticated provider clients use `redirect::Policy::none()`. The shared `ctx.http` client in `apps/desktop/src-tauri/src/state.rs` is used only for unauthenticated fetches (the ECB rates file), so rule 6 does not apply to it; it still uses the default redirect policy and no connect timeout; moving it to `providers::http::plain_client()`.
+- Rule 7 gap: the panic hook is not tested from outside the process; the unit test covers only the panic text redaction.
+- Rule 8 is implemented by a Rust check that blocks AWS, GitHub, `sk-`, Slack, JWT and PEM patterns, and high-entropy tokens of 32 or more characters.
 - Key metadata is stored in `secret_meta.json`, which holds no values (ADR-007).
 
 ## Alternatives

@@ -1,4 +1,4 @@
-//! The `Feature` trait (ADR-009, BSD section 2).
+//! The `Feature` trait (ADR-009).
 
 use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;

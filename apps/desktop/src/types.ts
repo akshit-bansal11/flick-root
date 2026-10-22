@@ -1,4 +1,4 @@
-// Mirrors crates/launcher-core/src/types.rs and BSD sections 4 and 5 (serde camelCase).
+// Mirrors crates/launcher-core/src/types.rs (serde camelCase).
 
 export type Mode = "command" | "find" | "query";
 
@@ -100,7 +100,7 @@ export interface ShownPayload {
   reason: string;
 }
 
-/** `explain://captured` payload (BSD 5); `preview` is at most 2,000 characters. */
+/** `explain://captured` payload; `preview` is at most 2,000 characters. */
 export interface ExplainCaptured {
   preview: string;
   length: number;

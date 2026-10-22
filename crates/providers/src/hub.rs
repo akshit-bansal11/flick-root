@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-/// Events of one ask; mirrors BSD section 5 `AskEvent`.
+/// Events of one ask; mirrors the UI `AskEvent` type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HubEvent {
     /// First provider selected.

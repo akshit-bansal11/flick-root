@@ -1,4 +1,4 @@
-//! F10 Quick capture: `log 250 lunch`, `note ...`, `todo ...` go to Obsidian, a Markdown file,
+//! Quick capture: `log 250 lunch`, `note ...`, `todo ...` go to Obsidian, a Markdown file,
 //! Notion or a webhook (ADR-010). Parsing is local; the Query provider is asked only when a
 //! `log` line has no amount or no label, and its reply only fills fields.
 //!
@@ -36,7 +36,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-/// Request timeout for Notion and webhooks (BSD External API table).
+/// Request timeout for Notion and webhooks.
 const TIMEOUT: Duration = Duration::from_secs(10);
 /// Largest reply read from Notion or a webhook.
 const MAX_BODY: usize = 1 << 20;
@@ -70,7 +70,7 @@ pub enum CaptureError {
 }
 
 impl CaptureError {
-    /// Stable code for the UI (BSD 4: `not_configured`, `network`).
+    /// Stable code for the UI (`not_configured`, `network`).
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotConfigured(_) | Self::HostMismatch => "not_configured",
@@ -482,7 +482,7 @@ impl Feature for Capture {
         "Quick capture"
     }
     fn version_tag(&self) -> &'static str {
-        "v0.1.0"
+        "v0.0.1"
     }
     fn description(&self) -> &'static str {
         "\"log 250 lunch\", \"note ...\", \"todo ...\" go to Obsidian, a Markdown file, Notion or a webhook."

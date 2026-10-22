@@ -1,12 +1,12 @@
 # Performance
 
-Budgets are from KICKOFF section 4. All rows: date 2026-10-19, dev machine, Windows 11, 24 GB.
+Budgets: hotkey to visible p95 <= 50 ms; command match <= 2 ms for 2,000 apps; each feature query() <= 0.5 ms; Find match p95 <= 25 ms over 300k paths; launch call <= 30 ms; idle RAM <= 120 MB. All rows: date 2026-10-19, dev machine, Windows 11, 24 GB.
 
 | Budget | Limit | Measured | How measured | Build | Status |
 | --- | --- | --- | --- | --- | --- |
 | Launch call | <= 30 ms | 0-1 ms | live (Calculator, Notepad) | release | within |
 | Command match, 2,000 apps | <= 2 ms | 0.25 ms | launcher-core bench | release | within |
-| Command search, 2,000 apps, all v0.0.1 features on | <= 2 ms | worst 0.29 ms ("2.5 kg to lb"), "code" 0.11 ms, currency 0.06 ms | features bench (T5.6) | release | within |
+| Command search, 2,000 apps, all features on | <= 2 ms | worst 0.29 ms ("2.5 kg to lb"), "code" 0.11 ms, currency 0.06 ms | features bench | release | within |
 | Find match p95, 305k paths | <= 25 ms | p95 <= 4.7 ms (<= 3.9 ms with a 2k-entry overlay) | index-files bench | release | within |
 | Feature query(): web | <= 0.5 ms | 7.5 us | features bench | release | within |
 | Feature query(): syscmd | <= 0.5 ms | <= 2.4 us | features bench | release | within |
@@ -20,7 +20,7 @@ Budgets are from KICKOFF section 4. All rows: date 2026-10-19, dev machine, Wind
 | Cold start to tray ready | <= 600 ms | 1,435 ms | `scripts/measure.ps1` | release | over (run included the first-run settings window; under investigation) |
 | Keystroke to paint | not yet measured | n/a | n/a | n/a | not yet measured |
 
-### v0.1.0 (GitHub `windows-latest` runner, bench.yml run 39209805426, commit c0f5d53)
+### Integrations benches (GitHub `windows-latest` runner, `bench.yml`)
 
 The shared 2-vCPU runner is slower than the laptop above, so compare rows within this table only. Values are criterion means (the middle of the printed interval), not p95.
 
@@ -35,7 +35,7 @@ The shared 2-vCPU runner is slower than the laptop above, so compare rows within
 | Command match, 2,000 apps (top_k_8) | <= 2 ms | worst 0.22 ms ("co") | within |
 | Find match, 305k paths | <= 25 ms p95 | means 13.7–22.1 ms ("rep" with overlay slowest); p95 not reported by criterion | within on means, close on this runner |
 
-### v0.2.0 (GitHub `windows-latest` runner, bench.yml run 39274780839, commit db7710f)
+### Programs index benches (GitHub `windows-latest` runner, `bench.yml`)
 
 Programs found by the drive scan are matched in their own index, off the keystroke thread, with Find's budget. Criterion means.
 
@@ -57,14 +57,14 @@ Programs found by the drive scan are matched in their own index, off the keystro
 - Hotkey to visible p95 needs an interactive session with the settings window closed.
 - Keystroke to paint has no measurement yet.
 
-## WebView2 idle memory (F8.10)
+## WebView2 idle memory
 
-Researched 2026-10-22. No documented option works without a new dependency, so the user approved a direct `webview2-com` dependency (the version wry already uses). The two documented memory APIs now run while the launcher is hidden; the numbers are below.
+Researched 2026-10-22. No documented option works without a new dependency, so Flick depends directly on `webview2-com` (the version wry already uses). The two documented memory APIs now run while the launcher is hidden; the numbers are below.
 
 | Option | Expected saving | Show-latency cost / risk | Status |
 | --- | --- | --- | --- |
-| `TrySuspend` / `Resume` ([perf guide](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#use-memory-management-apis)) | Pauses scripts, lowers renderer use while hidden | Resume on every show sits on the hotkey path; best-effort | **shipped** (F8.10b, user approved `webview2-com` 0.39.1; controller set invisible first, as [TrySuspend](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_3#trysuspend) requires, since F8.R3) |
-| `MemoryUsageTargetLevel = Low` while hidden, `Normal` on show (same page) | Engine may drop caches or swap to disk | Restore on show may add latency; best-effort | **shipped** (F8.10b) |
+| `TrySuspend` / `Resume` ([perf guide](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#use-memory-management-apis)) | Pauses scripts, lowers renderer use while hidden | Resume on every show sits on the hotkey path; best-effort | **shipped** (uses `webview2-com` 0.39.1; the controller is set invisible first, as [TrySuspend]((https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_3#trysuspend)) requires) |
+| `MemoryUsageTargetLevel = Low` while hidden, `Normal` on show (same page) | Engine may drop caches or swap to disk | Restore on show may add latency; best-effort | **shipped** |
 | `additional_browser_args` ([docs.rs](https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html#method.additional_browser_args)) | None documented | Replaces wry's default `--disable-features` set; needs the window built in code instead of `tauri.conf.json`; risk to the transparent window | not shipped: [flag list](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/webview-features-flags) says production apps should not use flags, and none is a memory saver |
 | `msWebView2SimulateMemoryPressureWhenInactive` | Unknown ("simulates memory pressure for an inactive WebView") | Unknown | not shipped (undocumented effect and behaviour) |
 | `disable-background-timer-throttling` | None (the opposite: more timer work) | More idle CPU | not shipped (wrong direction) |
@@ -76,12 +76,12 @@ Researched 2026-10-22. No documented option works without a new dependency, so t
 
 Process tree = the app plus its WebView2 processes (7 processes, 128 threads in every run). Idle CPU was 0 % of one core and no scan ran during the 60 s idle window in every run.
 
-| Build | perf.yml run id | Hotkey p95 (ms) | Idle private MB | Idle working set MB | Cold start (ms) |
+| Build | `perf.yml` run | Hotkey p95 (ms) | Idle private MB | Idle working set MB | Cold start (ms) |
 | --- | --- | --- | --- | --- | --- |
-| Before (be103de, no WebView2 change) | 39728001281 (attempt 1) | 148.4 | 111.8 | 326.7 | 728 |
-| Before (be103de) | 39728001281 (attempt 2) | 136.6 | 111.6 | 327.1 | 1134 |
-| Low memory level only (4141132; TrySuspend then failed with ERROR_INVALID_STATE) | 39729486251 (attempt 1) | 172.4 | 112.0 | 83.4 | 1376 |
-| Low memory level only (4141132) | 39729486251 (attempt 2) | 128.1 | 113.7 | 75.5 | 909 |
-| Low level + TrySuspend (dc43791, F8.R3) | 39739170373 | 181.4 | 109.8 | 64.2 | 813 |
+| Before (no WebView2 change) | 1 | 148.4 | 111.8 | 326.7 | 728 |
+| Before | 2 | 136.6 | 111.6 | 327.1 | 1134 |
+| Low memory level only | 1 | 172.4 | 112.0 | 83.4 | 1376 |
+| Low memory level only | 2 | 128.1 | 113.7 | 75.5 | 909 |
+| Low level + TrySuspend | 1 | 181.4 | 109.8 | 64.2 | 813 |
 
 Reading: the working set (physical RAM in use while hidden) drops from about 327 MB to 64 MB. Private bytes stay flat because suspended pages are released from RAM, not freed. Timings swing by hundreds of milliseconds between identical runs on this shared VM (cold start 728 vs 1134 ms for the same commit), so the hotkey p95 differences are within noise; the hotkey is over its 50 ms budget on the runner with or without the change and needs a check on real hardware.

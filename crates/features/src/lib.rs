@@ -65,7 +65,7 @@ mod tests {
         assert!(f.iter().all(|x| x.default_enabled()));
         assert!(
             f.iter()
-                .any(|x| x.id() == "ports" && x.version_tag() == "v0.1.0")
+                .any(|x| x.id() == "ports" && x.version_tag() == "v0.0.1")
         );
     }
 }

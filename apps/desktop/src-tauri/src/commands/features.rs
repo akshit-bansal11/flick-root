@@ -1,4 +1,4 @@
-//! Feature, mode and system-command commands (BSD section 4).
+//! Feature, mode and system-command commands.
 use super::blocking;
 use crate::error::CommandError;
 use crate::state::{self, AppState};

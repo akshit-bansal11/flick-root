@@ -1,4 +1,4 @@
-//! General settings, history, reindex, about and window sizing commands (BSD section 4).
+//! General settings, history, reindex, about and window sizing commands.
 use super::blocking;
 use crate::autostart;
 use crate::error::CommandError;

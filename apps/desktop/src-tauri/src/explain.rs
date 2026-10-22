@@ -1,4 +1,4 @@
-//! Explain this (F09): the second hotkey captures the selected text and opens Query mode with it.
+//! Explain this: the second hotkey captures the selected text and opens Query mode with it.
 //! Nothing is sent here; the UI shows the text and the user presses Enter (the ask path re-checks it).
 use crate::state::AppState;
 use crate::window;

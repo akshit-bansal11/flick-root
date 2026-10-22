@@ -1,4 +1,4 @@
-//! Shared types that cross the Rust and UI boundary (BSD section 2).
+//! Shared types that cross the Rust and UI boundary.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

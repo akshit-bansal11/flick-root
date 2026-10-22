@@ -1,4 +1,4 @@
-//! Natural-language finder (F06, ADR-005): a plain-language Find phrase is parsed offline, matched
+//! Natural-language finder (ADR-005): a plain-language Find phrase is parsed offline, matched
 //! against the file index, and opened only when the winner is clear and of an allowlisted type.
 //! Otherwise optional decision engines may pick, else the ranked candidates are listed.
 //! Engines see file names and parent folders only. Nothing here runs on the keystroke path except
@@ -333,7 +333,7 @@ impl Feature for NlFind {
         "Natural-language finder"
     }
     fn version_tag(&self) -> &'static str {
-        "v0.1.0"
+        "v0.0.1"
     }
     fn description(&self) -> &'static str {
         "Find files by describing them. Opens only a clear winner of a safe type; engines are optional."

@@ -1,4 +1,4 @@
-//! F07 Ports and processes: `port <n>` and `proc <name>` (KICKOFF 1.3, AFD 7.7).
+//! Ports and processes: `port <n>` and `proc <name>`.
 //!
 //! `query()` only parses the text and returns one cheap row. The OS is read in `execute()`.
 //! Killing needs a confirm token (3 s, single use) issued by a first `Kill` action.
@@ -350,7 +350,7 @@ impl Feature for Ports {
         "Ports and processes"
     }
     fn version_tag(&self) -> &'static str {
-        "v0.1.0"
+        "v0.0.1"
     }
     fn description(&self) -> &'static str {
         "port 3000 shows what holds a port; proc <name> searches processes; Backspace ends one after a confirm."

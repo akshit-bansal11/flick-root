@@ -1,4 +1,4 @@
-//! F05 Project launcher (KICKOFF 1.3, ADR-009; FR-F05-01). Scan is off the keystroke path.
+//! Project launcher (ADR-009). Scan is off the keystroke path.
 //! Keywords `code <name>` / `term <name>` open the folder in the editor / Windows Terminal;
 //! a bare name opens it in Explorer. VS Code recents are merged with the scan.
 

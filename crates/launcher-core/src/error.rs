@@ -1,4 +1,4 @@
-//! Error type for launcher-core (BSD section 10). Messages never carry secrets or user text.
+//! Error type for launcher-core. Messages never carry secrets or user text.
 
 use std::path::PathBuf;
 

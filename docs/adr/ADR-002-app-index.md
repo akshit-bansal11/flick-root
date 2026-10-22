@@ -24,5 +24,5 @@ Launching an installed app should work the way Start's "All apps" list works. Th
 ## Consequences
 
 - Measured on the dev machine: launch call 0 to 1 ms (budget 30 ms). Command match over 2,000 apps 0.25 ms (budget 2 ms).
-- Known limit: icon bitmaps come back premultiplied and are stored as straight alpha, so dark icon edges may appear. With `SIIGBF_BIGGERSIZEOK` a "32" icon may be larger than 32 px. Both are open in `docs/followups.md`.
+- Known limit: icon bitmaps come back premultiplied and are stored as straight alpha, so dark icon edges may appear. With `SIIGBF_BIGGERSIZEOK` a "32" icon may be larger than 32 px.
 - Live launch was checked on the dev machine with Calculator and Notepad. A packaged Store app (Spotify) could not be checked there.

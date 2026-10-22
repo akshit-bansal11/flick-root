@@ -1,4 +1,4 @@
-//! Web shortcuts (F04): `<keyword> <text>` opens a URL template with `{q}` filled in.
+//! Web shortcuts: `<keyword> <text>` opens a URL template with `{q}` filled in.
 //!
 //! A bare keyword with no text yields a hint item with no actions (Enter does nothing, so a
 //! half-typed shortcut never launches a browser). State lives in a process-wide slot because the

@@ -1,4 +1,4 @@
-//! F08 Media controls: GSMTC play/pause/next/previous/now-playing on any player, plus
+//! Media controls: GSMTC play/pause/next/previous/now-playing on any player, plus
 //! "play <q> on spotify|youtube" search links (ADR-010 base layer).
 //!
 //! `query()` only parses text. The media session is read in `execute()`, so no task runs
@@ -350,7 +350,7 @@ impl Feature for Media {
         "Media controls"
     }
     fn version_tag(&self) -> &'static str {
-        "v0.1.0"
+        "v0.0.1"
     }
     fn description(&self) -> &'static str {
         "play, pause, next, previous, now playing; \"play <song> on spotify|youtube\"."

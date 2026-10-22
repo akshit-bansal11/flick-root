@@ -1,4 +1,4 @@
-//! ECB daily reference rates (F02, FR-F02-03/04): parse, convert, parse currency queries.
+//! ECB daily reference rates: parse, convert, parse currency queries.
 //! Everything here is pure; the fetch task lives in `mod.rs`.
 
 use quick_xml::Reader;

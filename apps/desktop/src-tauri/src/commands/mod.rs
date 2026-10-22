@@ -1,4 +1,4 @@
-//! Tauri commands exposed to the UI (flat params, BSD section 4).
+//! Tauri commands exposed to the UI (flat params).
 use crate::error::CommandError;
 
 pub mod ask;
