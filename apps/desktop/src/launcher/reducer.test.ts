@@ -669,8 +669,7 @@ describe("entering modes with text", () => {
   });
 
   describe("actionFailed", () => {
-    const failed = (s: State) =>
-      reduce(s, { type: "actionFailed", message: "Sleep failed" }).state;
+    const failed = (s: State) => reduce(s, { type: "actionFailed", message: "Sleep failed" }).state;
 
     it("stores the message as the notice and keeps the launcher open", () => {
       const r = reduce(inMode("commands"), { type: "actionFailed", message: "Sleep failed" });
