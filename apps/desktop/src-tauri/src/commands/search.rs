@@ -110,6 +110,7 @@ async fn command(
             let set = st.programs.load();
             program_items(
                 &set.entries,
+                &set.removable,
                 &set.index,
                 &mut st.prog_matcher.lock(),
                 &text,
@@ -119,7 +120,7 @@ async fn command(
         .await
         .map_err(|e| CommandError::new("internal", e.to_string()))?
     };
-    let mut items = merge_items(items, programs, K);
+    let mut items = merge_items(items, programs, &input.text, K);
     let set = state.programs.load();
     let mut missing = Vec::new();
     for it in items.iter_mut().filter(|i| i.source == "apps") {

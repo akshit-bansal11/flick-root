@@ -72,6 +72,17 @@ fn app_entry(
         .ok_or_else(not_found)
 }
 
+/// True when `parsing` is a scanned program on a removable drive. Checked here, not only in the
+/// UI: a removable program never runs elevated, even if the IPC call asks for it.
+fn is_removable_program(state: &AppState, parsing: &str) -> bool {
+    let set = state.programs.load();
+    set.entries
+        .iter()
+        .position(|a| a.parsing_name == parsing)
+        .and_then(|i| set.removable.get(i).copied())
+        .unwrap_or(false)
+}
+
 /// Runs `f` on a blocking thread with COM initialised. A dismissed UAC prompt maps to `Ok(false)`.
 async fn blocking_com<F>(f: F) -> Result<bool, CommandError>
 where
@@ -122,6 +133,12 @@ pub async fn launch(
                 return Err(CommandError::new(
                     "unsupported",
                     "only .exe and .msi files can run as administrator",
+                ));
+            }
+            if admin && program && is_removable_program(&state, parsing) {
+                return Err(CommandError::new(
+                    "unsupported",
+                    "programs on removable drives cannot run as administrator",
                 ));
             }
             let how = if admin {

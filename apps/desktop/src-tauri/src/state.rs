@@ -57,6 +57,8 @@ pub struct AppMatch {
 pub struct ProgramSet {
     /// Entries, same order as the index.
     pub entries: Vec<AppEntry>,
+    /// Per entry: it sits on a removable drive (from the scan's drive kinds).
+    pub removable: Vec<bool>,
     /// Fuzzy index over entry names.
     pub index: MatchIndex,
 }
@@ -65,6 +67,7 @@ impl Default for ProgramSet {
     fn default() -> Self {
         Self {
             entries: Vec::new(),
+            removable: Vec::new(),
             index: MatchIndex::new::<&str>(&[]),
         }
     }
@@ -196,12 +199,29 @@ pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> Vec<AppEnt
     out
 }
 
-/// [`merge_programs`] plus the fuzzy index.
-pub fn build_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> ProgramSet {
+/// [`merge_programs`] plus the fuzzy index. `removable_letters` are the drive letters whose
+/// `DriveKind` is `Removable` (from the drive scan); an entry is removable when its path starts there.
+pub fn build_programs(
+    apps: &[AppEntry],
+    programs: &[ProgramFile],
+    removable_letters: &[char],
+) -> ProgramSet {
     let entries = merge_programs(apps, programs);
+    let removable = entries
+        .iter()
+        .map(|e| {
+            let mut c = e.parsing_name.chars();
+            matches!((c.next(), c.next()), (Some(l), Some(':'))
+                if removable_letters.contains(&l.to_ascii_uppercase()))
+        })
+        .collect();
     let names: Vec<&str> = entries.iter().map(|a| a.name.as_str()).collect();
     let index = MatchIndex::new(&names);
-    ProgramSet { entries, index }
+    ProgramSet {
+        entries,
+        removable,
+        index,
+    }
 }
 
 impl AppState {
@@ -444,8 +464,14 @@ pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
         let live = || !cancel.load(Ordering::Relaxed) && st.config.load().apps.scan_programs;
         // Cancel is set before `stop_programs` takes the gate, so a store here either lands first
         // (and is cleared) or sees the flag.
+        let drives = win::drives::indexable_drives();
+        let removable: Vec<char> = drives
+            .iter()
+            .filter(|d| d.kind == win::drives::DriveKind::Removable)
+            .map(|d| d.letter)
+            .collect();
         let publish = |list: &[ProgramFile]| {
-            let set = build_programs(&st.apps.entries(), list);
+            let set = build_programs(&st.apps.entries(), list, &removable);
             let _gate = st.programs_gate.lock();
             if live() {
                 st.programs.store(Arc::new(set));
@@ -456,8 +482,8 @@ pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
             Ok(None) => {}
             Err(err) => tracing::warn!(%err, "programs cache unreadable"),
         }
-        let roots: Vec<PathBuf> = win::drives::indexable_drives()
-            .into_iter()
+        let roots: Vec<PathBuf> = drives
+            .iter()
             .map(|d| PathBuf::from(format!("{}:\\", d.letter)))
             .collect();
         let list = {
@@ -629,6 +655,14 @@ mod tests {
         assert_eq!(out[0].parsing_name, r"C:\x\c.msi");
         assert!(out[0].target.is_none());
         assert_eq!(out[0].id, index_apps::make_id(r"C:\x\c.msi"));
+    }
+
+    #[test]
+    fn removable_flag_follows_drive_kind() {
+        let progs = vec![prog(r"E:\a.exe"), prog(r"c:\b.exe"), prog(r"e:\c.exe")];
+        let set = build_programs(&[], &progs, &['E']);
+        assert_eq!(set.removable, [true, false, true]);
+        assert_eq!(set.removable.len(), set.entries.len());
     }
 
     #[test]

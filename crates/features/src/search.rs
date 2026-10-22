@@ -43,7 +43,8 @@ pub fn can_run_as_admin(a: &AppEntry, program: bool) -> bool {
 }
 
 /// `idx` is the entry's position in its own list (apps or programs); it rides in the payload as `entry`.
-fn app_item(a: &AppEntry, idx: usize, score: f32, program: bool) -> Item {
+/// `removable` (programs only) marks a program on a removable drive: labelled, no Admin action.
+fn app_item(a: &AppEntry, idx: usize, score: f32, program: bool, removable: bool) -> Item {
     let mut actions = vec![ActionKind::Primary, ActionKind::Location];
     let mut payload =
         serde_json::json!({ "appId": a.id, "parsingName": a.parsing_name, "entry": idx });
@@ -54,8 +55,12 @@ fn app_item(a: &AppEntry, idx: usize, score: f32, program: bool) -> Item {
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default();
         payload["program"] = serde_json::json!(true);
+        if removable {
+            subtitle = format!("Removable · {subtitle}");
+            payload["removable"] = serde_json::json!(true);
+        }
     }
-    if can_run_as_admin(a, program) {
+    if can_run_as_admin(a, program) && !removable {
         actions.insert(1, ActionKind::Admin);
     }
     Item {
@@ -126,7 +131,7 @@ pub fn command_search_scoped(
             items.extend(
                 apps.iter()
                     .enumerate()
-                    .map(|(i, a)| app_item(a, i, 0.0, false)),
+                    .map(|(i, a)| app_item(a, i, 0.0, false, false)),
             );
         } else {
             let hits = matcher.top_k(&input.text, app_index, k);
@@ -139,7 +144,7 @@ pub fn command_search_scoped(
                 } else {
                     0.0
                 };
-                Some(app_item(a, h.idx, score, false))
+                Some(app_item(a, h.idx, score, false, false))
             }));
         }
     }
@@ -165,9 +170,11 @@ fn solid_match(name: &str, query: &str) -> bool {
 }
 
 /// Fuzzy matches of `text` over scanned programs, best `k`, scored below real apps. Empty text matches nothing.
+/// `removable[i]` says program `i` sits on a removable drive (missing entries count as fixed).
 /// Budget is Find's 25 ms; call from a blocking thread.
 pub fn program_items(
     programs: &[AppEntry],
+    removable: &[bool],
     index: &MatchIndex,
     matcher: &mut FuzzyMatcher,
     text: &str,
@@ -194,13 +201,34 @@ pub fn program_items(
                 h.idx,
                 APP_CEIL * PROGRAM_FACTOR * h.score as f32 / max,
                 true,
+                removable.get(h.idx).copied().unwrap_or(false),
             ))
         })
         .collect()
 }
 
-/// Joins [`command_search_scoped`] and [`program_items`] results, at most `k`.
-pub fn merge_items(mut items: Vec<Item>, programs: Vec<Item>, k: usize) -> Vec<Item> {
+/// Joins [`command_search_scoped`] and [`program_items`] results for query `text`, at most `k`.
+/// A program never outranks an installed app that solidly matches the same query: its score is
+/// capped just below that app's, so a file named like an app (chrome.exe) cannot hijack Enter.
+pub fn merge_items(
+    mut items: Vec<Item>,
+    mut programs: Vec<Item>,
+    text: &str,
+    k: usize,
+) -> Vec<Item> {
+    let best_app = items
+        .iter()
+        .filter(|i| {
+            i.source == "apps" && i.payload.get("program").is_none() && solid_match(&i.title, text)
+        })
+        .map(|i| i.score)
+        .reduce(f32::max);
+    if let Some(best) = best_app {
+        let cap = (best - 0.01).max(0.0);
+        for p in &mut programs {
+            p.score = p.score.min(cap);
+        }
+    }
     items.extend(programs);
     top_k_sorted(items, k)
 }
@@ -293,9 +321,9 @@ mod tests {
             let p = if scope == SearchScope::Commands {
                 Vec::new()
             } else {
-                program_items(&progs, &pi, &mut FuzzyMatcher::new(), text, 5)
+                program_items(&progs, &[], &pi, &mut FuzzyMatcher::new(), text, 5)
             };
-            merge_items(a, p, 5)
+            merge_items(a, p, text, 5)
         };
         // Both match "code"; the program must not outrank the real app.
         let got = run(SearchScope::All, "code");
@@ -324,9 +352,46 @@ mod tests {
             &input("inlay"),
             5,
         );
-        let p = program_items(&progs, &pi, &mut m, "inlay", 5);
-        let got = merge_items(a, p, 5);
+        let p = program_items(&progs, &[], &pi, &mut m, "inlay", 5);
+        let got = merge_items(a, p, "inlay", 5);
         assert_eq!(got[0].title, "Inlay-2.0.0");
+    }
+
+    #[test]
+    fn program_named_like_an_app_never_outranks_it() {
+        let apps = vec![app("Google Chrome")];
+        let progs = vec![app("chrome")];
+        let (ai, pi) = (idx_of(&apps), idx_of(&progs));
+        let mut m = FuzzyMatcher::new();
+        let a = command_search_scoped(
+            &apps,
+            SearchScope::All,
+            &ai,
+            &mut m,
+            &Registry::new(),
+            &input("chrome"),
+            5,
+        );
+        let p = program_items(&progs, &[true], &pi, &mut m, "chrome", 5);
+        assert_eq!(p.len(), 1);
+        let got = merge_items(a, p, "chrome", 5);
+        assert_eq!(got[0].title, "Google Chrome");
+        assert_eq!(got[1].payload["program"], true);
+        assert!(got[1].score < got[0].score);
+    }
+
+    #[test]
+    fn removable_program_is_labelled_without_admin() {
+        let mut p = app("setup");
+        p.parsing_name = r"E:\dl\setup.exe".into();
+        let it = app_item(&p, 0, 0.5, true, true);
+        assert_eq!(it.subtitle, r"Removable · E:\dl");
+        assert_eq!(it.payload["removable"], true);
+        assert!(!it.actions.contains(&ActionKind::Admin));
+        let fixed = app_item(&p, 0, 0.5, true, false);
+        assert_eq!(fixed.subtitle, r"E:\dl");
+        assert!(fixed.payload.get("removable").is_none());
+        assert!(fixed.actions.contains(&ActionKind::Admin));
     }
 
     #[test]
@@ -337,7 +402,7 @@ mod tests {
             app("Visual Studio Code"),
         ];
         let pi = idx_of(&progs);
-        let got = program_items(&progs, &pi, &mut FuzzyMatcher::new(), "spotify", 5);
+        let got = program_items(&progs, &[], &pi, &mut FuzzyMatcher::new(), "spotify", 5);
         let titles: Vec<_> = got.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles, ["Spotify"]);
         assert!(solid_match("Visual Studio Code", "studio co"));
@@ -346,8 +411,13 @@ mod tests {
 
     #[test]
     fn merge_keeps_best_k_across_both_lists() {
-        let mk = |t: &str, s: f32| app_item(&app(t), 0, s, false);
-        let got = merge_items(vec![mk("a", 0.9), mk("b", 0.2)], vec![mk("c", 0.6)], 2);
+        let mk = |t: &str, s: f32| app_item(&app(t), 0, s, false, false);
+        let got = merge_items(
+            vec![mk("a", 0.9), mk("b", 0.2)],
+            vec![mk("c", 0.6)],
+            "zz",
+            2,
+        );
         let titles: Vec<_> = got.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles, ["a", "c"]);
     }
@@ -356,12 +426,12 @@ mod tests {
     fn program_rows_show_folder_and_gate_admin() {
         let mut p = app("setup");
         p.parsing_name = r"C:\dl\setup.apk".into();
-        let it = app_item(&p, 0, 0.5, true);
+        let it = app_item(&p, 0, 0.5, true, false);
         assert_eq!(it.subtitle, r"C:\dl");
         assert!(!it.actions.contains(&ActionKind::Admin));
         p.parsing_name = r"C:\dl\setup.EXE".into();
         assert!(
-            app_item(&p, 0, 0.5, true)
+            app_item(&p, 0, 0.5, true, false)
                 .actions
                 .contains(&ActionKind::Admin)
         );
@@ -370,7 +440,7 @@ mod tests {
         assert!(can_run_as_admin(&p, false));
         assert!(!can_run_as_admin(&p, true));
         assert!(
-            app_item(&p, 0, 0.5, false)
+            app_item(&p, 0, 0.5, false, false)
                 .actions
                 .contains(&ActionKind::Admin)
         );
@@ -404,7 +474,7 @@ mod tests {
         let ai = idx_of(&apps);
         let mut m = FuzzyMatcher::new();
         for text in ["", "a"] {
-            r.on_chosen_all(&input(text), &app_item(&apps[1], 1, 0.0, false));
+            r.on_chosen_all(&input(text), &app_item(&apps[1], 1, 0.0, false, false));
             let got =
                 command_search_scoped(&apps, SearchScope::Apps, &ai, &mut m, &r, &input(text), 5);
             assert_eq!(got[0].title, "Bravo", "text {text:?}");

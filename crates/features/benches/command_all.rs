@@ -182,7 +182,7 @@ fn bench(c: &mut Criterion) {
     let mut pmatcher = FuzzyMatcher::new();
     for t in ["c", "co", "setup", "inst 4", "zzzz"] {
         c.bench_function(&format!("programs_50k/{t}"), |b| {
-            b.iter(|| program_items(&programs, &pidx, &mut pmatcher, black_box(t), 8))
+            b.iter(|| program_items(&programs, &[], &pidx, &mut pmatcher, black_box(t), 8))
         });
     }
     // The apps part alone, with 50k programs present in memory but not in the apps index.
