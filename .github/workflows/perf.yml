@@ -1,0 +1,119 @@
+name: Perf
+
+# Manual only (gh workflow run perf.yml): never runs on push, so it costs nothing per commit.
+# Download with: gh run download <run-id> -n perf
+on:
+  workflow_dispatch:
+    inputs:
+      enforce:
+        description: Fail when idle CPU averages above 1% of one core or a scan runs while idle
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  perf:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build release exe (no installer)
+        run: pnpm --filter desktop tauri build --no-bundle
+
+      # measure.ps1 never edits config; the workflow seeds it so the settings window does not open.
+      - name: Seed config
+        shell: pwsh
+        run: |
+          $conf = Get-Content -Raw apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $dir = Join-Path $env:APPDATA ([string]$conf.productName)
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Set-Content -LiteralPath (Join-Path $dir 'config.toml') -Value "[general]`nfirst_run_done = true`n"
+
+      # Warm run: build the indexes once so the measured run starts from caches.
+      - name: Warm run
+        shell: pwsh
+        run: |
+          $conf = Get-Content -Raw apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $app = [string]$conf.productName
+          $exe = Join-Path $PWD "target/release/$app.exe"
+          $log = Join-Path $env:LOCALAPPDATA "$app/logs/app.log"
+          $proc = Start-Process -FilePath $exe -PassThru
+          try {
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $done = $false
+            while ($sw.Elapsed.TotalMinutes -lt 15) {
+              if (Test-Path -LiteralPath $log) {
+                $text = Get-Content -Raw -LiteralPath $log
+                if ($text -match 'find index ready' -and $text -match 'programs scanned') { $done = $true; break }
+              }
+              Start-Sleep -Seconds 5
+            }
+            Write-Output "Warm run: index ready lines seen = $done after $([int]$sw.Elapsed.TotalSeconds) s"
+          }
+          finally {
+            Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $proc.Id } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+            if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+            Start-Sleep -Seconds 5
+          }
+
+      # Exit 2 from measure.ps1 means inconclusive (e.g. hotkey not delivered); the JSON says why.
+      - name: Measured run
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force perf | Out-Null
+          pwsh -File scripts/measure.ps1 -IdleSeconds 60 -Json perf/perf.json 2>&1 | Tee-Object -FilePath perf/perf.txt
+          Write-Output "measure.ps1 exit code: $LASTEXITCODE"
+          $conf = Get-Content -Raw apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $log = Join-Path $env:LOCALAPPDATA "$([string]$conf.productName)/logs/app.log"
+          if (Test-Path -LiteralPath $log) { Copy-Item -LiteralPath $log perf/app.log }
+          if (-not (Test-Path perf/perf.json)) { throw 'measure.ps1 wrote no JSON' }
+          $global:LASTEXITCODE = 0
+
+      - name: Summary and enforce
+        shell: pwsh
+        env:
+          ENFORCE: ${{ inputs.enforce }}
+        run: |
+          $r = Get-Content -Raw perf/perf.json | ConvertFrom-Json
+          $lines = @(
+            "idle CPU % of one core ($($r.idle_seconds) s avg): $($r.idle_cpu_pct_core)"
+            "working set MB (tree): $($r.working_set_mb)"
+            "private MB (tree): $($r.private_mb)"
+            "threads: $($r.thread_count) in $($r.process_count) processes"
+            "cold start ms: $($r.cold_start_ms)"
+            "hotkey p95 ms: $($r.hotkey_p95_ms)"
+            "toggles: $($r.toggles)"
+            "scan log lines during idle: $(@($r.idle_scan_log_lines).Count)"
+          )
+          $lines | Tee-Object -FilePath perf/summary.txt
+          $lines | Add-Content $env:GITHUB_STEP_SUMMARY
+          if ($env:ENFORCE -eq 'true') {
+            $bad = @()
+            if ($null -eq $r.idle_cpu_pct_core -or $r.idle_cpu_pct_core -gt 1) { $bad += "idle CPU $($r.idle_cpu_pct_core)% of one core > 1%" }
+            if (@($r.idle_scan_log_lines).Count -gt 0) { $bad += 'scan log line during idle window' }
+            if ($bad) { $bad | ForEach-Object { Write-Error $_ }; exit 1 }
+          }
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: perf
+          path: perf/
+          retention-days: 14

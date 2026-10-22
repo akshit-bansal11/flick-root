@@ -7,6 +7,10 @@ global hotkey with keybd_event, parses hotkey_to_shown_ms from app.log, waits fo
 then samples idle RAM and CPU. Stops only the process it started.
 Budgets: cold start <= 600 ms, hotkey p95 <= 50 ms, idle RAM <= 120 MB.
 Run: pwsh -File scripts/measure.ps1 [-Exe path] [-Toggles 50] [-Hotkey Alt+Space]
+.PARAMETER IdleSeconds
+Length of the idle CPU averaging window. Default 5.
+.PARAMETER Json
+If set, writes the metrics (idle CPU, memory, threads, cold start, hotkey samples) to this file.
 .PARAMETER Exe
 App executable. Default target\release\<productName>.exe, else target\debug\desktop-shell.exe.
 .PARAMETER Toggles
@@ -18,7 +22,9 @@ Chord such as Alt+Space. Default: general.hotkey from config.toml, else Alt+Spac
 param(
     [string]$Exe,
     [int]$Toggles = 50,
-    [string]$Hotkey
+    [string]$Hotkey,
+    [int]$IdleSeconds = 5,
+    [string]$Json
 )
 
 Set-StrictMode -Version Latest
@@ -124,7 +130,7 @@ $proc = Start-Process -FilePath $Exe -PassThru
 $coldMs = $null; $p95 = $null; $ws = $null; $settled = $false
 try {
     while ($sw.ElapsedMilliseconds -lt 10000) {
-        if ((Read-LogFrom $startLen) -match '(?m)(\bready\s*$|phase="?ready\b)') { $coldMs = $sw.Elapsed.TotalMilliseconds; break }
+        if ((Read-LogFrom $startLen) -match 'phase="ready"') { $coldMs = $sw.Elapsed.TotalMilliseconds; break }
         Start-Sleep -Milliseconds 20
     }
     if ($null -eq $coldMs) { Write-Output 'Cold start: "ready" not seen within 10 s' }
@@ -162,17 +168,25 @@ try {
 
     # Idle: launcher should be hidden after an even number of toggles
     Start-Sleep -Seconds 10
+    $idleLen = Get-LogLength
     $t0 = @(Get-Tree $proc.Id)
-    Start-Sleep -Seconds 5
+    $idleSw = [System.Diagnostics.Stopwatch]::StartNew()
+    Start-Sleep -Seconds $IdleSeconds
     $t1 = @(Get-Tree $proc.Id)
+    $idleSecs = $idleSw.Elapsed.TotalSeconds
     $c0 = ($t0 | Measure-Object Cpu -Sum).Sum
-    $cpuPct = if ($t1) { (($t1 | Measure-Object Cpu -Sum).Sum - $c0) / 5 * 100 / [Environment]::ProcessorCount } else { $null }
+    $cpuDelta = if ($t1) { ($t1 | Measure-Object Cpu -Sum).Sum - $c0 } else { $null }
+    $cpuPct = if ($t1) { $cpuDelta / $IdleSeconds * 100 / [Environment]::ProcessorCount } else { $null }
+    # % of ONE core averaged over the idle window (the enforce gate); processes that exit mid-window can undercount
+    $cpuCore = if ($t1) { [math]::Max(0, $cpuDelta) / $idleSecs * 100 } else { $null }
+    $threads = (@($t1 | ForEach-Object { (Get-Process -Id $_.Pid -ErrorAction SilentlyContinue).Threads.Count }) | Measure-Object -Sum).Sum
+    $idleScans = @((Read-LogFrom $idleLen) -split "`n" | Where-Object { $_ -match 'programs scanned|find index ready|apps refreshed|indexing' })
     $tree = $t1
     $ws = ($tree | Measure-Object WS -Sum).Sum
     $priv = ($tree | Measure-Object Private -Sum).Sum
     $privNoGpu = ($tree | Where-Object Role -ne 'gpu-process' | Measure-Object Private -Sum).Sum
     $tree | Select-Object Pid, Role, WS, Private | Format-Table -AutoSize | Out-String | Write-Output
-    Write-Output ('Idle: {0} procs, total WS {1:N0} MB (budget compares this), total private {2:N0} MB, private excl. gpu-process {3:N0} MB, CPU {4:N2}% of machine (5 s)' -f $tree.Count, $ws, $priv, $privNoGpu, $cpuPct)
+    Write-Output ('Idle: {0} procs, total WS {1:N0} MB (budget compares this), total private {2:N0} MB, private excl. gpu-process {3:N0} MB, CPU {4:N2}% of machine, {5:N2}% of one core ({6} s), {7} threads, {8} scan log lines' -f $tree.Count, $ws, $priv, $privNoGpu, $cpuPct, $cpuCore, $IdleSeconds, $threads, $idleScans.Count)
     if (-not $settled) { $ws = $null; $why['idle RAM MB (ws)'] = 'not settled within 90 s' }
 }
 finally {
@@ -183,6 +197,27 @@ finally {
         $left = @($kids | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
         if ($left) { Write-Output "Lingering child PIDs 5 s after exit (not killed): $($left -join ', ')" }
     }
+}
+
+if ($Json) {
+    $togglesNote = if ($null -ne $p95) { 'ok' } else { 'inconclusive: no hotkey_to_shown_ms lines captured (keybd_event not delivered on this runner, or focus stolen)' }
+    [ordered]@{
+        cold_start_ms        = $coldMs
+        hotkey_p95_ms        = $p95
+        hotkey_samples_ms    = @($vals)
+        toggles              = $togglesNote
+        settled              = $settled
+        idle_seconds         = $IdleSeconds
+        idle_cpu_pct_core    = $cpuCore
+        idle_cpu_pct_machine = $cpuPct
+        working_set_mb       = $(if ($tree) { ($tree | Measure-Object WS -Sum).Sum } else { $null })
+        private_mb           = $(if ($tree) { ($tree | Measure-Object Private -Sum).Sum } else { $null })
+        thread_count         = $threads
+        process_count        = $(if ($tree) { @($tree).Count } else { 0 })
+        processes            = @($tree | Select-Object Pid, Role, WS, Private)
+        idle_scan_log_lines  = @($idleScans)
+        not_comparable       = $notComparable
+    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $Json -Encoding utf8
 }
 
 $over = $false
