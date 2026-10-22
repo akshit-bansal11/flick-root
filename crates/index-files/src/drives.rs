@@ -3,14 +3,6 @@
 use crate::scan::Root;
 use std::path::{Path, PathBuf};
 
-/// Drive letters whose root exists. ponytail: std cannot tell fixed from removable or network
-/// drives; callers filter with `win::drives::is_fixed_drive` (crates/win).
-pub fn present_drives() -> Vec<char> {
-    ('A'..='Z')
-        .filter(|c| std::fs::metadata(format!("{c}:\\")).is_ok())
-        .collect()
-}
-
 /// The system drive letter from `%SystemDrive%` (e.g. `C:`), if set.
 pub fn system_drive() -> Option<char> {
     std::env::var("SystemDrive")

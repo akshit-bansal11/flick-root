@@ -21,7 +21,7 @@ use providers::KeySource;
 use providers::hub::ProviderHub;
 use providers::secret::{KeyringBackend, SecretVault, VaultKeys};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -257,10 +257,12 @@ fn roots_for(cfg: &Config) -> Vec<Root> {
         .filter(|r| find.roots.iter().any(|n| n.eq_ignore_ascii_case(&r.label)))
         .collect();
     // Runs on the blocking pool: GetDriveTypeW can stall on network or optical drives.
+    // Find keeps fixed drives only until the entry cap lands (F8.14).
     let drive_list: Vec<char> = if find.include_drives {
-        drives::present_drives()
+        win::drives::indexable_drives()
             .into_iter()
-            .filter(|d| win::drives::is_fixed_drive(Path::new(&format!("{d}:\\"))))
+            .filter(|d| d.kind == win::drives::DriveKind::Fixed)
+            .map(|d| d.letter)
             .collect()
     } else {
         Vec::new()
@@ -454,10 +456,9 @@ pub(crate) async fn scan_programs_task(s: &Arc<AppState>) {
             Ok(None) => {}
             Err(err) => tracing::warn!(%err, "programs cache unreadable"),
         }
-        let roots: Vec<PathBuf> = drives::present_drives()
+        let roots: Vec<PathBuf> = win::drives::indexable_drives()
             .into_iter()
-            .map(|d| PathBuf::from(format!("{d}:\\")))
-            .filter(|r| win::drives::is_fixed_drive(r))
+            .map(|d| PathBuf::from(format!("{}:\\", d.letter)))
             .collect();
         let list = {
             let _bg = win::thread::BackgroundGuard::new();
@@ -591,6 +592,7 @@ pub fn shutdown(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn entry(name: &str, parsing: &str, target: Option<&str>) -> AppEntry {
         AppEntry {
