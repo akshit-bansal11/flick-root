@@ -5,8 +5,8 @@ use std::time::Instant;
 use crate::error::CommandError;
 use serde_json::json;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow,
-    WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize, State,
+    WebviewWindow, WindowEvent,
 };
 
 /// Label of the single launcher window.
@@ -26,14 +26,14 @@ fn max_height(work_h: u32, scale: f64) -> f64 {
     (f64::from(work_h) / scale - WORK_MARGIN).clamp(PANEL_MIN_H, PANEL_MAX_H)
 }
 
-/// Window origin and width in physical px for a work area `(x, y, w, h)` at `scale`:
-/// centred horizontally, top at the vertical centre of a max-height panel.
-fn layout(work: (i32, i32, u32, u32), scale: f64) -> (i32, i32, u32) {
+/// Window origin and size in physical px for a panel `height` logical px tall in a
+/// work area `(x, y, w, h)` at `scale`: centred both ways, never above the work area.
+fn layout(work: (i32, i32, u32, u32), scale: f64, height: f64) -> (i32, i32, u32, u32) {
     let w = (PANEL_W * scale).round();
+    let h = (height.min(max_height(work.3, scale)) * scale).round();
     let x = f64::from(work.0) + (f64::from(work.2) - w) / 2.0;
-    let tall = max_height(work.3, scale) * scale;
-    let y = f64::from(work.1) + ((f64::from(work.3) - tall) / 2.0).max(0.0);
-    (x.round() as i32, y.round() as i32, w as u32)
+    let y = f64::from(work.1) + ((f64::from(work.3) - h) / 2.0).max(0.0);
+    (x.round() as i32, y.round() as i32, w as u32, h as u32)
 }
 
 fn clamp_height(h: f64) -> f64 {
@@ -249,11 +249,6 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let Some(m) = found.or(monitors.first()) else {
         return Ok(());
     };
-    let (wa, scale) = (m.work_area(), m.scale_factor());
-    let (x, y, w) = layout(
-        (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
-        scale,
-    );
     let state: State<ShowState> = app.state();
     let height = state
         .inner
@@ -261,19 +256,29 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
         .map_err(|_| anyhow::anyhow!("state poisoned"))?
         .height
         .unwrap_or(PANEL_MIN_H);
+    center_on(win, m, height)?;
+    Ok(())
+}
+
+/// Sizes the window to a panel `height` logical px tall and centres it in `m`'s work area.
+fn center_on(win: &WebviewWindow, m: &Monitor, height: f64) -> tauri::Result<()> {
+    let (wa, scale) = (m.work_area(), m.scale_factor());
+    let (x, y, w, h) = layout(
+        (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
+        scale,
+        height,
+    );
     let pos = PhysicalPosition::new(x, y);
-    let height = height.min(max_height(wa.size.height, scale));
-    let size = PhysicalSize::new(w, (height * scale).round() as u32);
     // Move first so a cross-monitor DPI change (WM_DPICHANGED) rescales the
     // old size, then set the size in physical px and re-pin the position,
     // since resizing after the move can shift the origin.
     win.set_position(pos)?;
-    win.set_size(size)?;
-    win.set_position(pos)?;
-    Ok(())
+    win.set_size(PhysicalSize::new(w, h))?;
+    win.set_position(pos)
 }
 
-/// Grows or shrinks the window to the panel's content height (logical px); the top stays put.
+/// Grows or shrinks the window to the panel's content height (logical px) and
+/// re-centres it on its monitor.
 #[tauri::command]
 pub async fn resize_launcher(
     app: AppHandle,
@@ -283,17 +288,17 @@ pub async fn resize_launcher(
     let win = app
         .get_webview_window(LABEL)
         .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
-    let mut h = clamp_height(height);
-    if let Ok(Some(m)) = win.current_monitor() {
-        h = h.min(max_height(m.work_area().size.height, m.scale_factor()));
-    }
+    let h = clamp_height(height);
     state
         .inner
         .lock()
         .map_err(|_| CommandError::new("internal", "state poisoned"))?
         .height = Some(h);
-    win.set_size(LogicalSize::new(PANEL_W, h))
-        .map_err(|e| CommandError::new("window", e.to_string()))?;
+    match win.current_monitor() {
+        Ok(Some(m)) => center_on(&win, &m, h),
+        _ => win.set_size(LogicalSize::new(PANEL_W, h)),
+    }
+    .map_err(|e| CommandError::new("window", e.to_string()))?;
     Ok(())
 }
 
@@ -330,21 +335,33 @@ mod tests {
     #[test]
     fn layout_centres_at_scale_1() {
         // 1920x1040 work area with a 40px taskbar at the bottom.
-        assert_eq!(layout((0, 0, 1920, 1040), 1.0), (640, 227, 640));
+        assert_eq!(
+            layout((0, 0, 1920, 1040), 1.0, PANEL_MAX_H),
+            (640, 227, 640, 586)
+        );
+    }
+
+    #[test]
+    fn layout_centres_a_short_panel() {
+        // Input row alone: centred on its own height, not a full list's.
+        assert_eq!(
+            layout((0, 0, 1920, 1040), 1.0, PANEL_MIN_H),
+            (640, 492, 640, 56)
+        );
     }
 
     #[test]
     fn layout_scales_and_offsets() {
         // Second monitor to the right, 150%.
-        let (x, y, w) = layout((1920, 0, 2880, 1500), 1.5);
-        assert_eq!(w, 960);
+        let (x, y, w, h) = layout((1920, 0, 2880, 1500), 1.5, 200.0);
+        assert_eq!((w, h), (960, 300));
         assert_eq!(x, 1920 + (2880 - 960) / 2);
-        assert_eq!(y, ((1500.0 - 586.0 * 1.5) / 2.0_f64).round() as i32);
+        assert_eq!(y, (1500 - 300) / 2);
     }
 
     #[test]
     fn layout_never_above_work_area() {
-        let (_, y, _) = layout((0, 10, 800, 300), 1.0);
+        let (_, y, _, _) = layout((0, 10, 800, 300), 1.0, PANEL_MAX_H);
         assert!(y >= 10, "panel top above the work area: {y}");
         assert_eq!(y, 10 + (WORK_MARGIN / 2.0) as i32);
     }

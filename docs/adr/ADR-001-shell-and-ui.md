@@ -27,7 +27,7 @@ The user instructed this on 2026-10-19, in the v0.0.2/v0.0.3 review. It replaces
 
 This replaces the full-monitor transparent window above, and with it the user's earlier "remove the bg" request (no backdrop).
 
-- The window is the panel: it is sized to the bar plus its results, and its height follows the results (`resize_launcher`). It is still centred on the monitor under the cursor.
+- The window is the panel: it is sized to the bar plus its results, and its height follows the results (`resize_launcher`). It is centred on the monitor under the cursor when shown, and re-centred on its monitor at every height change, so the input moves as the list grows (user, 2026-10-22: the fixed input top sat near the top edge of a laptop screen).
 - The backdrop is Windows acrylic, with rounded corners, set from `window.rs` and `crates/win/src/dwm.rs`.
 - When Windows transparency effects are off, the panel is opaque.
 
