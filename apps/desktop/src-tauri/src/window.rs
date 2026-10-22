@@ -20,6 +20,12 @@ const PANEL_MAX_H: f64 = 706.0;
 const PANEL_MIN_H: f64 = 60.0;
 /// Gap kept between the panel and the work-area edge, in logical px.
 const WORK_MARGIN: f64 = 24.0;
+/// Tray menu width in logical px. Keep equal to `--l-menu-w` in tokens.css.
+const MENU_W: f64 = 280.0;
+/// Tray menu height in logical px. Keep equal to `--l-menu-h` in tokens.css.
+const MENU_H: f64 = 225.0;
+/// Gap between the tray click point and the menu, in logical px.
+const MENU_GAP: f64 = 8.0;
 
 /// Tallest panel (logical px) that fits a work area `work_h` physical px high at `scale`.
 fn max_height(work_h: u32, scale: f64) -> f64 {
@@ -33,6 +39,33 @@ fn layout(work: (i32, i32, u32, u32), scale: f64, height: f64) -> (i32, i32, u32
     let h = (height.min(max_height(work.3, scale)) * scale).round();
     let x = f64::from(work.0) + (f64::from(work.2) - w) / 2.0;
     let y = f64::from(work.1) + ((f64::from(work.3) - h) / 2.0).max(0.0);
+    (x.round() as i32, y.round() as i32, w as u32, h as u32)
+}
+
+/// Window origin and size in physical px for the tray menu opened by a click at `anchor`
+/// (physical px) on a monitor whose work area is `(x, y, w, h)` at `scale`.
+///
+/// The taskbar is where the click lands outside the work area: left or right of it puts the
+/// menu beside the click, otherwise the menu opens above a click in the lower half (bottom
+/// taskbar, or an auto-hidden one) and below a click in the upper half (top taskbar). The
+/// result is clamped inside the work area, pinned to its top-left when the area is too small.
+fn menu_layout(work: (i32, i32, u32, u32), scale: f64, anchor: (f64, f64)) -> (i32, i32, u32, u32) {
+    let (wx, wy) = (f64::from(work.0), f64::from(work.1));
+    let (ww, wh) = (f64::from(work.2), f64::from(work.3));
+    let (w, h) = ((MENU_W * scale).round(), (MENU_H * scale).round());
+    let gap = MENU_GAP * scale;
+    let (ax, ay) = anchor;
+    let (x, y) = if ax < wx {
+        (ax + gap, ay - h / 2.0)
+    } else if ax >= wx + ww {
+        (ax - w - gap, ay - h / 2.0)
+    } else if ay >= wy + wh / 2.0 {
+        (ax - w / 2.0, ay - h - gap)
+    } else {
+        (ax - w / 2.0, ay + gap)
+    };
+    let x = x.min(wx + ww - w).max(wx);
+    let y = y.min(wy + wh - h).max(wy);
     (x.round() as i32, y.round() as i32, w as u32, h as u32)
 }
 
@@ -60,6 +93,8 @@ struct Inner {
     glass: bool,
     /// Dark flag last given to the backdrop.
     dark: bool,
+    /// Whether the window currently shows the tray menu instead of the launcher.
+    menu: bool,
 }
 
 /// Hooks up blur/close handling for the prewarmed launcher window.
@@ -95,6 +130,7 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
 }
 
 fn hide(app: &AppHandle, win: &WebviewWindow) {
+    set_menu(app, false);
     if let Err(err) = win.hide() {
         tracing::warn!(%err, "hide failed");
     } else {
@@ -108,6 +144,24 @@ fn hide(app: &AppHandle, win: &WebviewWindow) {
         }
     }
     emit(app, "launcher://hidden", json!({}));
+}
+
+/// Hides the launcher window if it exists.
+pub fn hide_now(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(LABEL) {
+        hide(app, &win);
+    }
+}
+
+fn set_menu(app: &AppHandle, on: bool) {
+    if let Ok(mut s) = app.state::<ShowState>().inner.lock() {
+        s.menu = on;
+    }
+}
+
+/// True while the launcher window shows the tray menu.
+pub fn menu_active(app: &AppHandle) -> bool {
+    app.state::<ShowState>().inner.lock().is_ok_and(|s| s.menu)
 }
 
 fn emit(app: &AppHandle, event: &str, payload: serde_json::Value) {
@@ -147,27 +201,14 @@ pub fn show(app: &AppHandle, reason: &str) {
 }
 
 fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) {
+    set_menu(app, false);
     if let Err(err) = place(app, win) {
         tracing::warn!(%err, "positioning failed");
     }
-    // Resume before show so the first frame paints from a live page.
-    #[cfg(windows)]
-    if let Err(err) = win.with_webview(|w| {
-        if let Err(err) = win::webview::on_shown(&w.controller()) {
-            tracing::debug!(%err, "webview resume failed");
-        }
-    }) {
-        tracing::debug!(%err, "webview resume dispatch failed");
-    }
-    if let Err(err) = win.show().and_then(|()| win.set_focus()) {
-        tracing::warn!(%err, "show failed");
-    }
+    reveal(win);
     // Spawned; nothing on the show path waits for the refresh.
     crate::state::on_open(app);
-    #[cfg(windows)]
-    if let Ok(h) = win.hwnd() {
-        let _ = win::dwm::strip_caption(h.0 as isize);
-    }
+    strip_caption(win);
     let glass = sync_glass(app, win);
     let state: State<ShowState> = app.state();
     let Ok(mut s) = state.inner.lock() else {
@@ -177,10 +218,7 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     s.t0 = Some(t0);
     let shown_id = s.shown_id;
     drop(s);
-    let config = app
-        .state::<std::sync::Arc<crate::state::AppState>>()
-        .config
-        .load();
+    let config = config(app);
     let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
     let running = app
         .state::<std::sync::Arc<crate::state::AppState>>()
@@ -203,6 +241,91 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
             "webTitle": web_title,
         }),
     );
+}
+
+/// Resumes the WebView, then shows and focuses the window.
+fn reveal(win: &WebviewWindow) {
+    // Resume before show so the first frame paints from a live page.
+    #[cfg(windows)]
+    if let Err(err) = win.with_webview(|w| {
+        if let Err(err) = win::webview::on_shown(&w.controller()) {
+            tracing::debug!(%err, "webview resume failed");
+        }
+    }) {
+        tracing::debug!(%err, "webview resume dispatch failed");
+    }
+    if let Err(err) = win.show().and_then(|()| win.set_focus()) {
+        tracing::warn!(%err, "show failed");
+    }
+}
+
+fn strip_caption(win: &WebviewWindow) {
+    #[cfg(windows)]
+    if let Ok(h) = win.hwnd() {
+        let _ = win::dwm::strip_caption(h.0 as isize);
+    }
+    #[cfg(not(windows))]
+    let _ = win;
+}
+
+/// Current config snapshot, shared by the `launcher://shown` and `tray://menu` payloads.
+fn config(app: &AppHandle) -> std::sync::Arc<launcher_core::Config> {
+    app.state::<std::sync::Arc<crate::state::AppState>>()
+        .config
+        .load_full()
+}
+
+/// Turns the launcher window into the tray menu: placed at the click `anchor` (physical px)
+/// on the monitor that contains it, shown and focused, then `tray://menu` is emitted.
+/// Focus loss hides it like the launcher; the next normal show restores the launcher layout.
+pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
+    let Some(win) = app.get_webview_window(LABEL) else {
+        tracing::error!("launcher window missing");
+        return;
+    };
+    // Set first so a resize from the UI cannot move the menu.
+    set_menu(app, true);
+    match monitor_at(app, anchor.x, anchor.y) {
+        Ok(Some(m)) => {
+            if let Err(err) = place_menu(&win, &m, anchor) {
+                tracing::warn!(%err, "menu positioning failed");
+            }
+        }
+        Ok(None) => {}
+        Err(err) => tracing::warn!(%err, "monitor lookup failed"),
+    }
+    reveal(&win);
+    strip_caption(&win);
+    let glass = sync_glass(app, &win);
+    let config = config(app);
+    let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
+    let update = crate::update::available(app).map(|version| json!({ "version": version }));
+    emit(
+        app,
+        "tray://menu",
+        json!({
+            "appVersion": env!("CARGO_PKG_VERSION"),
+            "hotkey": config.general.hotkey,
+            "update": update,
+            "glass": glass,
+            "appearance": appearance,
+        }),
+    );
+}
+
+/// Sizes and moves the window to the menu layout for `anchor` in `m`'s work area.
+fn place_menu(
+    win: &WebviewWindow,
+    m: &Monitor,
+    anchor: PhysicalPosition<f64>,
+) -> tauri::Result<()> {
+    let (wa, scale) = (m.work_area(), m.scale_factor());
+    let (x, y, w, h) = menu_layout(
+        (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
+        scale,
+        (anchor.x, anchor.y),
+    );
+    set_bounds(win, PhysicalPosition::new(x, y), PhysicalSize::new(w, h))
 }
 
 /// Source ids the launcher can offer now: `apps` always, `files` while Find is on, `ask` while
@@ -269,15 +392,7 @@ fn is_dark(scheme: &str) -> bool {
 /// Sizes the window to the panel and centres it on the monitor under the cursor.
 fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let cursor = app.cursor_position()?;
-    let monitors = app.available_monitors()?;
-    let found = monitors.iter().find(|m| {
-        let (p, s) = (m.position(), m.size());
-        cursor.x >= f64::from(p.x)
-            && cursor.x < f64::from(p.x) + f64::from(s.width)
-            && cursor.y >= f64::from(p.y)
-            && cursor.y < f64::from(p.y) + f64::from(s.height)
-    });
-    let Some(m) = found.or(monitors.first()) else {
+    let Some(m) = monitor_at(app, cursor.x, cursor.y)? else {
         return Ok(());
     };
     let state: State<ShowState> = app.state();
@@ -287,8 +402,22 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
         .map_err(|_| anyhow::anyhow!("state poisoned"))?
         .height
         .unwrap_or(PANEL_MIN_H);
-    center_on(win, m, height)?;
+    center_on(win, &m, height)?;
     Ok(())
+}
+
+/// The monitor containing the physical point `(x, y)`, else the first monitor.
+fn monitor_at(app: &AppHandle, x: f64, y: f64) -> tauri::Result<Option<Monitor>> {
+    let mut monitors = app.available_monitors()?;
+    let found = monitors.iter().position(|m| {
+        let (p, s) = (m.position(), m.size());
+        x >= f64::from(p.x)
+            && x < f64::from(p.x) + f64::from(s.width)
+            && y >= f64::from(p.y)
+            && y < f64::from(p.y) + f64::from(s.height)
+    });
+    let i = found.unwrap_or(0);
+    Ok((i < monitors.len()).then(|| monitors.swap_remove(i)))
 }
 
 /// Sizes the window to a panel `height` logical px tall and centres it in `m`'s work area.
@@ -299,12 +428,19 @@ fn center_on(win: &WebviewWindow, m: &Monitor, height: f64) -> tauri::Result<()>
         scale,
         height,
     );
-    let pos = PhysicalPosition::new(x, y);
+    set_bounds(win, PhysicalPosition::new(x, y), PhysicalSize::new(w, h))
+}
+
+fn set_bounds(
+    win: &WebviewWindow,
+    pos: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+) -> tauri::Result<()> {
     // Move first so a cross-monitor DPI change (WM_DPICHANGED) rescales the
     // old size, then set the size in physical px and re-pin the position,
     // since resizing after the move can shift the origin.
     win.set_position(pos)?;
-    win.set_size(PhysicalSize::new(w, h))?;
+    win.set_size(size)?;
     win.set_position(pos)
 }
 
@@ -320,11 +456,17 @@ pub async fn resize_launcher(
         .get_webview_window(LABEL)
         .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
     let h = clamp_height(height);
-    state
-        .inner
-        .lock()
-        .map_err(|_| CommandError::new("internal", "state poisoned"))?
-        .height = Some(h);
+    {
+        let mut s = state
+            .inner
+            .lock()
+            .map_err(|_| CommandError::new("internal", "state poisoned"))?;
+        // The tray menu has a fixed size; the launcher lays itself out again on its next show.
+        if s.menu {
+            return Ok(());
+        }
+        s.height = Some(h);
+    }
     match win.current_monitor() {
         Ok(Some(m)) => center_on(&win, &m, h),
         _ => win.set_size(LogicalSize::new(PANEL_W, h)),
@@ -428,6 +570,81 @@ mod tests {
     fn explicit_schemes_resolve() {
         assert!(is_dark("dark"));
         assert!(!is_dark("light"));
+    }
+
+    // Menu is 280x225 with an 8 px gap at scale 1.
+
+    #[test]
+    fn menu_above_a_bottom_taskbar() {
+        // Work area 1920x1040, click on the taskbar at y 1060: above, clamped to the work area.
+        assert_eq!(
+            menu_layout((0, 0, 1920, 1040), 1.0, (1700.0, 1060.0)),
+            (1560, 815, 280, 225)
+        );
+    }
+
+    #[test]
+    fn menu_above_an_auto_hidden_taskbar() {
+        // Work area is the whole monitor: bottom edge sits one gap above the click.
+        let (_, y, _, h) = menu_layout((0, 0, 1920, 1080), 1.0, (960.0, 1000.0));
+        assert_eq!(y + h as i32, 1000 - 8);
+    }
+
+    #[test]
+    fn menu_below_a_top_taskbar() {
+        // Work area starts at y 40; click at y 20.
+        assert_eq!(
+            menu_layout((0, 40, 1920, 1040), 1.0, (1700.0, 20.0)),
+            (1560, 40, 280, 225)
+        );
+        // A click in the upper half (auto-hidden top taskbar) opens below with the gap.
+        let (_, y, _, _) = menu_layout((0, 0, 1920, 1080), 1.0, (960.0, 100.0));
+        assert_eq!(y, 108);
+    }
+
+    #[test]
+    fn menu_beside_a_left_taskbar() {
+        // Work area starts at x 48; click at x 24, y 900.
+        assert_eq!(
+            menu_layout((48, 0, 1872, 1080), 1.0, (24.0, 900.0)),
+            (48, 788, 280, 225)
+        );
+    }
+
+    #[test]
+    fn menu_beside_a_right_taskbar() {
+        // Work area 0..1872; click at x 1896, y 1070: left of the click, clamped to the bottom.
+        assert_eq!(
+            menu_layout((0, 0, 1872, 1080), 1.0, (1896.0, 1070.0)),
+            (1592, 855, 280, 225)
+        );
+    }
+
+    #[test]
+    fn menu_clamps_to_the_edges() {
+        // Far right of a bottom taskbar: right edge stays in the work area.
+        let (x, _, w, _) = menu_layout((0, 0, 1920, 1040), 1.0, (1910.0, 1060.0));
+        assert_eq!(x + w as i32, 1920);
+        // Far left: left edge at the work-area origin.
+        let (x, _, _, _) = menu_layout((0, 0, 1920, 1040), 1.0, (5.0, 1060.0));
+        assert_eq!(x, 0);
+    }
+
+    #[test]
+    fn menu_scales_on_an_offset_monitor() {
+        // Monitor left of the primary at 150%: 2880x1560 work area at x -2880.
+        let (x, y, w, h) = menu_layout((-2880, 0, 2880, 1560), 1.5, (-1440.0, 1590.0));
+        assert_eq!((w, h), (420, 338));
+        assert_eq!(x, -1440 - 210);
+        assert_eq!(y, 1560 - 338);
+    }
+
+    #[test]
+    fn menu_in_a_tiny_work_area_pins_to_the_origin() {
+        assert_eq!(
+            menu_layout((100, 50, 200, 100), 1.0, (150.0, 160.0)),
+            (100, 50, 280, 225)
+        );
     }
 
     #[test]

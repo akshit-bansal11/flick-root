@@ -1,5 +1,4 @@
 //! System tray and the Settings window.
-use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -20,37 +19,26 @@ pub fn show_launcher(app: &AppHandle, reason: &str) {
     }
 }
 
-/// Builds the tray icon with Open, Settings, update and Quit entries.
+/// Builds the tray icon: left click shows the launcher, right click opens the glass menu
+/// (rendered by the launcher window, see `window::show_menu`).
 pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-    let upd = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &settings, &upd, &quit])?;
-    crate::update::init(app, upd);
+    crate::update::init(app);
     let mut builder = TrayIconBuilder::new()
         .tooltip(app.package_info().name.clone())
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" => show_launcher(app, "tray"),
-            "settings" => {
-                if let Err(err) = open_settings_window(app, None) {
-                    tracing::warn!(%err, "open settings failed");
-                }
-            }
-            "update" => crate::update::on_tray(app),
-            "quit" => app.exit(0),
-            _ => {}
-        })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
+            let TrayIconEvent::Click {
+                button,
                 button_state: MouseButtonState::Up,
+                position,
                 ..
             } = event
-            {
-                show_launcher(tray.app_handle(), "tray");
+            else {
+                return;
+            };
+            match button {
+                MouseButton::Left => show_launcher(tray.app_handle(), "tray"),
+                MouseButton::Right => window::show_menu(tray.app_handle(), position),
+                MouseButton::Middle => {}
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -97,9 +85,76 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
     Ok(())
 }
 
+/// An item of the tray menu, as the launcher UI sends it.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum TrayAction {
+    Open,
+    Settings,
+    Update,
+    Quit,
+}
+
+impl TrayAction {
+    fn parse(s: &str) -> Option<Self> {
+        match s {
+            "open" => Some(Self::Open),
+            "settings" => Some(Self::Settings),
+            "update" => Some(Self::Update),
+            "quit" => Some(Self::Quit),
+            _ => None,
+        }
+    }
+}
+
+/// Runs a tray menu item. Accepted only while the launcher window shows the menu.
+#[tauri::command]
+pub async fn tray_action(app: AppHandle, action: String) -> Result<(), CommandError> {
+    let action = TrayAction::parse(&action)
+        .ok_or_else(|| CommandError::new("invalid_action", "unknown tray action"))?;
+    if !window::menu_active(&app) {
+        return Err(CommandError::new(
+            "not_available",
+            "the tray menu is not open",
+        ));
+    }
+    match action {
+        TrayAction::Open => {
+            window::hide_now(&app);
+            show_launcher(&app, "tray");
+        }
+        TrayAction::Settings => {
+            window::hide_now(&app);
+            open_settings_window(&app, None)?;
+        }
+        TrayAction::Update => {
+            window::hide_now(&app);
+            crate::update::on_tray(&app);
+        }
+        // RunEvent::Exit runs the normal shutdown.
+        TrayAction::Quit => app.exit(0),
+    }
+    Ok(())
+}
+
 /// Opens Settings on behalf of the launcher UI.
 #[tauri::command]
 pub async fn open_settings(app: AppHandle, section: Option<String>) -> Result<(), CommandError> {
     open_settings_window(&app, section.as_deref())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tray_actions_parse() {
+        assert_eq!(TrayAction::parse("open"), Some(TrayAction::Open));
+        assert_eq!(TrayAction::parse("settings"), Some(TrayAction::Settings));
+        assert_eq!(TrayAction::parse("update"), Some(TrayAction::Update));
+        assert_eq!(TrayAction::parse("quit"), Some(TrayAction::Quit));
+        for bad in ["", "Quit", " open", "exit", "settings\0"] {
+            assert_eq!(TrayAction::parse(bad), None, "{bad:?}");
+        }
+    }
 }

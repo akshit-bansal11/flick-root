@@ -88,6 +88,7 @@ pub fn run() {
             window::hide_launcher,
             window::resize_launcher,
             tray::open_settings,
+            tray::tray_action,
             commands::search::search,
             commands::ask::ask_stream,
             commands::ask::cancel_ask,

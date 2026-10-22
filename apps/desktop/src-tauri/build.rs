@@ -4,6 +4,7 @@ fn main() {
         "hide_launcher",
         "resize_launcher",
         "open_settings",
+        "tray_action",
         "search",
         "launch",
         "reveal",

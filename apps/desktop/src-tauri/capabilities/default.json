@@ -10,6 +10,7 @@
     "allow-hide-launcher",
     "allow-resize-launcher",
     "allow-open-settings",
+    "allow-tray-action",
     "allow-search",
     "allow-launch",
     "allow-reveal",
