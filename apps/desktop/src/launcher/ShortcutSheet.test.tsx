@@ -17,7 +17,7 @@ describe("ShortcutSheet", () => {
       expect(screen.getAllByText(s.label, { exact: false }).length).toBeGreaterThan(0);
     expect(container.querySelectorAll("kbd").length).toBeGreaterThan(SHORTCUTS.length - 2);
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toContain(
-      "Find",
+      "Open",
     );
   });
 

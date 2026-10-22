@@ -101,7 +101,7 @@ describe("chordOf and matches", () => {
     expect(idFor("find", key("Enter"))).toBe("open");
     expect(idFor("query", key("Enter"))).toBe("ask");
     expect(idFor("none", key("Enter"))).toBe("enterMode");
-    expect(idFor("commands", key("1", { ctrl: true }))).toBe("go:commands");
+    expect(idFor("commands", key("1", { ctrl: true }))).toBe("go:find");
     expect(idFor("settings", key("w", { ctrl: true }))).toBe("closeSettingsW");
     expect(idFor("find", key("Backspace", { ctrl: true }))).toBeUndefined();
   });

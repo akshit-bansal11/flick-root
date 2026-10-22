@@ -96,7 +96,12 @@ describe("Launcher", () => {
 
   it("shown with sources [apps] hides the other four prefix hint rows", async () => {
     vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
-      cb({ shownId: 1, reason: "hotkey", sources: ["apps"] });
+      cb({
+        shownId: 1,
+        reason: "hotkey",
+        sources: ["apps"],
+        appearance: { theme: "glass", glass: 90, scheme: "dark" },
+      });
       return Promise.resolve(() => {});
     });
     await mount();
