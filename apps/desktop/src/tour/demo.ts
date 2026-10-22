@@ -71,8 +71,8 @@ const proc = item("proc:chrome", "process", "chrome.exe", "Process", {
 });
 
 export const DEMO_PROJECTS: readonly Item[] = [
-  item("project:flick", "project", "flick", "Projects"),
-  item("project:notes", "project", "notes-app", "Projects"),
+  item("projects:flick", "project", "flick", "Projects"),
+  item("projects:notes", "project", "notes-app", "Projects"),
 ];
 
 /** Canned results for the examples the steps use, per source. */
@@ -283,7 +283,11 @@ export function tourEventOf(e: Effect): TourEvent | null {
         ? "openFile"
         : e.itemId.startsWith("app:") || e.itemId.startsWith("prog:")
           ? "launchApp"
-          : null;
+          : e.itemId.startsWith("cmd:")
+            ? "runCommand"
+            : e.itemId.startsWith("projects:")
+              ? "openProject"
+              : null;
     case "reveal":
       return e.itemId.startsWith("file:") ? "openFile" : null;
     case "copyPath":

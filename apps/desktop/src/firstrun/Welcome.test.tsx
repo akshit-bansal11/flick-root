@@ -10,7 +10,7 @@ describe("Welcome", () => {
     const f = fns();
     render(<Welcome note={false} {...f} />);
     expect(screen.getByText("Take a 2-minute interactive tour?")).toBeTruthy();
-    expect(document.querySelectorAll(".fr-chip")).toHaveLength(4);
+    expect(document.querySelectorAll(".fr-chip")).toHaveLength(5);
     expect(document.activeElement).toBe(screen.getByText("Take the tour"));
     fireEvent.click(screen.getByText("Take the tour"));
     fireEvent.click(screen.getByText("Not now"));

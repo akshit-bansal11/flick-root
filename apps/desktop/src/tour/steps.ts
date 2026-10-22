@@ -7,6 +7,8 @@ export type TourEvent =
   | "hotkey"
   | "launchApp"
   | "openFile"
+  | "runCommand"
+  | "openProject"
   | "copied"
   | "askSent"
   | "modelSwitched"
@@ -55,31 +57,40 @@ export const TOUR_STEPS: readonly TourStep[] = [
     goal: (v) => saw(v, "hotkey"),
   },
   {
-    id: "apps",
-    title: "! Apps and programs",
-    body: `Type ! and a name, arrow to a row, then press ${key("open")} to open it.`,
-    keys: ["!", ...caps("open")],
-    example: "! spotify",
+    id: "find",
+    title: "/ Open apps and files",
+    body: `Find apps, programs, files and folders. ${key("open")} opens one, ${key("location")} shows it in Explorer.`,
+    keys: ["/", ...caps("open"), ...caps("location")],
+    example: "/ spotify",
     show: "type",
-    goal: (v) => saw(v, "launchApp"),
+    goal: (v) => saw(v, "launchApp") || saw(v, "openFile"),
   },
   {
     id: "commands",
     title: "> Commands",
-    body: `Math, units, currency, time zones and system commands. Type 5 km to mi, then press ${key("copyResult")} to copy the answer.`,
-    keys: [">", ...caps("copyResult")],
-    example: "> 5 km to mi",
+    body: `Lock the PC, end a process, free a port. Type lock, then press ${key("open")} to run it.`,
+    keys: [">", ...caps("open")],
+    example: "> lock",
     show: "type",
-    goal: (v) => v.mode === "commands" && saw(v, "copied"),
+    goal: (v) => saw(v, "runCommand"),
   },
   {
-    id: "find",
-    title: "/ Find",
-    body: `Search files and folders. ${key("open")} opens one, ${key("location")} shows it in Explorer.`,
-    keys: ["/", ...caps("open"), ...caps("location")],
-    example: "/ report",
+    id: "calc",
+    title: "= Calc",
+    body: `Math, units, currency and time zones. Type 5 km to mi, then press ${key("copyResult")} to copy the answer.`,
+    keys: ["=", ...caps("copyResult")],
+    example: "= 5 km to mi",
     show: "type",
-    goal: (v) => saw(v, "openFile"),
+    goal: (v) => v.mode === "calc" && saw(v, "copied"),
+  },
+  {
+    id: "projects",
+    title: "@ Projects",
+    body: `Jump into a code project. Type a name, then press ${key("open")} to open it.`,
+    keys: ["@", ...caps("open")],
+    example: "@ flick",
+    show: "type",
+    goal: (v) => saw(v, "openProject"),
   },
   {
     id: "ask",
@@ -102,9 +113,9 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "around",
     title: "Getting around",
-    body: `${key("leave")} on an empty bar leaves a mode. Then ${key("go:find")} jumps to Find. ${key("sheet")} lists every shortcut and ${key("back")} steps back: close, clear, hide.`,
+    body: `${key("leave")} on an empty bar leaves a mode. Then ${key("go:find")} jumps to Open. ${key("sheet")} lists every shortcut and ${key("back")} steps back: close, clear, hide.`,
     keys: [...caps("leave"), ...caps("go:find"), ...caps("sheet")],
-    example: "!",
+    example: ">",
     show: "type",
     goal: (v) => saw(v, "left") && v.mode === "find",
   },
@@ -120,7 +131,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "done",
     title: "You are set",
     body: "Press the hotkey any time and pick a prefix. Find this tour again in Settings > General.",
-    keys: [">", "!", "/", "?"],
+    keys: ["/", ">", "=", "?", "@"],
   },
 ];
 

@@ -107,6 +107,8 @@ describe("tourEventOf", () => {
     const ev = (e: Effect) => tourEventOf(e);
     expect(ev({ type: "launch", itemId: "app:chrome", admin: false })).toBe("launchApp");
     expect(ev({ type: "launch", itemId: "file:report", admin: false })).toBe("openFile");
+    expect(ev({ type: "launch", itemId: "cmd:lock", admin: false })).toBe("runCommand");
+    expect(ev({ type: "launch", itemId: "projects:flick", admin: false })).toBe("openProject");
     expect(ev({ type: "reveal", itemId: "file:report" })).toBe("openFile");
     expect(ev({ type: "copyText", text: "1" })).toBe("copied");
     expect(ev({ type: "setThinkingMode", id: "x" })).toBe("modelSwitched");

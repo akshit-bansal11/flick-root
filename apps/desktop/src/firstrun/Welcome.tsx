@@ -25,7 +25,7 @@ function Primary({ onClick, children }: { onClick: () => void; children: string 
   );
 }
 
-/** First screen of first run: logo, the four prefixes, and the tour question. */
+/** First screen of first run: logo, the prefixes, and the tour question. */
 export function Welcome({ note, onTour, onSkip, onContinue }: Props) {
   if (note) {
     return (
@@ -41,7 +41,7 @@ export function Welcome({ note, onTour, onSkip, onContinue }: Props) {
     <main className="fr-shell fr-welcome">
       <Logo size={96} animated />
       <h1 className="s-title fr-rise">Welcome to {APP_DISPLAY_NAME}</h1>
-      <p className="s-help">One bar for apps, commands, files and questions.</p>
+      <p className="s-help">One bar for apps, files, commands, math and questions.</p>
       <div className="fr-chips">
         {CHIPS.map((m, i) => (
           <span key={m.prefix} className="fr-chip" style={{ "--i": i + 1 } as CSSProperties}>
