@@ -53,7 +53,7 @@ pnpm --filter web dev
 pnpm --filter web build
 ```
 
-CI runs the same gates on every pull request: Rust format, clippy, Rust tests, cargo deny, cargo audit, TypeScript typecheck, lint, JS tests, pnpm audit and the web build.
+CI runs the same gates on every pull request, split into jobs that run only when their files changed: `rust` (format, clippy, tests, cargo deny, cargo audit) for `crates/`, `apps/desktop/src-tauri/` and the Cargo files; `js` (typecheck, lint, JS tests, pnpm audit) for the desktop UI and any JS, TS, JSON or CSS file; `web` (the web build) for `apps/web/`. A change to `ci.yml` itself, or a manual run (`gh workflow run ci.yml`), runs every job.
 
 ## Code rules
 
