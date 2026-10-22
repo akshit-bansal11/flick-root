@@ -227,6 +227,21 @@ impl FileStore {
         });
         b.finish(roots)
     }
+
+    /// A new store without every folder below a root whose full path `excluded` accepts, and
+    /// everything beneath it. Roots are kept. No I/O.
+    pub fn without_dirs(&self, excluded: impl Fn(&Path) -> bool) -> FileStore {
+        let mut ids = [None; 256];
+        for r in &self.roots {
+            ids[usize::from(r.id)] = Some(r.id);
+        }
+        let mut b = StoreBuilder::new();
+        // Children of a dropped folder are dropped by copy_into, so only the top match is tested.
+        copy_into(&mut b, self, &ids, |i| {
+            self.parent(i).is_none() || !self.is_dir(i) || !excluded(&self.path_of(i))
+        });
+        b.finish(self.roots.clone())
+    }
 }
 
 /// Assign ids 0.. to `kept` in order; returns the renumbered roots and a map from each old
@@ -295,6 +310,13 @@ impl FileIndex {
         self.inner.store(Arc::new(store));
     }
 
+    /// Publish `store` only if the current store is still `current`, the one the caller built it
+    /// from; otherwise drop it (a newer store won). Returns whether it was published.
+    pub fn replace_if(&self, current: &Arc<FileStore>, store: FileStore) -> bool {
+        let prev = self.inner.compare_and_swap(current, Arc::new(store));
+        Arc::ptr_eq(&prev, current)
+    }
+
     /// Current store snapshot.
     pub fn load(&self) -> Arc<FileStore> {
         self.inner.load_full()
@@ -337,5 +359,45 @@ mod tests {
         ix.replace(s);
         assert_eq!(ix.len(), 3);
         assert_eq!(ix.path_of(1), PathBuf::from("C:\\Users\\x\\docs"));
+    }
+
+    #[test]
+    fn replace_if_drops_a_stale_publish() {
+        let ix = FileIndex::new();
+        let old = ix.load();
+        ix.replace(StoreBuilder::new().finish(Vec::new()));
+        let newer = ix.load();
+        assert!(!ix.replace_if(&old, StoreBuilder::new().finish(Vec::new())));
+        assert!(
+            Arc::ptr_eq(&newer, &ix.load()),
+            "the stale result was dropped"
+        );
+        assert!(ix.replace_if(&newer, StoreBuilder::new().finish(Vec::new())));
+        assert!(!Arc::ptr_eq(&newer, &ix.load()));
+    }
+
+    #[test]
+    fn without_dirs_drops_matching_subtrees() {
+        let mut b = StoreBuilder::new();
+        let r = b.push("C:\\x", NO_PARENT, true, 0, 0).unwrap();
+        let nm = b.push("node_modules", r, true, 0, 0).unwrap();
+        b.push("dep.js", nm, false, 0, 0).unwrap();
+        let src = b.push("src", r, true, 0, 0).unwrap();
+        b.push("main.rs", src, false, 0, 0).unwrap();
+        let s = b.finish(vec![Root {
+            id: 0,
+            path: PathBuf::from("C:\\x"),
+            label: "x".into(),
+        }]);
+        let kept = s.without_dirs(|p| p.ends_with("node_modules"));
+        let paths: Vec<PathBuf> = (0..kept.len()).map(|i| kept.path_of(i)).collect();
+        assert_eq!(
+            paths,
+            [
+                PathBuf::from("C:\\x"),
+                PathBuf::from("C:\\x\\src"),
+                PathBuf::from("C:\\x\\src\\main.rs"),
+            ]
+        );
     }
 }

@@ -49,10 +49,16 @@ impl FileIndex {
     }
 
     /// Fold `overlay` into a new store and publish it. Holds the overlay's write lock so no
-    /// event is lost between fold and clear (ponytail: queries stall during the fold).
-    pub fn compact(&self, overlay: &Overlay) {
+    /// event is lost between fold and clear (ponytail: queries stall during the fold). When the
+    /// store was replaced meanwhile (a rescan or a skip-list filter), the fold is dropped and the
+    /// overlay kept. Returns whether it was published.
+    pub fn compact(&self, overlay: &Overlay) -> bool {
         let mut g = overlay.write();
-        self.replace(watch::fold(&self.load(), &g));
-        g.reset();
+        let cur = self.load();
+        let published = self.replace_if(&cur, watch::fold(&cur, &g));
+        if published {
+            g.reset();
+        }
+        published
     }
 }

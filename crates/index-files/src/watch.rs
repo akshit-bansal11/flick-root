@@ -271,22 +271,24 @@ pub enum ProgramChange {
 /// Callback for [`ProgramChange`]s; runs on the notify thread, so it must be quick.
 pub type ProgramHook = Arc<dyn Fn(ProgramChange) + Send + Sync>;
 
-/// Program-file changes in one event: a path with a program extension (or a `.app` folder)
-/// that no excluded folder above it hides.
+/// Program-file changes in one event, for paths no excluded folder above hides: a path with a
+/// program extension (or a `.app` folder) that appeared or vanished, and any other path that
+/// vanished, since a deleted or renamed-away folder takes its programs with it (the hook's
+/// receiver drops everything under a removed path).
 fn program_changes(kind: &EventKind, paths: &[PathBuf], skip: &SkipList) -> Vec<ProgramChange> {
     let mut out = Vec::new();
     for (i, p) in paths.iter().enumerate() {
-        if ProgramFile::from_path(p).is_none()
-            || p.ancestors().skip(1).any(|a| skip.excludes_dir(a))
-        {
-            continue;
-        }
         let added = match kind {
             EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(RenameMode::To)) => true,
             EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(RenameMode::From)) => false,
             EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => i > 0,
             _ => p.exists(),
         };
+        if (added && ProgramFile::from_path(p).is_none())
+            || p.ancestors().skip(1).any(|a| skip.excludes_dir(a))
+        {
+            continue;
+        }
         out.push(if added {
             ProgramChange::Added(p.clone())
         } else {
@@ -521,5 +523,34 @@ mod tests {
             notify::Event::new(EventKind::Other).set_flag(Flag::Rescan)
         ));
         assert!(s.stale.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn folder_remove_and_rename_away_report_the_folder() {
+        use notify::event::RemoveKind;
+        let skip = SkipList::default();
+        let dir = PathBuf::from(r"C:\x\Tools");
+        let gone = [ProgramChange::Removed(dir.clone())];
+        let remove = EventKind::Remove(RemoveKind::Any);
+        assert_eq!(
+            program_changes(&remove, std::slice::from_ref(&dir), &skip),
+            gone
+        );
+        let from = EventKind::Modify(ModifyKind::Name(RenameMode::From));
+        assert_eq!(
+            program_changes(&from, std::slice::from_ref(&dir), &skip),
+            gone
+        );
+        let both = EventKind::Modify(ModifyKind::Name(RenameMode::Both));
+        let renamed = [dir.clone(), PathBuf::from(r"C:\x\Tools2")];
+        assert_eq!(program_changes(&both, &renamed, &skip), gone);
+        // A new folder or other file is not a program; a new program is.
+        let create = EventKind::Create(CreateKind::Any);
+        assert!(program_changes(&create, std::slice::from_ref(&dir), &skip).is_empty());
+        let exe = PathBuf::from(r"C:\x\Tools\a.exe");
+        assert_eq!(
+            program_changes(&create, std::slice::from_ref(&exe), &skip),
+            [ProgramChange::Added(exe)]
+        );
     }
 }

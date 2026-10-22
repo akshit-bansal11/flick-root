@@ -22,7 +22,7 @@ use providers::KeySource;
 use providers::hub::ProviderHub;
 use providers::secret::{KeyringBackend, SecretVault, VaultKeys};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -36,6 +36,10 @@ const APPS_MAX_AGE: u64 = 600;
 const PROGRAMS_MAX_AGE: u64 = 24 * 3600;
 /// The first open of the process reconciles Find when the snapshot is older than this (seconds).
 const FIND_MAX_AGE: u64 = 600;
+/// Programs cache file in the cache dir.
+const PROGRAMS_FILE: &str = "programs.idx";
+/// Find snapshot file in the cache dir.
+const SNAPSHOT_FILE: &str = "files.idx";
 
 static START: OnceLock<Instant> = OnceLock::new();
 
@@ -153,6 +157,37 @@ fn acquire(busy: &Busy, run: &FindRun, supersede: bool) -> Option<(BusyGuard, Ar
     }
 }
 
+/// Rescans a skip-list change asked for that no run has completed yet: a newer change cancels the
+/// run in flight, and the next run picks these up. A run takes them when it starts and puts them
+/// back when it does not complete.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PendingRescan {
+    /// Rescan every programs drive (a name pattern was removed).
+    pub all: bool,
+    /// Programs drives to rescan (a drive or folder entry was removed).
+    pub letters: Vec<char>,
+    /// Rescan Find completely.
+    pub find: bool,
+}
+
+impl PendingRescan {
+    /// Takes the programs part, leaving it empty.
+    fn take_programs(&mut self) -> (bool, Vec<char>) {
+        (
+            std::mem::take(&mut self.all),
+            std::mem::take(&mut self.letters),
+        )
+    }
+
+    /// Adds `all` and `letters` to the programs part.
+    fn add_programs(&mut self, all: bool, letters: &[char]) {
+        self.all |= all;
+        self.letters.extend_from_slice(letters);
+        self.letters.sort_unstable();
+        self.letters.dedup();
+    }
+}
+
 /// When each index was last refreshed, in Unix seconds (0 = never), kept in memory. Seeded from
 /// the cache headers and the snapshot mtime at startup.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -217,6 +252,13 @@ impl RefreshPlan {
     fn programs(&self) -> bool {
         self.programs_full || !self.program_roots.is_empty() || self.programs_republish
     }
+}
+
+/// Whether this open settles the first-open Find reconcile: Find is off, or it was not needed. A
+/// busy Find job (the startup load) or a reconcile still to run leaves it for a later open, or for
+/// the reconcile once it has run.
+fn marks_opened(cfg: &PlanCfg, plan: &RefreshPlan) -> bool {
+    !cfg.find || !(cfg.busy_find || plan.find_reconcile)
 }
 
 /// Decides what one launcher open refreshes. Pure. `drives` are the indexable drives as
@@ -340,6 +382,45 @@ fn drive_letters(roots: &[Root]) -> Vec<char> {
         .collect()
 }
 
+/// `(letter, serial)` of every root line at the top of the programs cache (format:
+/// [`ProgramCache::save`]) and the oldest of their scans (0 when none or malformed). Reads only
+/// those lines, so [`init`] can seed [`Freshness`] without loading the whole cache.
+fn cached_program_roots(path: &Path) -> (Vec<(char, u32)>, u64) {
+    use std::io::BufRead;
+    let Ok(file) = std::fs::File::open(path) else {
+        return (Vec::new(), 0);
+    };
+    let mut roots = Vec::new();
+    let mut oldest = u64::MAX;
+    for line in std::io::BufReader::new(file)
+        .lines()
+        .skip(1) // header
+        .map_while(Result::ok)
+    {
+        let Some(rest) = line.strip_prefix("root ") else {
+            break;
+        };
+        // `<path> <serial hex> <unix secs> <capped>`; split from the right, the path may hold spaces.
+        let mut f = rest.rsplitn(4, ' ').skip(1);
+        let secs = f.next().and_then(|v| v.parse::<u64>().ok());
+        let serial = f.next().and_then(|v| u32::from_str_radix(v, 16).ok());
+        let (Some(secs), Some(serial)) = (secs, serial) else {
+            return (Vec::new(), 0); // malformed: the cache loads as missing too
+        };
+        let mut c = f.next().unwrap_or_default().chars();
+        if let (Some(l), Some(':')) = (c.next(), c.next())
+            && l.is_ascii_alphabetic()
+        {
+            roots.push((l.to_ascii_uppercase(), serial));
+            oldest = oldest.min(secs);
+        }
+    }
+    if roots.is_empty() {
+        return (Vec::new(), 0);
+    }
+    (roots, oldest)
+}
+
 /// Modification time of `path` in Unix seconds, 0 when unreadable.
 fn mtime_secs(path: &std::path::Path) -> u64 {
     std::fs::metadata(path)
@@ -366,6 +447,8 @@ pub struct AppState {
     program_pending: Mutex<Vec<ProgramChange>>,
     /// A delayed apply is queued; false while idle, so no timer runs.
     program_scheduled: AtomicBool,
+    /// Skip-list rescans no run has completed yet.
+    rescan: Mutex<PendingRescan>,
     /// An attached drive's programs walk stopped at its cap (for the settings page).
     pub programs_capped: AtomicBool,
     /// Single-flight flags of the apps, programs and Find jobs and of the on-open refresh.
@@ -489,30 +572,62 @@ pub fn build_programs(
     }
 }
 
-/// Current program paths with `changes` applied in order (last change per path wins, matched
-/// case-insensitively), deduplicated. Pure; the watcher feeds it (D9).
-pub fn apply_program_changes(paths: &[Box<str>], changes: &[ProgramChange]) -> Vec<ProgramFile> {
-    let mut last: HashMap<String, &ProgramChange> = HashMap::new();
-    for c in changes {
-        let (ProgramChange::Added(p) | ProgramChange::Removed(p)) = c;
-        last.insert(p.to_string_lossy().to_lowercase(), c);
+/// Lowercase `p` ending in one separator, for "lies under" checks.
+fn dir_key(p: &Path) -> String {
+    let mut k = p.to_string_lossy().to_lowercase();
+    if !k.ends_with('\\') {
+        k.push('\\');
     }
-    let mut seen = std::collections::HashSet::new();
-    let mut out = Vec::with_capacity(paths.len());
-    let kept = paths
-        .iter()
-        .filter(|p| !last.contains_key(&p.to_lowercase()))
-        .filter_map(|p| ProgramFile::from_path(std::path::Path::new(&**p)));
-    let added = last.values().filter_map(|c| match c {
-        ProgramChange::Added(p) => ProgramFile::from_path(p),
-        ProgramChange::Removed(_) => None,
-    });
-    for f in kept.chain(added) {
-        if seen.insert(f.path.to_string_lossy().to_lowercase()) {
-            out.push(f);
+    k
+}
+
+/// Applies watcher `changes` in order to `cache`, matching paths case-insensitively: an added
+/// program file under a cached root joins it; a removed path drops that file and every file under
+/// it (a deleted or renamed-away folder). Keeps the cache sorted by lowercase path. Returns
+/// whether anything changed. Pure; the watcher feeds it (D9).
+pub fn apply_cache_changes(cache: &mut ProgramCache, changes: &[ProgramChange]) -> bool {
+    let key = |p: &Path| p.to_string_lossy().to_lowercase();
+    let roots: Vec<String> = cache.roots.iter().map(|r| dir_key(&r.root)).collect();
+    let mut list: Vec<(String, ProgramFile)> = std::mem::take(&mut cache.files)
+        .into_iter()
+        .map(|f| (key(&f.path), f))
+        .collect();
+    let mut changed = false;
+    for c in changes {
+        match c {
+            ProgramChange::Removed(p) => {
+                let (k, dir) = (key(p), dir_key(p));
+                let n = list.len();
+                list.retain(|(f, _)| *f != k && !f.starts_with(&dir));
+                changed |= list.len() != n;
+            }
+            ProgramChange::Added(p) => {
+                let k = key(p);
+                if roots.iter().any(|r| k.starts_with(r))
+                    && !list.iter().any(|(f, _)| *f == k)
+                    && let Some(f) = ProgramFile::from_path(p)
+                {
+                    list.push((k, f));
+                    changed = true;
+                }
+            }
         }
     }
-    out
+    if changed {
+        list.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+    cache.files = list.into_iter().map(|(_, f)| f).collect();
+    changed
+}
+
+/// Whether a path in `sorted` lies under the folder `dir`. `sorted` is ordered by lowercase path,
+/// as the published program set is (cache order, which [`merge_programs`] keeps).
+fn has_program_under(sorted: &[Box<str>], dir: &Path) -> bool {
+    let k = dir_key(dir);
+    let i = sorted.partition_point(|p| p.to_lowercase() < k);
+    sorted
+        .get(i)
+        .is_some_and(|p| p.to_lowercase().starts_with(&k))
 }
 
 /// The Find watcher's program hook. Holds the state weakly so the watcher never keeps it alive.
@@ -525,11 +640,19 @@ fn program_hook(st: &Arc<AppState>) -> ProgramHook {
     })
 }
 
-/// Queues `change`; the first one of a burst schedules a single apply 2 s later. A no-op (and
-/// the queue is cleared) while Programs is off.
+/// Queues `change`; the first one of a burst schedules a single apply 2 s later, retried every
+/// 2 s while a programs run holds the job. A no-op (and the queue is cleared) while Programs is
+/// off. Runs on the notify thread: a removed non-program path (maybe a folder) is queued only when
+/// a listed program lies under it, a binary search.
 fn queue_program_change(st: &Arc<AppState>, change: ProgramChange) {
     if !st.config.load().apps.scan_programs {
         st.program_pending.lock().clear();
+        return;
+    }
+    if let ProgramChange::Removed(p) = &change
+        && ProgramFile::from_path(p).is_none()
+        && !has_program_under(&st.programs.load().paths, p)
+    {
         return;
     }
     st.program_pending.lock().push(change);
@@ -538,33 +661,85 @@ fn queue_program_change(st: &Arc<AppState>, change: ProgramChange) {
     }
     let s = st.clone();
     tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        if let Err(err) =
-            tauri::async_runtime::spawn_blocking(move || flush_program_changes(&s)).await
-        {
-            tracing::warn!(%err, "program changes task failed");
+        loop {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let st = s.clone();
+            match tauri::async_runtime::spawn_blocking(move || flush_program_changes(&st)).await {
+                Ok(true) => {}
+                Ok(false) => break,
+                Err(err) => {
+                    tracing::warn!(%err, "program changes task failed");
+                    s.program_scheduled.store(false, Ordering::Release);
+                    break;
+                }
+            }
         }
     });
 }
 
-/// Rebuilds the program set from the queued changes and publishes it if Programs is still on.
-/// The cache is not saved here; the next on-open does that. Blocking (drive query, index build).
-fn flush_program_changes(st: &AppState) {
+/// Applies the queued changes to the programs cache, saves it and publishes, holding the programs
+/// job so it never races a scan or a skip filter. Returns true (retry later) when a programs run
+/// holds the job; that run merges the queue itself. Blocking (cache I/O, drive query, index build).
+fn flush_program_changes(st: &AppState) -> bool {
+    if !st.config.load().apps.scan_programs {
+        st.program_pending.lock().clear();
+        st.program_scheduled.store(false, Ordering::Release);
+        return false;
+    }
+    let Some(_busy) = st.programs_busy.try_begin() else {
+        return true;
+    };
     // Cleared before draining: an event after this schedules a fresh apply.
     st.program_scheduled.store(false, Ordering::Release);
     let changes = std::mem::take(&mut *st.program_pending.lock());
-    if changes.is_empty() || !st.config.load().apps.scan_programs {
-        return;
+    if changes.is_empty() {
+        return false;
     }
-    let files = apply_program_changes(&st.programs.load().paths, &changes);
-    let removable: Vec<char> = win::drives::indexable_drives()
+    let path = st.programs_path();
+    let mut cache = match ProgramCache::load(&path) {
+        Ok(Some(c)) => c,
+        Ok(None) => return false, // nothing cached yet: the first run scans everything
+        Err(err) => {
+            tracing::warn!(%err, "programs cache unreadable; changes wait for the next scan");
+            return false;
+        }
+    };
+    if apply_cache_changes(&mut cache, &changes) {
+        if let Err(err) = cache.save(&path) {
+            tracing::warn!(%err, "saving programs cache failed");
+        }
+        let (present, removable) = drive_sets(&win::drives::indexable_drives());
+        publish_programs(st, &cache, &present, &removable, || {
+            st.config.load().apps.scan_programs
+        });
+    }
+    false
+}
+
+/// `(letter, serial)` of the indexable drives, and the letters of the removable ones.
+fn drive_sets(vols: &[win::drives::DriveRoot]) -> (Vec<(char, u32)>, Vec<char>) {
+    let present = vols.iter().map(|d| (d.letter, d.serial)).collect();
+    let removable = vols
         .iter()
         .filter(|d| d.kind == DriveKind::Removable)
         .map(|d| d.letter)
         .collect();
-    let set = build_programs(&st.apps.entries(), &files, &removable);
+    (present, removable)
+}
+
+/// Builds the program set from `cache`'s entries on the `present` drives and publishes it under
+/// the gate if `live()` still holds there. [`stop_programs`] cancels before taking the gate, so a
+/// store here either lands first (and is cleared) or sees the flag. Blocking.
+fn publish_programs(
+    st: &AppState,
+    cache: &ProgramCache,
+    present: &[(char, u32)],
+    removable: &[char],
+    live: impl Fn() -> bool,
+) {
+    let set = build_programs(&st.apps.entries(), &cache.visible(present), removable);
     let _gate = st.programs_gate.lock();
-    if st.config.load().apps.scan_programs {
+    if live() {
         st.programs.store(Arc::new(set));
     }
 }
@@ -598,11 +773,11 @@ impl AppState {
     }
 
     fn programs_path(&self) -> PathBuf {
-        self.cache_dir.join("programs.idx")
+        self.cache_dir.join(PROGRAMS_FILE)
     }
 
     fn snapshot_path(&self) -> PathBuf {
-        self.cache_dir.join("files.idx")
+        self.cache_dir.join(SNAPSHOT_FILE)
     }
 
     fn save_snapshot(&self) {
@@ -685,6 +860,9 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
     } else {
         0
     };
+    // Seeded from the cache headers, so an open before the startup runs finish plans no walk.
+    let (program_roots, programs_full) = cached_program_roots(&cache_dir.join(PROGRAMS_FILE));
+    let find_snapshot = mtime_secs(&cache_dir.join(SNAPSHOT_FILE));
     phase("app cache loaded");
     let vault = Arc::new(SecretVault::new(
         Arc::new(KeyringBackend),
@@ -720,6 +898,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         programs_gate: Mutex::new(()),
         program_pending: Mutex::new(Vec::new()),
         program_scheduled: AtomicBool::new(false),
+        rescan: Mutex::new(PendingRescan::default()),
         programs_capped: AtomicBool::new(false),
         apps_busy: Busy::default(),
         programs_busy: Busy::default(),
@@ -727,6 +906,9 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         refresh_busy: Busy::default(),
         fresh: Mutex::new(Freshness {
             apps: apps_stamp,
+            programs_full,
+            program_roots,
+            find_snapshot,
             ..Freshness::default()
         }),
         prog_matcher: Mutex::new(FuzzyMatcher::new()),
@@ -841,7 +1023,9 @@ async fn refresh_on_open(s: &Arc<AppState>) {
         f.find_stale = stale;
         f.find_drives = find_drives;
         let plan = plan_refresh(unix_now(), &f, &vols, &cfg);
-        f.opened = true;
+        if marks_opened(&cfg, &plan) {
+            f.opened = true;
+        }
         plan
     })
     .await;
@@ -857,7 +1041,9 @@ async fn refresh_on_open(s: &Arc<AppState>) {
         refresh_apps(s).await;
     }
     if plan.find_reconcile {
-        find_full(s, false).await;
+        if find_full(s, false).await {
+            s.fresh.lock().opened = true;
+        }
     } else if !plan.find_roots_add.is_empty() || !plan.find_roots_drop.is_empty() {
         find_drive_roots(s, plan.find_roots_add.clone(), plan.find_roots_drop.clone()).await;
     }
@@ -901,98 +1087,25 @@ pub(crate) async fn refresh_apps(s: &Arc<AppState>) {
 
 /// Loads the programs cache, scans what is asked, saves and publishes the entries of the drives
 /// that are attached. Scans every drive when `all` or when there is no cache, else only the drive
-/// letters in `roots`. Off when `apps.scan_programs` is false; [`stop_programs`] cancels it.
-/// `supersede` (settings, reindex) cancels a running run; otherwise a running run makes this skip.
+/// letters in `roots`, plus any skip-list rescan still pending. Off when `apps.scan_programs` is
+/// false; [`stop_programs`] cancels it. `supersede` (settings, reindex) cancels a running run;
+/// otherwise a running run makes this skip.
 pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>, supersede: bool) {
     let st = s.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let Some((_busy, cancel)) = acquire(&st.programs_busy, &st.programs_run, supersede) else {
+        let Some((busy, cancel)) = acquire(&st.programs_busy, &st.programs_run, supersede) else {
             return Err(FilesError::Cancelled);
         };
-        let live = || !cancel.load(Ordering::Relaxed) && st.config.load().apps.scan_programs;
-        if !live() {
-            return Err(FilesError::Cancelled);
+        let (p_all, p_letters) = st.rescan.lock().take_programs();
+        let mut roots = roots;
+        roots.extend_from_slice(&p_letters);
+        let out = programs_job(&st, all || p_all, &roots, supersede, &cancel);
+        if out.is_err() {
+            // Put back before the job is released, so the next run picks them up.
+            st.rescan.lock().add_programs(p_all, &p_letters);
         }
-        let vols = win::drives::indexable_drives();
-        let present: Vec<(char, u32)> = vols.iter().map(|d| (d.letter, d.serial)).collect();
-        let removable: Vec<char> = vols
-            .iter()
-            .filter(|d| d.kind == DriveKind::Removable)
-            .map(|d| d.letter)
-            .collect();
-        // Cancel is set before `stop_programs` takes the gate, so a store here either lands first
-        // (and is cleared) or sees the flag.
-        let publish = |cache: &ProgramCache| {
-            let set = build_programs(&st.apps.entries(), &cache.visible(&present), &removable);
-            let _gate = st.programs_gate.lock();
-            if live() {
-                st.programs.store(Arc::new(set));
-            }
-        };
-        let path = st.programs_path();
-        let (mut cache, cached) = match ProgramCache::load(&path) {
-            Ok(Some(c)) => (c, true),
-            Ok(None) => (ProgramCache::default(), false),
-            Err(err) => {
-                tracing::warn!(%err, "programs cache unreadable");
-                (ProgramCache::default(), false)
-            }
-        };
-        let targets: Vec<(PathBuf, u32)> = vols
-            .iter()
-            .filter(|d| all || !cached || roots.contains(&d.letter))
-            .map(|d| (PathBuf::from(format!("{}:\\", d.letter)), d.serial))
-            .collect();
-        let mut scanned = None;
-        if !targets.is_empty() {
-            if supersede && cached {
-                publish(&cache); // usable at once while the rescan runs
-            }
-            let started = Instant::now();
-            let failed = {
-                let pool = scan_pool();
-                let _bg = win::thread::BackgroundGuard::new();
-                let skip = SkipList::new(&st.config.load().apps.skip);
-                cache.scan_into(&targets, &pool, &cancel, &skip)?
-            };
-            for (root, err) in &failed {
-                tracing::warn!(root = %root.display(), %err, "programs root not scanned");
-            }
-            if !live() {
-                return Err(FilesError::Cancelled);
-            }
-            if let Err(err) = cache.save(&path) {
-                tracing::warn!(%err, "saving programs cache failed");
-            }
-            scanned = Some((targets.len(), started.elapsed().as_millis() as u64));
-        }
-        publish(&cache);
-        let oldest = cache
-            .roots
-            .iter()
-            .filter(|r| r.letter().is_some_and(|l| present.contains(&(l, r.serial))))
-            .map(|r| r.scanned)
-            .min()
-            .unwrap_or(0);
-        let program_roots = cache
-            .roots
-            .iter()
-            .filter_map(|r| Some((r.letter()?, r.serial)))
-            .collect();
-        let count = cache.files.len();
-        st.programs_capped.store(
-            cache
-                .roots
-                .iter()
-                .any(|r| r.capped && r.letter().is_some_and(|l| present.iter().any(|p| p.0 == l))),
-            Ordering::Relaxed,
-        );
-        drop(cache); // the scanned list is not needed once published
-        let mut f = st.fresh.lock();
-        f.programs_full = oldest;
-        f.program_roots = program_roots;
-        f.programs_present = present;
-        Ok((scanned, count))
+        drop(busy);
+        out
     })
     .await;
     match res {
@@ -1004,11 +1117,99 @@ pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>,
     }
 }
 
+/// Body of [`run_programs`], run while holding the programs job. Returns the scanned root count
+/// and time (when it walked) and the cached entry count. Blocking.
+fn programs_job(
+    st: &AppState,
+    all: bool,
+    roots: &[char],
+    supersede: bool,
+    cancel: &AtomicBool,
+) -> Result<(Option<(usize, u64)>, usize), FilesError> {
+    let live = || !cancel.load(Ordering::Relaxed) && st.config.load().apps.scan_programs;
+    if !live() {
+        return Err(FilesError::Cancelled);
+    }
+    let vols = win::drives::indexable_drives();
+    let (present, removable) = drive_sets(&vols);
+    let path = st.programs_path();
+    let (mut cache, cached) = match ProgramCache::load(&path) {
+        Ok(Some(c)) => (c, true),
+        Ok(None) => (ProgramCache::default(), false),
+        Err(err) => {
+            tracing::warn!(%err, "programs cache unreadable");
+            (ProgramCache::default(), false)
+        }
+    };
+    let targets: Vec<(PathBuf, u32)> = vols
+        .iter()
+        .filter(|d| all || !cached || roots.contains(&d.letter))
+        .map(|d| (PathBuf::from(format!("{}:\\", d.letter)), d.serial))
+        .collect();
+    let mut scanned = None;
+    if !targets.is_empty() {
+        if supersede && cached {
+            publish_programs(st, &cache, &present, &removable, live); // usable while it rescans
+        }
+        let started = Instant::now();
+        let failed = {
+            let pool = scan_pool();
+            let _bg = win::thread::BackgroundGuard::new();
+            let skip = SkipList::new(&st.config.load().apps.skip);
+            cache.scan_into(&targets, &pool, cancel, &skip)?
+        };
+        for (root, err) in &failed {
+            tracing::warn!(root = %root.display(), %err, "programs root not scanned");
+        }
+        if !live() {
+            return Err(FilesError::Cancelled);
+        }
+        scanned = Some((targets.len(), started.elapsed().as_millis() as u64));
+    }
+    // Watcher changes queued meanwhile join the cache before it is saved and published; the
+    // flush retries while this run holds the job, so none is lost or published over.
+    let changes = std::mem::take(&mut *st.program_pending.lock());
+    let merged = apply_cache_changes(&mut cache, &changes);
+    if (scanned.is_some() || merged)
+        && let Err(err) = cache.save(&path)
+    {
+        tracing::warn!(%err, "saving programs cache failed");
+    }
+    publish_programs(st, &cache, &present, &removable, live);
+    let oldest = cache
+        .roots
+        .iter()
+        .filter(|r| r.letter().is_some_and(|l| present.contains(&(l, r.serial))))
+        .map(|r| r.scanned)
+        .min()
+        .unwrap_or(0);
+    let program_roots = cache
+        .roots
+        .iter()
+        .filter_map(|r| Some((r.letter()?, r.serial)))
+        .collect();
+    let count = cache.files.len();
+    st.programs_capped.store(
+        cache
+            .roots
+            .iter()
+            .any(|r| r.capped && r.letter().is_some_and(|l| present.iter().any(|p| p.0 == l))),
+        Ordering::Relaxed,
+    );
+    drop(cache); // the scanned list is not needed once published
+    let mut f = st.fresh.lock();
+    f.programs_full = oldest;
+    f.program_roots = program_roots;
+    f.programs_present = present;
+    Ok((scanned, count))
+}
+
 /// Programs off: cancels a running scan and frees the program entries and index.
 pub(crate) fn stop_programs(s: &AppState) {
     s.programs_run.cancel();
     let _gate = s.programs_gate.lock();
     s.program_pending.lock().clear();
+    s.rescan.lock().take_programs();
     s.programs.store(Arc::new(ProgramSet::default()));
     s.programs_capped.store(false, Ordering::Relaxed);
 }
@@ -1034,56 +1235,68 @@ fn filter_programs(st: &AppState) -> Result<usize, FilesError> {
     Ok(gone)
 }
 
-/// Drops from the Find store the subtrees of the newly added drive or folder entries (no I/O).
-/// Name patterns need no pass here: the Find scan and watcher apply the skip list themselves.
-fn filter_find(st: &AppState, added: &[String]) {
+/// Restarts the Find watcher with the current skip list (so removed entries stop filtering it and
+/// added ones start) and drops from the store what the `added` entries exclude: drive and folder
+/// entries by prefix, name patterns by a pass over the store's folders. No walk. Publishes only
+/// over the store it started from. Returns whether a Find run was in flight, which may have read
+/// the old list. Blocking.
+fn filter_find(st: &Arc<AppState>, added: &[String]) -> bool {
+    let mut watch = st.watch.lock();
+    // stop_find cancels, then takes this lock: checking under it leaves no window.
     if !st.config.load().modes.find.enabled {
-        return;
+        return false;
     }
-    let mut store = None;
+    let old = watch.take();
+    if let Some(h) = &old {
+        // Fold pending watcher changes in first: they carry the current root ids.
+        st.files.compact(&h.overlay());
+    }
+    let cur = st.files.load();
+    let mut next: Option<index_files::FileStore> = None;
     for e in added.iter().filter(|e| is_path_entry(e)) {
-        let n = store
-            .as_ref()
-            .unwrap_or(&*st.files.load())
-            .without_prefix(std::path::Path::new(e));
-        store = Some(n);
+        next = Some(next.as_ref().unwrap_or(&*cur).without_prefix(Path::new(e)));
     }
-    if let Some(n) = store {
-        st.files.replace(n);
-        st.save_snapshot();
+    let globs: Vec<String> = added
+        .iter()
+        .filter(|e| !is_path_entry(e))
+        .cloned()
+        .collect();
+    if !globs.is_empty() {
+        let skip = SkipList::new(&globs);
+        next = Some(
+            next.as_ref()
+                .unwrap_or(&*cur)
+                .without_dirs(|p| skip.excludes_dir(p)),
+        );
     }
+    if let Some(n) = next {
+        if st.files.replace_if(&cur, n) {
+            st.save_snapshot();
+        } else {
+            tracing::debug!("find store changed meanwhile; exclusion filter dropped");
+        }
+    }
+    if old.is_some() {
+        let roots = st.files.load().roots().to_vec();
+        if let Err(err) = watch_roots(st, &mut watch, &roots) {
+            tracing::warn!(%err, "find watcher failed");
+        }
+    }
+    st.find_busy.is_busy()
 }
 
 /// Applies a skip-list change: added entries filter the cached programs and the Find store with no
-/// walk; a removed drive or folder rescans only its drive; a removed pattern rescans every drive,
-/// all at background priority. A newer change cancels the apply in flight (the runs supersede).
-/// ponytail: a removed folder rescans its whole drive, not only that folder.
+/// walk, and the Find watcher restarts with the new list. A removed drive or folder rescans only
+/// its programs drive, a removed pattern every programs drive, and any removal rescans Find, all
+/// at background priority. A newer change cancels the runs in flight; their rescans stay pending
+/// (in [`AppState`]) until a run completes them.
+/// ponytail: a removed entry rescans its whole drive (programs) or all of Find, not only that
+/// folder; per-folder rescans when that walk costs too much.
 pub(crate) async fn apply_skip(s: &Arc<AppState>, diff: SkipDiff) {
     if diff.is_empty() {
         return;
     }
-    if !diff.added.is_empty() {
-        let st = s.clone();
-        let added = diff.added.clone();
-        let res = tauri::async_runtime::spawn_blocking(move || {
-            filter_find(&st, &added);
-            filter_programs(&st)
-        })
-        .await;
-        match res {
-            Ok(Ok(gone)) => tracing::info!(gone, "programs filtered by new exclusions"),
-            Ok(Err(FilesError::Cancelled)) => tracing::debug!("exclusion filter superseded"),
-            Ok(Err(err)) => tracing::warn!(%err, "exclusion filter failed"),
-            Err(err) => tracing::warn!(%err, "exclusion filter task failed"),
-        }
-    }
-    if !s.config.load().apps.scan_programs {
-        return;
-    }
-    if !diff.removed_globs.is_empty() {
-        run_programs(s, true, Vec::new(), true).await;
-        return;
-    }
+    let all = !diff.removed_globs.is_empty();
     let mut letters: Vec<char> = diff
         .removed_paths
         .iter()
@@ -1091,9 +1304,48 @@ pub(crate) async fn apply_skip(s: &Arc<AppState>, diff: SkipDiff) {
         .collect();
     letters.sort_unstable();
     letters.dedup();
-    if !letters.is_empty() || !diff.added.is_empty() {
-        // With no letters this only republishes the filtered cache.
-        run_programs(s, false, letters, true).await;
+    let removed = all || !letters.is_empty();
+    {
+        let mut p = s.rescan.lock();
+        if s.config.load().apps.scan_programs {
+            p.add_programs(all, &letters);
+        }
+        if removed && s.config.load().modes.find.enabled {
+            p.find = true;
+        }
+    }
+    let st = s.clone();
+    let added = diff.added.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let find_busy = filter_find(&st, &added);
+        let gone = if added.is_empty() {
+            Ok(0)
+        } else {
+            filter_programs(&st)
+        };
+        (find_busy, gone)
+    })
+    .await;
+    let mut find_busy = false;
+    match res {
+        Ok((busy, gone)) => {
+            find_busy = busy;
+            match gone {
+                Ok(gone) => tracing::info!(gone, "programs filtered by new exclusions"),
+                Err(FilesError::Cancelled) => tracing::debug!("exclusion filter superseded"),
+                Err(err) => tracing::warn!(%err, "exclusion filter failed"),
+            }
+        }
+        Err(err) => tracing::warn!(%err, "exclusion filter task failed"),
+    }
+    if s.config.load().apps.scan_programs && (removed || !diff.added.is_empty()) {
+        // With nothing to rescan this only republishes the filtered cache.
+        run_programs(s, all, letters, true).await;
+    }
+    // A Find run in flight may have read the old list; a pending rescan may have been cancelled.
+    let pending = s.rescan.lock().find;
+    if s.config.load().modes.find.enabled && (removed || find_busy || pending) {
+        find_full(s, true).await;
     }
 }
 
@@ -1185,77 +1437,86 @@ pub(crate) async fn start_find(s: &Arc<AppState>) {
 }
 
 /// Scans every Find root, publishes and saves the store and restarts the watcher. Until the scan
-/// ends, an empty index shows the snapshot.
-async fn find_full(s: &Arc<AppState>, supersede: bool) {
+/// ends, an empty index shows the snapshot. Takes a pending skip-list rescan, putting it back when
+/// it does not complete. Returns whether it completed.
+async fn find_full(s: &Arc<AppState>, supersede: bool) -> bool {
     let st = s.clone();
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let Some((_busy, cancel)) = acquire(&st.find_busy, &st.find_run, supersede) else {
+        let Some((busy, cancel)) = acquire(&st.find_busy, &st.find_run, supersede) else {
             return Err(FilesError::Cancelled);
         };
-        let live = || !cancel.load(Ordering::Relaxed) && st.config.load().modes.find.enabled;
-        if !live() {
-            return Err(FilesError::Cancelled);
+        let took = std::mem::take(&mut st.rescan.lock().find);
+        let out = find_full_job(&st, &cancel);
+        if out.is_err() && took {
+            // Put back before the job is released, so the next run picks it up.
+            st.rescan.lock().find = true;
         }
-        if st.files.is_empty() {
-            match snapshot::load(&st.snapshot_path()) {
-                Ok(Some(store)) => {
-                    // Check and replace under the watch lock stop_find takes after cancelling.
-                    let _watch = st.watch.lock();
-                    if live() {
-                        st.files.replace(store);
-                    }
-                }
-                Ok(None) => {}
-                Err(err) => tracing::warn!(%err, "file snapshot unreadable"),
-            }
-        }
-        let roots = roots_for(&st.config.load());
-        let started = Instant::now();
-        let store = {
-            let pool = scan_pool();
-            let _bg = win::thread::BackgroundGuard::new();
-            let skip = SkipList::new(&st.config.load().apps.skip);
-            let (store, capped) = index_files::scan_capped(
-                &roots,
-                &skip,
-                index_files::MAX_FILES,
-                &pool,
-                &cancel,
-                |_| {},
-            )?;
-            if capped {
-                tracing::warn!(
-                    max = index_files::MAX_FILES,
-                    "find scan stopped at the entry cap; the index is incomplete"
-                );
-            }
-            store
-        };
-        tracing::info!(
-            files = store.len(),
-            roots = roots.len(),
-            elapsed_ms = started.elapsed().as_millis() as u64,
-            "find scan finished"
-        );
-        // stop_find cancels, then takes this lock: checking under it leaves no window.
-        let mut watch = st.watch.lock();
-        if !live() {
-            return Err(FilesError::Cancelled);
-        }
-        st.files.replace(store);
-        st.save_snapshot();
-        watch_roots(&st, &mut watch, &roots)?;
-        drop(watch);
-        st.fresh.lock().find_snapshot = unix_now();
-        Ok(())
+        drop(busy);
+        out
     })
     .await;
+    let done = matches!(res, Ok(Ok(())));
     match res {
         Ok(Ok(())) => tracing::info!("find index ready"),
         Ok(Err(FilesError::Cancelled)) => tracing::debug!("find run cancelled or skipped"),
         Ok(Err(err)) => tracing::warn!(%err, "find index failed"),
         Err(err) => tracing::warn!(%err, "find task failed"),
     }
+    done
+}
+
+/// Body of [`find_full`], run while holding the Find job. Blocking.
+fn find_full_job(st: &Arc<AppState>, cancel: &AtomicBool) -> Result<(), FilesError> {
+    let live = || !cancel.load(Ordering::Relaxed) && st.config.load().modes.find.enabled;
+    if !live() {
+        return Err(FilesError::Cancelled);
+    }
+    if st.files.is_empty() {
+        match snapshot::load(&st.snapshot_path()) {
+            Ok(Some(store)) => {
+                // Check and replace under the watch lock stop_find takes after cancelling.
+                let _watch = st.watch.lock();
+                if live() {
+                    st.files.replace(store);
+                }
+            }
+            Ok(None) => {}
+            Err(err) => tracing::warn!(%err, "file snapshot unreadable"),
+        }
+    }
+    let roots = roots_for(&st.config.load());
+    let started = Instant::now();
+    let store = {
+        let pool = scan_pool();
+        let _bg = win::thread::BackgroundGuard::new();
+        let skip = SkipList::new(&st.config.load().apps.skip);
+        let (store, capped) =
+            index_files::scan_capped(&roots, &skip, index_files::MAX_FILES, &pool, cancel, |_| {})?;
+        if capped {
+            tracing::warn!(
+                max = index_files::MAX_FILES,
+                "find scan stopped at the entry cap; the index is incomplete"
+            );
+        }
+        store
+    };
+    tracing::info!(
+        files = store.len(),
+        roots = roots.len(),
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        "find scan finished"
+    );
+    // stop_find cancels, then takes this lock: checking under it leaves no window.
+    let mut watch = st.watch.lock();
+    if !live() {
+        return Err(FilesError::Cancelled);
+    }
+    st.files.replace(store);
+    st.save_snapshot();
+    watch_roots(st, &mut watch, &roots)?;
+    drop(watch);
+    st.fresh.lock().find_snapshot = unix_now();
+    Ok(())
 }
 
 /// Adds the drive roots `add` (one walk each) and drops `drop_roots` (no I/O), keeping the rest
@@ -1337,6 +1598,7 @@ async fn find_drive_roots(s: &Arc<AppState>, add: Vec<char>, drop_roots: Vec<cha
 pub(crate) fn stop_find(s: &AppState) {
     s.find_run.cancel();
     s.watch.lock().take();
+    s.rescan.lock().find = false;
     s.overlay.store(Arc::new(Overlay::new()));
     s.files
         .replace(index_files::store::StoreBuilder::new().finish(Vec::new()));
@@ -1404,23 +1666,112 @@ mod tests {
         assert!(features::search::can_run_as_admin(&e, true));
     }
 
+    fn root(letter: char, serial: u32, scanned: u64) -> index_files::ScannedRoot {
+        index_files::ScannedRoot {
+            root: PathBuf::from(format!("{letter}:\\")),
+            serial,
+            scanned,
+            capped: false,
+        }
+    }
+
+    fn cache_paths(cache: &ProgramCache) -> Vec<String> {
+        cache
+            .files
+            .iter()
+            .map(|f| f.path.to_string_lossy().into_owned())
+            .collect()
+    }
+
     #[test]
     fn program_changes_apply_deduped_and_case_insensitive() {
-        let paths: Vec<Box<str>> = vec![r"C:\a\Old.exe".into(), r"C:\a\keep.exe".into()];
+        let mut cache = ProgramCache::default();
+        cache.replace_root(
+            root('C', 1, 1),
+            vec![prog(r"C:\a\Old.exe"), prog(r"C:\a\keep.exe")],
+        );
         let changes = [
             ProgramChange::Removed(r"c:\A\OLD.EXE".into()),
             ProgramChange::Added(r"C:\b\new.exe".into()),
             ProgramChange::Added(r"c:\B\NEW.exe".into()),
             ProgramChange::Added(r"C:\b\readme.txt".into()),
+            ProgramChange::Added(r"Q:\no\root.exe".into()), // no cached root owns it
         ];
-        let out = apply_program_changes(&paths, &changes);
-        let got: Vec<String> = out
-            .iter()
-            .map(|f| f.path.to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(got.len(), 2, "{got:?}");
-        assert!(got.contains(&r"C:\a\keep.exe".to_string()));
-        assert!(got.iter().any(|p| p.eq_ignore_ascii_case(r"C:\b\new.exe")));
+        assert!(apply_cache_changes(&mut cache, &changes));
+        assert_eq!(cache_paths(&cache), [r"C:\a\keep.exe", r"C:\b\new.exe"]);
+        assert!(!apply_cache_changes(&mut cache, &[]), "no change, no save");
+    }
+
+    #[test]
+    fn hook_changes_survive_a_concurrent_rescan() {
+        // The rescan's result replaces C:; changes queued during it are merged before publishing.
+        let mut cache = ProgramCache::default();
+        cache.replace_root(root('C', 1, 1), vec![prog(r"C:\old\gone.exe")]);
+        cache.replace_root(
+            root('C', 1, 2),
+            vec![prog(r"C:\scan\found.exe"), prog(r"C:\scan\deleted.exe")],
+        );
+        let queued = [
+            ProgramChange::Added(r"C:\new\installed.exe".into()),
+            ProgramChange::Removed(r"C:\scan\deleted.exe".into()),
+        ];
+        apply_cache_changes(&mut cache, &queued);
+        let set = build_programs(&[], &cache.visible(&[('C', 1)]), &[]);
+        let got: Vec<&str> = set.paths.iter().map(|p| &**p).collect();
+        assert_eq!(got, [r"C:\new\installed.exe", r"C:\scan\found.exe"]);
+    }
+
+    #[test]
+    fn folder_delete_removes_nested_programs() {
+        let mut cache = ProgramCache::default();
+        cache.replace_root(
+            root('C', 1, 1),
+            vec![
+                prog(r"C:\Tools\a.exe"),
+                prog(r"C:\Tools\sub\b.exe"),
+                prog(r"C:\ToolsX\c.exe"), // sibling with a shared name prefix stays
+            ],
+        );
+        assert!(apply_cache_changes(
+            &mut cache,
+            &[ProgramChange::Removed(r"c:\tools".into())]
+        ));
+        assert_eq!(cache_paths(&cache), [r"C:\ToolsX\c.exe"]);
+        let published: Vec<Box<str>> = vec![r"C:\Tools\sub\b.exe".into(), r"D:\x.exe".into()];
+        assert!(has_program_under(&published, Path::new(r"c:\TOOLS")));
+        assert!(has_program_under(&published, Path::new(r"C:\Tools\sub\")));
+        assert!(!has_program_under(&published, Path::new(r"C:\Tool")));
+        assert!(!has_program_under(&published, Path::new(r"E:\")));
+    }
+
+    #[test]
+    fn cached_program_roots_reads_the_root_lines() {
+        let mut cache = ProgramCache::default();
+        cache.replace_root(root('C', 0xC0, 500), vec![prog(r"C:\a.exe")]);
+        cache.replace_root(root('d', 0xD0, 300), vec![prog(r"D:\b.exe")]);
+        let dir = std::env::temp_dir().join(format!("flick-roots-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(PROGRAMS_FILE);
+        cache.save(&path).unwrap();
+        let (roots, oldest) = cached_program_roots(&path);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(roots, [('C', 0xC0), ('D', 0xD0)]);
+        assert_eq!(oldest, 300);
+        assert_eq!(cached_program_roots(&dir.join("missing")), (Vec::new(), 0));
+    }
+
+    #[test]
+    fn pending_rescan_is_put_back_and_unioned() {
+        let mut p = PendingRescan::default();
+        p.add_programs(false, &['D']);
+        let (all, letters) = p.take_programs();
+        assert_eq!(p, PendingRescan::default());
+        p.add_programs(false, &['E', 'D']); // a newer change while the run was in flight
+        p.add_programs(all, &letters); // that run was cancelled: put back
+        assert_eq!(p.letters, ['D', 'E']);
+        assert!(!p.all);
+        p.add_programs(true, &[]);
+        assert!(p.all);
     }
 
     #[test]
@@ -1650,6 +2001,55 @@ mod tests {
         assert_eq!(plan.find_roots_add, ['F']);
         assert_eq!(plan.program_roots, ['F']);
         assert!(plan.find_roots_drop.is_empty());
+    }
+
+    #[test]
+    fn init_seeding_plans_no_full_walk() {
+        // As init seeds it from valid caches: nothing published yet, not opened.
+        let seeded = Freshness {
+            apps: NOW - MIN,
+            programs_full: NOW - MIN,
+            program_roots: vec![('C', 0xC0), ('D', 0xD0)],
+            find_snapshot: NOW - MIN,
+            find_drives: vec!['D'],
+            ..Freshness::default()
+        };
+        let plan = plan_refresh(NOW, &seeded, &[C, D], &cfg());
+        assert_eq!(
+            plan,
+            RefreshPlan {
+                programs_republish: true, // publishes the cache, no walk
+                ..RefreshPlan::default()
+            }
+        );
+        // Unseeded, the same open walked every drive and reconciled Find.
+        let bare = Freshness {
+            apps: NOW - MIN,
+            find_drives: vec!['D'],
+            ..Freshness::default()
+        };
+        let plan = plan_refresh(NOW, &bare, &[C, D], &cfg());
+        assert!(plan.programs_full && plan.find_reconcile);
+    }
+
+    #[test]
+    fn first_open_waits_for_a_reconcile_that_ran() {
+        let reconcile = RefreshPlan {
+            find_reconcile: true,
+            ..RefreshPlan::default()
+        };
+        let busy = PlanCfg {
+            busy_find: true,
+            ..cfg()
+        };
+        let off = PlanCfg {
+            find: false,
+            ..cfg()
+        };
+        assert!(marks_opened(&cfg(), &RefreshPlan::default()), "not needed");
+        assert!(!marks_opened(&busy, &RefreshPlan::default()), "find busy");
+        assert!(!marks_opened(&cfg(), &reconcile), "set once it ran");
+        assert!(marks_opened(&off, &RefreshPlan::default()), "find off");
     }
 
     #[test]
