@@ -92,7 +92,7 @@ describe("Launcher", () => {
     expect(screen.getByPlaceholderText("Type / > = ? @ to start")).toBeTruthy();
     expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(5);
     expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
-    expect(screen.getByText("> commands")).toBeTruthy();
+    expect(screen.getByText("commands")).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
     expect(screen.queryByTestId("mode-chip")).toBeNull();
   });
@@ -148,7 +148,7 @@ describe("Launcher", () => {
     });
     await mount();
     expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(1);
-    expect(screen.queryByText("> commands")).toBeNull();
+    expect(screen.queryByText("commands")).toBeNull();
   });
 
   it("plain text keeps the hints and shows a muted line", async () => {
