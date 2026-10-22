@@ -14,6 +14,9 @@ use crate::error::WinError;
 /// suspend (TrySuspend only works while the webview is invisible). An old runtime without
 /// these interfaces is a silent no-op.
 pub fn on_hidden(c: &ICoreWebView2Controller) -> Result<(), WinError> {
+    // TrySuspend fails unless the controller is invisible; hiding the HWND does not set this.
+    // SAFETY: `c` is a live COM interface owned by the caller; the call takes a plain bool.
+    unsafe { c.SetIsVisible(false) }?;
     // SAFETY: `c` is a live COM interface owned by the caller; CoreWebView2 only reads it.
     let core = unsafe { c.CoreWebView2() }?;
     if let Ok(w) = core.cast::<ICoreWebView2_19>() {
@@ -31,6 +34,16 @@ pub fn on_hidden(c: &ICoreWebView2Controller) -> Result<(), WinError> {
 /// Call before the webview is shown: resumes it if suspended, then restores the normal
 /// memory target. An old runtime without these interfaces is a silent no-op.
 pub fn on_shown(c: &ICoreWebView2Controller) -> Result<(), WinError> {
+    // Microsoft's sample order: Resume, then IsVisible(TRUE). Visibility is restored even when
+    // resuming fails, so a failed resume can never leave the shown launcher blank (the WebView
+    // also auto-resumes when it becomes visible).
+    let resumed = resume_normal(c);
+    // SAFETY: `c` is a live COM interface owned by the caller; the call takes a plain bool.
+    unsafe { c.SetIsVisible(true) }?;
+    resumed
+}
+
+fn resume_normal(c: &ICoreWebView2Controller) -> Result<(), WinError> {
     // SAFETY: `c` is a live COM interface owned by the caller; CoreWebView2 only reads it.
     let core = unsafe { c.CoreWebView2() }?;
     if let Ok(w) = core.cast::<ICoreWebView2_3>() {
