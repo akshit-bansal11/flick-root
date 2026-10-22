@@ -1,7 +1,9 @@
 //! The `search` command.
 use crate::error::CommandError;
 use crate::state::AppState;
-use features::search::{SearchScope, command_search_scoped, merge_items, program_items};
+use features::search::{
+    SearchScope, command_search_scoped, merge_items, program_entry, program_items,
+};
 use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
 use std::sync::Arc;
@@ -109,7 +111,7 @@ async fn command(
         tauri::async_runtime::spawn_blocking(move || {
             let set = st.programs.load();
             program_items(
-                &set.entries,
+                &set.paths,
                 &set.removable,
                 &set.index,
                 &mut st.prog_matcher.lock(),
@@ -125,19 +127,22 @@ async fn command(
     let mut missing = Vec::new();
     for it in items.iter_mut().filter(|i| i.source == "apps") {
         let program = it.payload.get("program").is_some();
-        let entry = it
+        let idx = it
             .payload
             .get("entry")
             .and_then(|v| v.as_u64())
-            .and_then(|i| {
-                let list = if program { &set.entries } else { &am.entries };
-                list.get(i as usize)
-            });
+            .map(|i| i as usize);
+        let Some(idx) = idx else { continue };
+        let entry = if program {
+            set.paths.get(idx).map(|p| program_entry(p))
+        } else {
+            am.entries.get(idx).cloned()
+        };
         let Some(entry) = entry else { continue };
-        if let Some(url) = crate::icons::icon_data_url(&state.icons, entry, ICON_PX) {
+        if let Some(url) = crate::icons::icon_data_url(&state.icons, &entry, ICON_PX) {
             it.icon = Some(IconRef::DataUrl(url));
         } else if program {
-            missing.push(entry.clone());
+            missing.push(entry);
         }
     }
     let missing = state.icons.claim(missing);

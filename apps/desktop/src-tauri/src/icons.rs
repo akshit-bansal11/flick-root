@@ -4,15 +4,40 @@ use base64::engine::general_purpose::STANDARD;
 use index_apps::AppEntry;
 use index_apps::icons::IconCache;
 use parking_lot::Mutex;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Pixel size the launcher asks for and `refresh_apps` warms.
 pub const ICON_PX: u32 = 32;
 
-/// Disk icon cache plus an in-memory memo of encoded data URLs.
+/// Program-row icons kept in memory at most; the oldest is dropped first.
+const PROGRAM_MEMO_MAX: usize = 256;
+
+/// Insertion-ordered, size-bounded map of data URLs for program rows.
+#[derive(Default)]
+struct BoundedMemo {
+    map: HashMap<(String, u32), String>,
+    order: VecDeque<(String, u32)>,
+}
+
+impl BoundedMemo {
+    fn insert(&mut self, key: (String, u32), url: String) {
+        if self.map.insert(key.clone(), url).is_none() {
+            self.order.push_back(key);
+            while self.order.len() > PROGRAM_MEMO_MAX {
+                if let Some(old) = self.order.pop_front() {
+                    self.map.remove(&old);
+                }
+            }
+        }
+    }
+}
+
+/// Disk icon cache plus in-memory memos of encoded data URLs: the warmed app set, and a
+/// bounded one for program rows (they are extracted on demand and must not accumulate).
 pub struct Icons {
     cache: IconCache,
     memo: Mutex<HashMap<(String, u32), String>>,
+    program_memo: Mutex<BoundedMemo>,
     /// Ids already queued for extraction; a row is queued at most once.
     tried: Mutex<HashSet<String>>,
 }
@@ -23,6 +48,7 @@ impl Icons {
         Self {
             cache,
             memo: Mutex::new(HashMap::new()),
+            program_memo: Mutex::new(BoundedMemo::default()),
             tried: Mutex::new(HashSet::new()),
         }
     }
@@ -34,7 +60,11 @@ impl Icons {
 
     /// `data:image/png;base64,...` for a warmed icon; memory only, never touches disk.
     pub fn data_url(&self, entry: &AppEntry, size: u32) -> Option<String> {
-        self.memo.lock().get(&(entry.id.clone(), size)).cloned()
+        let key = (entry.id.clone(), size);
+        if let Some(url) = self.memo.lock().get(&key) {
+            return Some(url.clone());
+        }
+        self.program_memo.lock().map.get(&key).cloned()
     }
 
     /// The entries that may be extracted now: icon-safe (no remote paths) and never queued before.
@@ -61,13 +91,12 @@ impl Icons {
             };
             if let Ok(bytes) = std::fs::read(path) {
                 let url = format!("data:image/png;base64,{}", STANDARD.encode(bytes));
-                self.memo.lock().insert((e.id.clone(), size), url);
+                self.program_memo.lock().insert((e.id.clone(), size), url);
             }
         }
     }
 
-    /// Reads the cached icons of `entries` from disk and merges them into the memo
-    /// (icons of other entries, such as programs, stay).
+    /// Reads the cached icons of `entries` from disk and merges them into the app memo.
     /// Blocking: call from a blocking thread.
     pub fn warm(&self, entries: &[AppEntry], size: u32) {
         let memo: HashMap<_, _> = entries
@@ -103,6 +132,23 @@ mod tests {
             is_packaged: false,
         };
         assert!(icon_data_url(&icons, &e, 32).is_none());
+    }
+
+    #[test]
+    fn program_memo_drops_the_oldest_past_the_bound() {
+        let mut m = BoundedMemo::default();
+        for i in 0..PROGRAM_MEMO_MAX + 5 {
+            m.insert((i.to_string(), 32), "u".into());
+        }
+        assert_eq!(m.map.len(), PROGRAM_MEMO_MAX);
+        assert!(!m.map.contains_key(&("0".to_owned(), 32)));
+        assert!(
+            m.map
+                .contains_key(&((PROGRAM_MEMO_MAX + 4).to_string(), 32))
+        );
+        // Re-inserting a live key neither grows nor reorders the memo.
+        m.insert(((PROGRAM_MEMO_MAX + 4).to_string(), 32), "v".into());
+        assert_eq!(m.order.len(), PROGRAM_MEMO_MAX);
     }
 
     #[test]

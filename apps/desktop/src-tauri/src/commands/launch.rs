@@ -1,6 +1,7 @@
 //! Launch, reveal, copy path and open link.
 use crate::error::CommandError;
 use crate::state::AppState;
+use features::search::program_entry;
 use index_apps::AppsError;
 use index_apps::launch as ia;
 use launcher_core::{Action, ActionKind, Item, Outcome};
@@ -67,8 +68,11 @@ fn app_entry(
     if let Some(e) = find(&state.app_match.load().entries) {
         return Ok((e, false));
     }
-    find(&state.programs.load().entries)
-        .map(|e| (e, true))
+    let set = state.programs.load();
+    set.paths
+        .iter()
+        .any(|p| &**p == parsing)
+        .then(|| (program_entry(parsing), true))
         .ok_or_else(not_found)
 }
 
@@ -76,11 +80,31 @@ fn app_entry(
 /// UI: a removable program never runs elevated, even if the IPC call asks for it.
 fn is_removable_program(state: &AppState, parsing: &str) -> bool {
     let set = state.programs.load();
-    set.entries
+    set.paths
         .iter()
-        .position(|a| a.parsing_name == parsing)
+        .position(|p| &**p == parsing)
         .and_then(|i| set.removable.get(i).copied())
         .unwrap_or(false)
+}
+
+/// Ok when `path` still exists; else the `not_found` error shown to the user. Blocking: an
+/// index entry can sit on a detached or sleeping drive, so call it from a blocking thread.
+fn check_exists(path: &Path) -> Result<(), CommandError> {
+    if path.exists() {
+        Ok(())
+    } else {
+        Err(CommandError::new(
+            "not_found",
+            "That file no longer exists (moved, deleted or on a detached drive).",
+        ))
+    }
+}
+
+/// [`check_exists`] on the blocking pool.
+async fn ensure_exists(path: PathBuf) -> Result<(), CommandError> {
+    tauri::async_runtime::spawn_blocking(move || check_exists(&path))
+        .await
+        .map_err(internal)?
 }
 
 /// Runs `f` on a blocking thread with COM initialised. A dismissed UAC prompt maps to `Ok(false)`.
@@ -129,6 +153,9 @@ pub async fn launch(
     let outcome = match parse_id(&item_id) {
         IdRef::App(parsing) => {
             let (entry, program) = app_entry(&state, parsing)?;
+            if program {
+                ensure_exists(PathBuf::from(parsing)).await?;
+            }
             if admin && !features::search::can_run_as_admin(&entry, program) {
                 return Err(CommandError::new(
                     "unsupported",
@@ -154,6 +181,7 @@ pub async fn launch(
         }
         IdRef::File(p) => {
             let p = PathBuf::from(p);
+            ensure_exists(p.clone()).await?;
             blocking_com(move || ia::open_path(&p)).await?;
             Outcome::HideLauncher
         }
@@ -278,6 +306,16 @@ mod tests {
         ] {
             assert_eq!(check_link(bad).unwrap_err().code, "invalid_url", "{bad}");
         }
+    }
+
+    #[test]
+    fn missing_file_is_not_found() {
+        let dir = std::env::temp_dir().join("flick-launch-test-exists");
+        std::fs::create_dir_all(&dir).unwrap();
+        assert!(check_exists(&dir).is_ok());
+        let err = check_exists(&dir.join("gone.exe")).unwrap_err();
+        assert_eq!(err.code, "not_found");
+        assert!(err.message.contains("no longer exists"));
     }
 
     #[test]

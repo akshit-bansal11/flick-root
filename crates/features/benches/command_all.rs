@@ -4,7 +4,7 @@
 use arc_swap::ArcSwap;
 use criterion::{Criterion, criterion_group, criterion_main};
 use features::math::Math;
-use features::search::program_items;
+use features::search::{program_index, program_items};
 use features::{EventSink, Feature, FeatureCtx, Registry, TaskScope, command_search};
 use index_apps::AppEntry;
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -174,11 +174,10 @@ fn bench(c: &mut Criterion) {
     let stems = [
         "setup", "install", "update", "launcher", "tool", "driver", "game", "helper",
     ];
-    let programs: Vec<AppEntry> = (0..50_000)
-        .map(|i| app(i, format!("{} {} v{}", stems[i % stems.len()], i, i % 97)))
+    let programs: Vec<Box<str>> = (0..50_000)
+        .map(|i| format!(r"C:\p\{} {} v{}.exe", stems[i % stems.len()], i, i % 97).into_boxed_str())
         .collect();
-    let pnames: Vec<&str> = programs.iter().map(|a| a.name.as_str()).collect();
-    let pidx = MatchIndex::new(&pnames);
+    let pidx = program_index(&programs);
     let mut pmatcher = FuzzyMatcher::new();
     for t in ["c", "co", "setup", "inst 4", "zzzz"] {
         c.bench_function(&format!("programs_50k/{t}"), |b| {

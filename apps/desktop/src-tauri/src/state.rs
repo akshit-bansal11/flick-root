@@ -62,18 +62,19 @@ pub struct AppMatch {
 
 /// Scanned programs and their own fuzzy index, kept apart so the Command budget never pays for them.
 pub struct ProgramSet {
-    /// Entries, same order as the index.
-    pub entries: Vec<AppEntry>,
-    /// Per entry: it sits on a removable drive (from the scan's drive kinds).
+    /// Program file paths, same order as the index. An `AppEntry` is built only for a hit
+    /// ([`features::search::program_entry`]).
+    pub paths: Vec<Box<str>>,
+    /// Per path: it sits on a removable drive (from the scan's drive kinds).
     pub removable: Vec<bool>,
-    /// Fuzzy index over entry names.
+    /// Fuzzy index over the file names.
     pub index: MatchIndex,
 }
 
 impl Default for ProgramSet {
     fn default() -> Self {
         Self {
-            entries: Vec::new(),
+            paths: Vec::new(),
             removable: Vec::new(),
             index: MatchIndex::new::<&str>(&[]),
         }
@@ -372,9 +373,9 @@ fn is_shortcut(p: &ProgramFile) -> bool {
     matches!(p.ext.as_str(), "lnk" | "url")
 }
 
-/// Programs as [`AppEntry`]s, minus any whose path an app already launches and any shortcut
-/// named like a real app (Start Menu and Desktop shortcuts to apps already listed).
-pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> Vec<AppEntry> {
+/// Program paths, minus any an app already launches and any shortcut named like a real app
+/// (Start Menu and Desktop shortcuts to apps already listed).
+pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> Vec<Box<str>> {
     let mut seen: std::collections::HashSet<String> = apps
         .iter()
         .flat_map(|a| {
@@ -397,14 +398,9 @@ pub fn merge_programs(apps: &[AppEntry], programs: &[ProgramFile]) -> Vec<AppEnt
         if !seen.insert(path.to_lowercase()) {
             continue;
         }
-        out.push(AppEntry {
-            id: index_apps::make_id(&path),
-            name: p.name.clone(),
-            parsing_name: path, // the shell path; `target` stays None to save memory
-            target: None,
-            is_packaged: false,
-        });
+        out.push(path.into_boxed_str());
     }
+    out.shrink_to_fit();
     out
 }
 
@@ -415,19 +411,19 @@ pub fn build_programs(
     programs: &[ProgramFile],
     removable_letters: &[char],
 ) -> ProgramSet {
-    let entries = merge_programs(apps, programs);
-    let removable = entries
+    let paths = merge_programs(apps, programs);
+    let mut removable: Vec<bool> = paths
         .iter()
-        .map(|e| {
-            let mut c = e.parsing_name.chars();
+        .map(|p| {
+            let mut c = p.chars();
             matches!((c.next(), c.next()), (Some(l), Some(':'))
                 if removable_letters.contains(&l.to_ascii_uppercase()))
         })
         .collect();
-    let names: Vec<&str> = entries.iter().map(|a| a.name.as_str()).collect();
-    let index = MatchIndex::new(&names);
+    removable.shrink_to_fit();
+    let index = features::search::program_index(&paths);
     ProgramSet {
-        entries,
+        paths,
         removable,
         index,
     }
@@ -835,6 +831,7 @@ pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>,
             .filter_map(|r| Some((r.letter()?, r.serial)))
             .collect();
         let count = cache.files.len();
+        drop(cache); // the scanned list is not needed once published
         let mut f = st.fresh.lock();
         f.programs_full = oldest;
         f.program_roots = program_roots;
@@ -1127,11 +1124,15 @@ mod tests {
             prog(r"C:\tools\notepad.exe"),            // same name but a real exe: kept
         ];
         let out = merge_programs(&apps, &progs);
-        let names: Vec<_> = out.iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(names, ["c", "notepad"]);
-        assert_eq!(out[0].parsing_name, r"C:\x\c.msi");
-        assert!(out[0].target.is_none());
-        assert_eq!(out[0].id, index_apps::make_id(r"C:\x\c.msi"));
+        let kept: Vec<&str> = out.iter().map(|p| &**p).collect();
+        assert_eq!(kept, [r"C:\x\c.msi", r"C:\tools\notepad.exe"]);
+        // The entry built for a hit keeps the id, parsing name and admin gate it had before.
+        let e = features::search::program_entry(&out[0]);
+        assert_eq!(e.name, "c");
+        assert_eq!(e.parsing_name, r"C:\x\c.msi");
+        assert!(e.target.is_none());
+        assert_eq!(e.id, index_apps::make_id(r"C:\x\c.msi"));
+        assert!(features::search::can_run_as_admin(&e, true));
     }
 
     #[test]
@@ -1139,13 +1140,13 @@ mod tests {
         let progs = vec![prog(r"E:\a.exe"), prog(r"c:\b.exe"), prog(r"e:\c.exe")];
         let set = build_programs(&[], &progs, &['E']);
         assert_eq!(set.removable, [true, false, true]);
-        assert_eq!(set.removable.len(), set.entries.len());
+        assert_eq!(set.removable.len(), set.paths.len());
     }
 
     #[test]
     fn empty_program_set_is_empty() {
         let set = ProgramSet::default();
-        assert!(set.entries.is_empty() && set.index.is_empty());
+        assert!(set.paths.is_empty() && set.index.is_empty());
     }
 
     #[test]

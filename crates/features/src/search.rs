@@ -169,11 +169,36 @@ fn solid_match(name: &str, query: &str) -> bool {
         })
 }
 
-/// Fuzzy matches of `text` over scanned programs, best `k`, scored below real apps. Empty text matches nothing.
-/// `removable[i]` says program `i` sits on a removable drive (missing entries count as fixed).
-/// Budget is Find's 25 ms; call from a blocking thread.
+/// Display name of a program: its file name without the extension.
+fn program_name(path: &str) -> std::borrow::Cow<'_, str> {
+    std::path::Path::new(path)
+        .file_stem()
+        .map_or(std::borrow::Cow::Borrowed(""), |s| s.to_string_lossy())
+}
+
+/// The [`AppEntry`] of a scanned program path, built on demand (programs are stored as bare paths).
+/// The shell path is the parsing name; `target` stays `None`.
+pub fn program_entry(path: &str) -> AppEntry {
+    AppEntry {
+        id: index_apps::make_id(path),
+        name: program_name(path).into_owned(),
+        parsing_name: path.to_owned(),
+        target: None,
+        is_packaged: false,
+    }
+}
+
+/// Fuzzy index over the file names of `paths`, same order.
+pub fn program_index(paths: &[Box<str>]) -> MatchIndex {
+    let names: Vec<std::borrow::Cow<'_, str>> = paths.iter().map(|p| program_name(p)).collect();
+    MatchIndex::new(&names)
+}
+
+/// Fuzzy matches of `text` over scanned program `paths`, best `k`, scored below real apps. Empty text
+/// matches nothing. `removable[i]` says program `i` sits on a removable drive (missing entries count
+/// as fixed). Entries are built only for the hits. Budget is Find's 25 ms; call from a blocking thread.
 pub fn program_items(
-    programs: &[AppEntry],
+    programs: &[Box<str>],
     removable: &[bool],
     index: &MatchIndex,
     matcher: &mut FuzzyMatcher,
@@ -191,13 +216,13 @@ pub fn program_items(
     let max = best.max(matcher.perfect_score(text) as f32);
     hits.into_iter()
         .filter_map(|h| {
-            let a = programs.get(h.idx)?;
+            let a = program_entry(programs.get(h.idx)?);
             // Weak hits (< half the best score, or scattered letters) are noise.
             if (h.score as f32) < best * 0.5 || !solid_match(&a.name, text) {
                 return None;
             }
             Some(app_item(
-                a,
+                &a,
                 h.idx,
                 APP_CEIL * PROGRAM_FACTOR * h.score as f32 / max,
                 true,
@@ -309,11 +334,30 @@ mod tests {
         MatchIndex::new(&names)
     }
 
+    /// Program paths `C:\x\<name>.exe`.
+    fn paths(names: &[&str]) -> Vec<Box<str>> {
+        names
+            .iter()
+            .map(|n| format!(r"C:\x\{n}.exe").into_boxed_str())
+            .collect()
+    }
+
+    #[test]
+    fn program_entry_matches_the_old_entry_shape() {
+        let e = program_entry(r"C:\x\Setup Tool.EXE");
+        assert_eq!(e.name, "Setup Tool");
+        assert_eq!(e.parsing_name, r"C:\x\Setup Tool.EXE");
+        assert_eq!(e.id, index_apps::make_id(r"C:\x\Setup Tool.EXE"));
+        assert!(e.target.is_none() && !e.is_packaged);
+        assert!(can_run_as_admin(&e, true));
+        assert!(!can_run_as_admin(&program_entry(r"C:\x\a.lnk"), true));
+    }
+
     #[test]
     fn programs_rank_below_apps_and_scope_filters() {
         let apps = vec![app("Code")];
-        let progs = vec![app("Code Helper")];
-        let (ai, pi) = (idx_of(&apps), idx_of(&progs));
+        let progs = paths(&["Code Helper"]);
+        let (ai, pi) = (idx_of(&apps), program_index(&progs));
         let mut m = FuzzyMatcher::new();
         let r = Registry::new();
         let mut run = |scope, text: &str| {
@@ -340,8 +384,8 @@ mod tests {
     #[test]
     fn contiguous_program_beats_scattered_app() {
         let apps = vec![app("Windows Media Player Legacy")];
-        let progs = vec![app("Inlay-2.0.0")];
-        let (ai, pi) = (idx_of(&apps), idx_of(&progs));
+        let progs = paths(&["Inlay-2.0.0"]);
+        let (ai, pi) = (idx_of(&apps), program_index(&progs));
         let mut m = FuzzyMatcher::new();
         let a = command_search_scoped(
             &apps,
@@ -360,8 +404,8 @@ mod tests {
     #[test]
     fn program_named_like_an_app_never_outranks_it() {
         let apps = vec![app("Google Chrome")];
-        let progs = vec![app("chrome")];
-        let (ai, pi) = (idx_of(&apps), idx_of(&progs));
+        let progs = paths(&["chrome"]);
+        let (ai, pi) = (idx_of(&apps), program_index(&progs));
         let mut m = FuzzyMatcher::new();
         let a = command_search_scoped(
             &apps,
@@ -396,12 +440,12 @@ mod tests {
 
     #[test]
     fn scattered_program_hits_are_dropped() {
-        let progs = vec![
-            app("Spotify"),
-            app("snapshot-bash-1700000000000-i8kfky"),
-            app("Visual Studio Code"),
-        ];
-        let pi = idx_of(&progs);
+        let progs = paths(&[
+            "Spotify",
+            "snapshot-bash-1700000000000-i8kfky",
+            "Visual Studio Code",
+        ]);
+        let pi = program_index(&progs);
         let got = program_items(&progs, &[], &pi, &mut FuzzyMatcher::new(), "spotify", 5);
         let titles: Vec<_> = got.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles, ["Spotify"]);
