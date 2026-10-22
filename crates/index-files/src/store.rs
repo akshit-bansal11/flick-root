@@ -212,7 +212,7 @@ impl FileStore {
         let kept = self
             .roots
             .iter()
-            .filter(|r| !r.path.starts_with(prefix))
+            .filter(|r| !starts_with_ci(&r.path, prefix))
             .cloned()
             .collect();
         let (roots, ids) = renumber(&self.roots, kept);
@@ -221,9 +221,12 @@ impl FileStore {
         // Children of a dropped entry are dropped by copy_into, so only the top match is tested.
         copy_into(&mut b, self, &ids, |i| {
             if self.parent(i).is_none() {
-                return !Path::new(self.name(i)).starts_with(prefix);
+                return !starts_with_ci(Path::new(self.name(i)), prefix);
             }
-            !(leaf == Some(self.name(i)) && self.path_of(i) == prefix)
+            let same_leaf = leaf.is_some_and(|l| l.eq_ignore_ascii_case(self.name(i)));
+            !(same_leaf
+                && starts_with_ci(&self.path_of(i), prefix)
+                && starts_with_ci(prefix, &self.path_of(i)))
         });
         b.finish(roots)
     }
@@ -242,6 +245,19 @@ impl FileStore {
         });
         b.finish(self.roots.clone())
     }
+}
+
+/// Whether `path` is `prefix` or lies under it, comparing components with ASCII case folded
+/// (Windows paths are case-insensitive).
+fn starts_with_ci(path: &Path, prefix: &Path) -> bool {
+    let mut p = path.components();
+    prefix.components().all(|c| {
+        p.next().is_some_and(|x| {
+            x.as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&c.as_os_str().to_string_lossy())
+        })
+    })
 }
 
 /// Assign ids 0.. to `kept` in order; returns the renumbered roots and a map from each old
@@ -374,6 +390,32 @@ mod tests {
         );
         assert!(ix.replace_if(&newer, StoreBuilder::new().finish(Vec::new())));
         assert!(!Arc::ptr_eq(&newer, &ix.load()));
+    }
+
+    #[test]
+    fn without_prefix_ignores_case() {
+        let mut b = StoreBuilder::new();
+        let r = b.push("C:\\x", NO_PARENT, true, 0, 0).unwrap();
+        let nm = b.push("node_modules", r, true, 0, 0).unwrap();
+        b.push("dep.js", nm, false, 0, 0).unwrap();
+        let src = b.push("src", r, true, 0, 0).unwrap();
+        b.push("main.rs", src, false, 0, 0).unwrap();
+        let s = b.finish(vec![Root {
+            id: 0,
+            path: PathBuf::from("C:\\x"),
+            label: "x".into(),
+        }]);
+        let kept = s.without_prefix(Path::new("c:\\X\\NODE_Modules"));
+        let paths: Vec<PathBuf> = (0..kept.len()).map(|i| kept.path_of(i)).collect();
+        assert_eq!(
+            paths,
+            [
+                PathBuf::from("C:\\x"),
+                PathBuf::from("C:\\x\\src"),
+                PathBuf::from("C:\\x\\src\\main.rs"),
+            ]
+        );
+        assert_eq!(s.without_prefix(Path::new("c:\\X")).len(), 0);
     }
 
     #[test]

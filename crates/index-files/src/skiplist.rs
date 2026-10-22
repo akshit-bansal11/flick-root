@@ -72,7 +72,13 @@ impl SkipList {
             return false;
         }
         // Last folder first.
-        let tail: Vec<&str> = p.rsplit('\\').take(self.longest).collect();
+        // The drive (`x:`) is not a folder name: drive-less patterns must never match it.
+        let names = if b.len() >= 2 && b[1] == b':' {
+            p[2..].trim_start_matches('\\')
+        } else {
+            p
+        };
+        let tail: Vec<&str> = names.rsplit('\\').take(self.longest).collect();
         self.patterns.iter().any(|pat| {
             pat.len() <= tail.len()
                 && pat
@@ -153,6 +159,17 @@ mod tests {
         assert!(!hit(&l, r"C:\w\target\debug\deps\more"));
         assert!(!hit(&l, r"C:\w\deps"));
         assert!(!hit(&l, r"C:\w\other\debug\deps"));
+    }
+
+    #[test]
+    fn name_patterns_never_match_the_drive() {
+        let l = skip(&["c*", "*d*", "*:"]);
+        for p in [r"C:\", "C:", r"D:\", r"C:\x", r"D:\x\y"] {
+            assert!(!hit(&l, p), "{p}");
+        }
+        assert!(hit(&l, r"E:\abcd"));
+        assert!(hit(&l, r"E:\cat"));
+        assert!(!hit(&skip(&[r"*\a"]), r"C:\a"));
     }
 
     #[test]

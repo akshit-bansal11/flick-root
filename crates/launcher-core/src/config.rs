@@ -102,6 +102,9 @@ pub enum SkipError {
     /// The pattern is only `*`, which would exclude everything.
     #[error("skip entry is only wildcards")]
     OnlyWildcards,
+    /// A `*` in an entry that has a drive; only drive-less patterns may use wildcards.
+    #[error("wildcards are only allowed in patterns without a drive")]
+    WildcardWithDrive,
     /// More than [`MAX_SKIP`] entries.
     #[error("too many skip entries")]
     TooMany,
@@ -145,6 +148,9 @@ fn validate_entry(raw: &str) -> Result<String, SkipError> {
                 _ => segs.push(seg),
             }
         }
+    }
+    if drive && segs.iter().any(|g| g.contains('*')) {
+        return Err(SkipError::WildcardWithDrive);
     }
     if drive {
         let letter = b[0].to_ascii_uppercase() as char;
@@ -970,12 +976,15 @@ scan_programs = false
             ("C:foo", SkipError::BadChar),
             ("*", SkipError::OnlyWildcards),
             (r"a\\b", SkipError::Malformed),
+            (r"C:\*", SkipError::WildcardWithDrive),
+            (r"D:\x*", SkipError::WildcardWithDrive),
         ];
         for (input, want) in table {
             assert_eq!(validate_skip(v(&[input])), Err(want), "{input:?}");
         }
         assert_eq!(validate_skip(v(&["**"])), Err(SkipError::OnlyWildcards));
         assert_eq!(validate_skip(v(&["a:b"])), Err(SkipError::BadChar));
+        assert!(validate_skip(v(&["node_modules", r"target\*\deps"])).is_ok());
     }
 
     #[test]

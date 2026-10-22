@@ -288,6 +288,7 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let failed = c
         .scan_into(
             &roots,
+            2,
             &Parallelism::Serial,
             &AtomicBool::new(false),
             &default_skip(),
@@ -301,6 +302,7 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let before = c.clone();
     let r = c.scan_into(
         &roots,
+        2,
         &Parallelism::Serial,
         &AtomicBool::new(true),
         &default_skip(),
@@ -314,6 +316,7 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let failed = c
         .scan_into(
             &roots,
+            2,
             &Parallelism::Serial,
             &AtomicBool::new(false),
             &default_skip(),
@@ -324,6 +327,27 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let got: Vec<_> = c.files.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(got.len(), 3);
     assert!(got.contains(&"new") && got.contains(&"two"));
+}
+
+#[test]
+fn single_drive_rescan_uses_the_share_of_all_drives() {
+    let d = tempfile::tempdir().unwrap();
+    touch(&d.path().join("one.exe"));
+    let mut c = ProgramCache::default();
+    // The cap comes from the drive count passed in, not from this call's one root.
+    let failed = c
+        .scan_into(
+            &[(d.path().to_path_buf(), 1)],
+            MAX_PROGRAMS * 2,
+            &Parallelism::Serial,
+            &AtomicBool::new(false),
+            &default_skip(),
+        )
+        .unwrap();
+    assert!(failed.is_empty());
+    assert_eq!(c.roots.len(), 1);
+    assert_eq!(root_cap(MAX_PROGRAMS * 2), 0);
+    assert_eq!(root_cap(4), MAX_PROGRAMS / 4);
 }
 
 #[test]

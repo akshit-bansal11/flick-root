@@ -1156,7 +1156,7 @@ fn programs_job(
             let pool = scan_pool();
             let _bg = win::thread::BackgroundGuard::new();
             let skip = SkipList::new(&st.config.load().apps.skip);
-            cache.scan_into(&targets, &pool, cancel, &skip)?
+            cache.scan_into(&targets, vols.len(), &pool, cancel, &skip)?
         };
         for (root, err) in &failed {
             tracing::warn!(root = %root.display(), %err, "programs root not scanned");

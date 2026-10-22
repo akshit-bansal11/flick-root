@@ -299,17 +299,19 @@ impl ProgramCache {
             .collect()
     }
 
-    /// Scan each `(root, serial)` with a fair share of [`MAX_PROGRAMS`] and replace it once its
-    /// walk completes. A root that fails (drive removed) keeps its old entries and is returned in
-    /// the list; a cancel stops with [`FilesError::Cancelled`], keeping roots already finished.
+    /// Scan each `(root, serial)` with a fair share of [`MAX_PROGRAMS`] (`root_cap(n_drives)`,
+    /// `n_drives` being all present indexable drives, not just these roots) and replace it once
+    /// its walk completes. A root that fails (drive removed) keeps its old entries and is returned
+    /// in the list; a cancel stops with [`FilesError::Cancelled`], keeping roots already finished.
     pub fn scan_into(
         &mut self,
         roots: &[(PathBuf, u32)],
+        n_drives: usize,
         parallelism: &Parallelism,
         cancel: &AtomicBool,
         skip: &SkipList,
     ) -> Result<Vec<(PathBuf, FilesError)>, FilesError> {
-        let cap = root_cap(roots.len());
+        let cap = root_cap(n_drives);
         let mut failed = Vec::new();
         for (root, serial) in roots {
             match scan_root(root, cap, parallelism, cancel, skip) {
