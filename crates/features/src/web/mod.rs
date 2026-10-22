@@ -350,8 +350,12 @@ mod tests {
 
     #[test]
     fn fallback_title_is_first_shortcut() {
-        // Nothing in this crate's tests starts `web` with custom shortcuts, so this is the defaults.
-        assert_eq!(fallback_title().as_deref(), Some("Google"));
+        // `fallback_title()` reads the process-wide state other tests change, so test the same lookup on
+        // owned states.
+        assert_eq!(
+            State::defaults().list.first().map(|s| s.title.as_str()),
+            Some("Google")
+        );
         let custom = vec![(
             "ddg".to_owned(),
             "DuckDuckGo".to_owned(),
