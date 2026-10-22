@@ -353,7 +353,7 @@ impl Feature for Ports {
         "v0.0.1"
     }
     fn description(&self) -> &'static str {
-        "port 3000 shows what holds a port; proc <name> searches processes; Backspace ends one after a confirm."
+        "port 3000 shows what holds a port; proc <name> searches processes; Delete ends one after a confirm."
     }
     fn default_enabled(&self) -> bool {
         true
