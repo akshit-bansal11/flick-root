@@ -16,6 +16,7 @@
     "allow-copy-path",
     "allow-copy-text",
     "allow-open-link",
+    "allow-web-search",
     "allow-run-system-command",
     "allow-ask-stream",
     "allow-cancel-ask",

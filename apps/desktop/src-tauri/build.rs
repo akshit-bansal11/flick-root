@@ -10,6 +10,7 @@ fn main() {
         "copy_path",
         "copy_text",
         "open_link",
+        "web_search",
         "run_system_command",
         "ask_stream",
         "cancel_ask",

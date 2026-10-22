@@ -187,6 +187,10 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
         .registry
         .running_ids();
     let sources = live_sources(&config, &running);
+    let web_title = running
+        .contains(&"web")
+        .then(features::web::fallback_title)
+        .flatten();
     emit(
         app,
         "launcher://shown",
@@ -196,6 +200,7 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
             "glass": glass,
             "appearance": appearance,
             "sources": sources,
+            "webTitle": web_title,
         }),
     );
 }

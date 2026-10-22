@@ -290,9 +290,66 @@ pub async fn open_link(url: String) -> Result<(), CommandError> {
     Ok(())
 }
 
+/// Longest text the web fallback accepts.
+const MAX_FALLBACK_TEXT: usize = 500;
+
+/// Trimmed fallback text; `invalid_text` when blank or over [`MAX_FALLBACK_TEXT`] characters.
+fn check_fallback_text(text: &str) -> Result<&str, CommandError> {
+    let t = text.trim();
+    if t.is_empty() || t.chars().count() > MAX_FALLBACK_TEXT {
+        return Err(CommandError::new(
+            "invalid_text",
+            "search text must be 1 to 500 characters",
+        ));
+    }
+    Ok(t)
+}
+
+/// Searches the typed text on the first web shortcut. Takes only text, never a URL: the URL is
+/// built and opened by the web feature, so its http(s) check applies. Only called on user action.
+#[tauri::command]
+pub async fn web_search(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    text: String,
+) -> Result<Outcome, CommandError> {
+    let text = check_fallback_text(&text)?;
+    let f = state
+        .registry
+        .get("web")
+        .await
+        .ok_or_else(|| CommandError::new("unknown_feature", "web shortcuts are off"))?;
+    let it = features::web::fallback_item(text)
+        .ok_or_else(|| CommandError::new("unsupported", "no web shortcut to search with"))?;
+    let action = Action {
+        kind: ActionKind::Primary,
+        confirm_token: None,
+    };
+    let outcome = f
+        .execute(&it, action)
+        .await
+        .map_err(|e| CommandError::new("feature_failed", e.to_string()))?;
+    if outcome == Outcome::HideLauncher {
+        crate::window::hide_launcher(app).await?;
+    }
+    Ok(outcome)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fallback_text_bounds() {
+        assert!(check_fallback_text("").is_err());
+        assert!(check_fallback_text("   ").is_err());
+        assert!(check_fallback_text(&"a".repeat(501)).is_err());
+        assert_eq!(
+            check_fallback_text(&"a".repeat(500)).map(str::len).ok(),
+            Some(500)
+        );
+        assert_eq!(check_fallback_text("  cats ").ok(), Some("cats"));
+    }
 
     #[test]
     fn link_schemes() {

@@ -96,6 +96,7 @@ pub fn run() {
             commands::launch::copy_path,
             commands::launch::copy_text,
             commands::launch::open_link,
+            commands::launch::web_search,
             commands::providers::list_providers,
             commands::providers::probe_providers,
             commands::providers::set_provider,

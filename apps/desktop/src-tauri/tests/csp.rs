@@ -62,7 +62,7 @@ fn launcher_lacks_settings_commands() {
 #[test]
 fn settings_lacks_launcher_commands() {
     let p = perms("settings");
-    for c in ["launch", "search", "ask-stream"] {
+    for c in ["launch", "search", "ask-stream", "web-search"] {
         assert!(!p.contains(&format!("allow-{c}")), "settings has {c}");
     }
 }

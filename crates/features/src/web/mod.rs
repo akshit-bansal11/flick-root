@@ -150,6 +150,23 @@ impl State {
         Self::from_rows(&rows)
     }
 
+    fn fallback_item(&self, text: &str) -> Option<Item> {
+        let text = text.trim();
+        let first = self.list.first()?;
+        if text.is_empty() {
+            return None;
+        }
+        let input = Input {
+            raw: String::new(),
+            text: format!("{} {text}", first.keyword),
+            mode: Mode::Command,
+            seq: 0,
+        };
+        let mut item = self.query(&input).into_iter().next()?;
+        item.id = ItemId("web:fallback".into());
+        Some(item)
+    }
+
     fn query(&self, input: &Input) -> Vec<Item> {
         if input.mode != Mode::Command {
             return Vec::new();
@@ -232,6 +249,18 @@ fn current() -> Arc<State> {
         .unwrap_or_else(|| Arc::new(State::defaults()))
 }
 
+/// Title of the first shortcut, used for the plain-text "Search <title>" row. `None` when there are
+/// no shortcuts.
+pub fn fallback_title() -> Option<String> {
+    current().list.first().map(|s| s.title.clone())
+}
+
+/// The item `query` builds for `<first keyword> <text>`, with id `web:fallback`. `None` for blank
+/// text or no shortcuts. Builds the item only; opening goes through `Web::execute`.
+pub fn fallback_item(text: &str) -> Option<Item> {
+    current().fallback_item(text)
+}
+
 #[async_trait]
 impl Feature for Web {
     fn id(&self) -> &'static str {
@@ -300,6 +329,36 @@ mod tests {
 
     fn url(items: &[Item]) -> &str {
         items[0].payload["url"].as_str().unwrap_or("")
+    }
+
+    #[test]
+    fn fallback_item_encodes_and_skips_blank() {
+        let st = State::defaults();
+        let Some(it) = st.fallback_item(" a b&c ") else {
+            panic!("expected a fallback item");
+        };
+        assert_eq!(it.id.0, "web:fallback");
+        assert_eq!(it.source, "web");
+        assert_eq!(it.actions, vec![ActionKind::Primary]);
+        assert_eq!(
+            it.payload["url"],
+            "https://www.google.com/search?q=a%20b%26c"
+        );
+        assert!(st.fallback_item("   ").is_none());
+        assert!(State::default().fallback_item("x").is_none());
+    }
+
+    #[test]
+    fn fallback_title_is_first_shortcut() {
+        // Nothing in this crate's tests starts `web` with custom shortcuts, so this is the defaults.
+        assert_eq!(fallback_title().as_deref(), Some("Google"));
+        let custom = vec![(
+            "ddg".to_owned(),
+            "DuckDuckGo".to_owned(),
+            "https://duckduckgo.com/?q={q}".to_owned(),
+        )];
+        let st = State::from_rows(&custom).unwrap_or_default();
+        assert_eq!(st.list[0].title, "DuckDuckGo");
     }
 
     #[test]
