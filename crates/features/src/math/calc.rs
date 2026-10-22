@@ -105,6 +105,15 @@ mod tests {
         assert_eq!(evaluate("2+2*3").as_deref(), Some("8"));
     }
 
+    // fend-core's own tests: "65536 to hex" gives "10000" and "0x10ffff to decimal" gives "1114111"
+    // (fend-core-1.5.8 tests/integration_tests.rs:1829, :1844; "hex"/"decimal" names in src/ast.rs:851-852).
+    #[test]
+    fn fend_handles_number_bases() {
+        warm();
+        assert!(evaluate("255 to hex").is_some_and(|r| r.to_lowercase().contains("ff")));
+        assert!(evaluate("0xff to decimal").is_some_and(|r| r.contains("255")));
+    }
+
     #[test]
     fn rejects_non_math() {
         warm();
