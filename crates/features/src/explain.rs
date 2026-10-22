@@ -73,7 +73,7 @@ impl Feature for Explain {
         "v0.0.1"
     }
     fn description(&self) -> &'static str {
-        "A second hotkey sends the selected text to Query mode. You see it before anything is sent."
+        "A second hotkey sends the selected text to Ask (`?`). You see it before anything is sent."
     }
     fn default_enabled(&self) -> bool {
         true

@@ -245,6 +245,11 @@ impl Default for Appearance {
 }
 
 impl Appearance {
+    /// Pulls a stored glass value into [`GLASS_RANGE`], for configs saved under an older range.
+    pub fn clamp_glass(&mut self) {
+        self.glass = self.glass.clamp(*GLASS_RANGE.start(), *GLASS_RANGE.end());
+    }
+
     /// Checks every field; the error names the first bad one.
     pub fn validate(&self) -> Result<(), String> {
         if !THEMES.contains(&self.theme.as_str()) {
@@ -738,6 +743,7 @@ impl Config {
             path: path.to_path_buf(),
             source,
         })?;
+        c.appearance.clamp_glass();
         c.apps.skip = sanitize_skip(std::mem::take(&mut c.apps.skip));
         // Configs written before the Custom engine existed lack it in the order.
         if !c.decision.order.iter().any(|i| i == "custom") {
@@ -911,6 +917,27 @@ threshold = 0.7
             "glass must be between 80 and 95"
         );
         assert_eq!(c.general.hotkey, "Alt+Space");
+    }
+
+    #[test]
+    fn stored_glass_below_range_loads_clamped_and_still_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("config.toml");
+        fs::write(&p, "[appearance]\nglass = 62\n").unwrap();
+        let c = Config::load(&p).unwrap();
+        assert_eq!(c.appearance.glass, 80);
+        // The set_appearance path: clamp the stored value, apply the change, validate.
+        let mut stored = Appearance {
+            glass: 62,
+            ..Appearance::default()
+        };
+        stored.clamp_glass();
+        stored.theme = "midnight".into();
+        assert!(stored.validate().is_ok());
+        assert_eq!(stored.glass, 80);
+        // An explicit out-of-range request is still rejected.
+        stored.glass = 62;
+        assert!(stored.validate().is_err());
     }
 }
 

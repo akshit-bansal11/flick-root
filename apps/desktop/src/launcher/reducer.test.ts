@@ -119,7 +119,7 @@ describe("reducer", () => {
   });
 
   it("Ctrl+Enter reveals location", () => {
-    const r = reduce(withItems(inMode("commands")), k("Enter", { ctrl: true }));
+    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true }));
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i0" }]);
   });
 

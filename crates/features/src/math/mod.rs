@@ -196,7 +196,7 @@ impl Feature for Math {
         "v0.0.1"
     }
     fn description(&self) -> &'static str {
-        "Results while you type in Command mode: math, units, time zones and currency."
+        "Results while you type after `=`: math, units, time zones and currency."
     }
     fn default_enabled(&self) -> bool {
         true

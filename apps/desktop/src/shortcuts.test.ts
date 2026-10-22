@@ -64,6 +64,10 @@ describe("shortcut table", () => {
     expect(RESERVED).toContain("Ctrl+Alt+Delete");
   });
 
+  it("Show location applies to Open only", () => {
+    expect(SHORTCUTS.find((s) => s.id === "location")?.scope).toBe("find");
+  });
+
   it("has unique ids", () => {
     expect(new Set(SHORTCUTS.map((s) => s.id)).size).toBe(SHORTCUTS.length);
   });

@@ -62,7 +62,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     id: "location",
     keys: "Ctrl+Enter",
     label: "Show location",
-    scope: LIST_SCOPES,
+    scope: "find",
     foot: "location",
   },
   {

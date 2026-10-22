@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import {
   applyAppearance,
+  clampGlass,
   FORCED_SCHEME,
   GLASS_MAX,
   GLASS_MIN,
@@ -85,12 +86,13 @@ export function Appearance() {
     });
   };
 
+  const stored = clampGlass(a.glass);
   const commitGlass = () => {
     if (drag === null) return;
     setDrag(null);
-    if (drag !== a.glass) save({ glass: drag });
+    if (drag !== stored) save({ glass: drag });
   };
-  const glass = drag ?? a.glass;
+  const glass = drag ?? stored;
 
   const forced = FORCED_SCHEME[a.theme];
   const reducedTransparency = matchMedia("(prefers-reduced-transparency: reduce)").matches;

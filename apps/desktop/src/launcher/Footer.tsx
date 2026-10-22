@@ -2,10 +2,12 @@ import { APP_DISPLAY_NAME } from "../brand";
 import { type Condition, capsText, inScope, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
 import { useExit } from "../useMotion";
-import { MODES } from "./reducer";
+import { availableModes, MODES } from "./reducer";
 
 interface Props {
   mode: LaunchMode;
+  /** Modes the user can enter now; the empty-input hints list only these. */
+  modes?: Exclude<LaunchMode, "none">[];
   /** Which conditional hints apply to the current selection. */
   ctx?: Partial<Record<Condition, boolean>>;
   /** Shows the short "Copied" confirmation. */
@@ -15,11 +17,13 @@ interface Props {
 }
 
 /** Footer hints per mode, straight from the shortcut table. */
-export function footHints(mode: LaunchMode, ctx: Props["ctx"] = {}): string[] {
+export function footHints(
+  mode: LaunchMode,
+  ctx: Props["ctx"] = {},
+  modes: Props["modes"] = availableModes(null),
+): string[] {
   if (mode === "none") {
-    const prefixes = (Object.keys(MODES) as Exclude<LaunchMode, "none">[]).map(
-      (m) => `${MODES[m].prefix} ${MODES[m].label.toLowerCase()}`,
-    );
+    const prefixes = modes.map((m) => `${MODES[m].prefix} ${MODES[m].label.toLowerCase()}`);
     return [...prefixes, `${capsText("sheet")} ${shortcut("sheet").foot}`];
   }
   return inScope(mode)
@@ -27,7 +31,7 @@ export function footHints(mode: LaunchMode, ctx: Props["ctx"] = {}): string[] {
     .map((s) => `${capsText(s.id)} ${s.foot}`);
 }
 
-export function Footer({ mode, ctx, copied = false, copyFailed = false }: Props) {
+export function Footer({ mode, modes, ctx, copied = false, copyFailed = false }: Props) {
   const toast = useExit(copyFailed ? "Copy failed" : copied ? "Copied" : null);
   return (
     <div className="foot">
@@ -46,7 +50,7 @@ export function Footer({ mode, ctx, copied = false, copyFailed = false }: Props)
             {toast.shown}
           </span>
         )}
-        {footHints(mode, ctx).map((k) => (
+        {footHints(mode, ctx, modes).map((k) => (
           <span key={k}>{k}</span>
         ))}
       </span>

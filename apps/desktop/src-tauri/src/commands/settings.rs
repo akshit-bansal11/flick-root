@@ -197,6 +197,8 @@ pub async fn set_appearance(
     let next = blocking(move || {
         s.update_config(|c| {
             let mut next = c.appearance.clone();
+            // Only the stored value is clamped; an explicit glass below is still validated.
+            next.clamp_glass();
             if let Some(t) = theme {
                 next.theme = t;
             }

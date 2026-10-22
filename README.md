@@ -25,7 +25,7 @@ The installer is unsigned, so Windows SmartScreen shows "Windows protected your 
 
 ## Hotkeys and modes
 
-Modes are chosen only by a prefix typed first in the empty bar; there is no Tab switcher. Plain text with no prefix searches nothing and shows the prefix list. A prefix is offered only while a feature it needs is on. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode. With `@` and nothing after it, Flick lists your projects, most used first.
+Modes are chosen only by a prefix typed first in the empty bar; there is no Tab switcher. Plain text with no prefix searches nothing and shows the prefix list. A prefix is offered only while a feature it needs is on. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode. With `@` and nothing after it, Flick lists your projects, most used first (the order comes from Frecency ranking; with Frecency off it is scan order).
 
 | Prefix | Mode | Sources |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ Modes are chosen only by a prefix typed first in the empty bar; there is no Tab 
 | `Alt+Space` | Show or hide Flick (configurable). It replaces Windows' window menu; the hotkey picker warns about it. |
 | `Up` / `Down` | Move the selection |
 | `Enter` | Primary action (open, launch, ask) |
-| `Ctrl+Enter` | Show location (Open, Commands, Calc, Projects) |
+| `Ctrl+Enter` | Show location (Open) |
 | `Ctrl+Shift+Enter` | Run as admin (Open: apps and exe/msi programs, when the result can) |
 | `Ctrl+Shift+C` | Copy: path in Open (files and folders), result in Commands and Calc, answer in Ask |
 | `Delete` | End a process, after arrowing to its row in Commands; `Enter` confirms |
@@ -71,7 +71,7 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 - **Math and units:** type arithmetic, units, currency or time zones after `=`, for example `2.5 kg to lb`, `250 usd in inr` or `5pm ist in pst`. Enter copies the result. Currency uses the ECB daily reference rates, fetched at most once a day and cached. When offline, Flick uses the last cached rate and shows its age. The rates are published by the European Central Bank.
 - **System commands:** Lock, Sleep, Hibernate, Restart, Shut down, Sign out, Empty Recycle Bin, Restart Explorer, Wi-Fi on/off and Bluetooth on/off. Restart, Shut down, Sign out and Empty Recycle Bin need Enter twice within 3 seconds.
 - **Web shortcuts:** a keyword plus a query opens a URL. Defaults: `g` (Google), `yt` (YouTube), `gh` (GitHub), `amz` (amazon.in), `maps` (Google Maps), `wiki` (Wikipedia). Add, edit, remove and reorder them in Settings.
-- **Project launcher (`@`):** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder. `@` with nothing after it lists projects, most used first.
+- **Project launcher (`@`):** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder. `@` with nothing after it lists projects, most used first (the order comes from Frecency ranking; with Frecency off it is scan order).
 - **Natural-language finder:** after `/`, `the invoice i downloaded last week` is parsed offline and opens only a clear winner of a safe file type; otherwise it lists the candidates. Decision engines (Laya, Kev, your AI provider, Jev) are optional and off by default. [Details](docs/features/natural-language-finder.md).
 - **Ports and processes:** after `>`, `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Delete`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
 - **Media controls:** after `>`, `play`, `pause`, `next`, `previous`, `now playing` work on any player. `play X on spotify` / `on youtube` open a search; connecting your own Spotify developer app is optional. [Details](docs/features/media-controls.md).

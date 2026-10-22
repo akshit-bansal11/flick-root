@@ -108,6 +108,7 @@ export function LauncherView({
       )}
       <Footer
         mode={state.mode}
+        modes={hints}
         copied={state.copied}
         copyFailed={state.copyFailed}
         ctx={{
