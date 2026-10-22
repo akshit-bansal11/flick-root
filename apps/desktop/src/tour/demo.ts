@@ -1,7 +1,8 @@
 // Sample data and a fake effect runner for the tour's demo launcher. Nothing here touches the
 // system: effects become small toasts, searches filter the lists below, answers are canned.
+import { isProgram } from "../launcher/kinds";
 import type { Effect, Event } from "../launcher/reducer";
-import type { AskEvent, Item, ItemKind, Mode, SearchScope, ThinkingMode } from "../types";
+import type { AskEvent, Item, ItemKind, Mode, ThinkingMode } from "../types";
 import { GHOST_MS, type TourEvent } from "./steps";
 
 const item = (
@@ -69,12 +70,20 @@ const proc = item("proc:chrome", "process", "chrome.exe", "Process", {
   actions: [{ type: "kill" }],
 });
 
-/** Canned results for the examples the steps use; anything else falls through to words. */
-const CANNED: readonly [RegExp, () => Item[]][] = [
+export const DEMO_PROJECTS: readonly Item[] = [
+  item("project:flick", "project", "flick", "Projects"),
+  item("project:notes", "project", "notes-app", "Projects"),
+];
+
+/** Canned results for the examples the steps use, per source. */
+type Canned = readonly [RegExp, () => Item[]][];
+const CANNED_MATH: Canned = [
   [/^5\s*km\s*(to|in)\s*mi/i, () => [resultItem("3.107 mi", "5 km in miles")]],
   [/^2\s*\+\s*2$/, () => [resultItem("4", "2 + 2")]],
   [/^250\s*usd\s*(to|in)\s*inr/i, () => [resultItem("₹20,800", "250 USD in INR (sample rate)")]],
   [/^5pm\s*ist\s*(to|in)\s*pst/i, () => [resultItem("3:30 AM PST", "5 PM IST in PST")]],
+];
+const CANNED_SYSCMD: Canned = [
   [/^lock/i, () => [lockCommand]],
   [/^(proc|port)/i, () => [proc]],
 ];
@@ -84,14 +93,26 @@ const matchText = (it: Item, text: string): boolean => {
   return q === "" || it.title.toLowerCase().includes(q) || it.subtitle.toLowerCase().includes(q);
 };
 
-/** Items the demo shows for a search. */
-export function demoSearch(mode: Mode, scope: SearchScope | undefined, text: string): Item[] {
-  if (mode === "find") return DEMO_FILES.filter((i) => matchText(i, text));
-  if (mode !== "command") return [];
-  if (scope === "apps") return DEMO_APPS.filter((i) => matchText(i, text));
+const canned = (list: Canned, text: string): Item[] => {
   const t = text.trim();
-  for (const [re, make] of CANNED) if (re.test(t)) return make();
-  return t === "" ? [] : DEMO_APPS.filter((i) => matchText(i, text)).slice(0, 3);
+  return list.find(([re]) => re.test(t))?.[1]() ?? [];
+};
+
+/** Items the demo shows for a search, composed from `sources` in result order. */
+export function demoSearch(mode: Mode, sources: readonly string[], text: string): Item[] {
+  if (mode === "query") return [];
+  const has = (id: string) => sources.includes(id);
+  const match = (list: readonly Item[], pick: (i: Item) => boolean = () => true) =>
+    list.filter((i) => pick(i) && matchText(i, text));
+  return [
+    ...(has("math") ? canned(CANNED_MATH, text) : []),
+    ...(has("syscmd") ? canned(CANNED_SYSCMD, text) : []),
+    ...(has("apps") ? match(DEMO_APPS, (i) => !isProgram(i)) : []),
+    ...(has("apps") ? match(DEMO_APPS, isProgram) : []),
+    ...(has("files") ? match(DEMO_FILES, (i) => i.kind === "file") : []),
+    ...(has("files") ? match(DEMO_FILES, (i) => i.kind === "folder") : []),
+    ...(has("projects") ? match(DEMO_PROJECTS) : []),
+  ];
 }
 
 export const DEMO_MODES: ThinkingMode[] = [
@@ -152,7 +173,7 @@ export interface DemoHost {
 }
 
 const byId = (id: string): Item | undefined =>
-  [...DEMO_APPS, ...DEMO_FILES, lockCommand, proc].find((i) => i.id === id);
+  [...DEMO_APPS, ...DEMO_FILES, ...DEMO_PROJECTS, lockCommand, proc].find((i) => i.id === id);
 
 /** Runs reducer effects against the demo: toasts instead of actions, canned search and answers. */
 export function createDemoRunner(host: DemoHost) {
@@ -190,7 +211,7 @@ export function createDemoRunner(host: DemoHost) {
               host.dispatch({
                 type: "results",
                 seq: e.seq,
-                items: demoSearch(e.mode, e.scope, e.text),
+                items: demoSearch(e.mode, e.sources, e.text),
               }),
             0,
           );

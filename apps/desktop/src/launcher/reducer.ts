@@ -6,7 +6,6 @@ import type {
   LaunchMode,
   Mode,
   Outcome,
-  SearchScope,
   ThinkingMode,
 } from "../types";
 import { isProgram } from "./kinds";
@@ -87,7 +86,7 @@ export type Event =
   | { type: "hidden" };
 
 export type Effect =
-  | { type: "search"; seq: number; mode: Mode; text: string; scope?: SearchScope }
+  | { type: "search"; seq: number; mode: Mode; text: string; sources: readonly string[] }
   | { type: "launch"; itemId: string; admin: boolean }
   | { type: "confirm"; commandId: string; token: string; kill: boolean }
   | { type: "kill"; itemId: string }
@@ -123,32 +122,40 @@ export interface ModeDef {
   desc: string;
   /** Wire mode sent to Rust `search`; query never searches. */
   wire: Mode;
-  scope?: SearchScope;
+  /** Source ids sent to `search`; empty for query, which never searches. */
+  sources: readonly string[];
+  /** Live source ids (launcher://shown); the prefix is offered while one is live. */
+  needs: readonly string[];
 }
 
+/** Key order is hint order and Ctrl+N order. */
 export const MODES: Record<Exclude<LaunchMode, "none">, ModeDef> = {
+  find: {
+    prefix: "/",
+    label: "Open",
+    placeholder: "Open an app, file or folder",
+    desc: "apps, programs, files and folders",
+    wire: "find",
+    sources: ["apps", "files", "nlfind"],
+    needs: ["apps"],
+  },
   commands: {
     prefix: ">",
     label: "Commands",
-    placeholder: "Run a command, math, units or web search",
-    desc: "system commands, math, units, web, ports, media, capture",
+    placeholder: "Run a command or web shortcut",
+    desc: "system, web shortcuts, media, ports and capture",
     wire: "command",
-    scope: "commands",
+    sources: ["syscmd", "web", "media", "ports", "capture"],
+    needs: ["syscmd", "web", "media", "ports", "capture"],
   },
-  run: {
-    prefix: "!",
-    label: "Apps",
-    placeholder: "Open an app or program",
-    desc: "every app and program on your drives",
+  calc: {
+    prefix: "=",
+    label: "Calc",
+    placeholder: "Math, units, currency or time zones",
+    desc: "math, units, currency and time zones",
     wire: "command",
-    scope: "apps",
-  },
-  find: {
-    prefix: "/",
-    label: "Find",
-    placeholder: "Find a file or folder",
-    desc: "files and folders, plain-language too",
-    wire: "find",
+    sources: ["math"],
+    needs: ["math"],
   },
   query: {
     prefix: "?",
@@ -156,6 +163,17 @@ export const MODES: Record<Exclude<LaunchMode, "none">, ModeDef> = {
     placeholder: "Ask anything",
     desc: "your AI providers",
     wire: "query",
+    sources: [],
+    needs: ["ask"],
+  },
+  projects: {
+    prefix: "@",
+    label: "Projects",
+    placeholder: "Find a project folder",
+    desc: "code folders under your dev folders",
+    wire: "command",
+    sources: ["projects"],
+    needs: ["projects"],
   },
 };
 
@@ -200,13 +218,13 @@ export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
 
-/** Set mode and input; Commands, Apps and Find bump seq and search, the rest never search. */
+/** Set mode and input; every mode but none and query bumps seq and searches its sources. */
 function search(s: State, mode: LaunchMode, input: string): Result {
   const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null, armed: false };
   if (mode === "none" || mode === "query") return out({ ...next, items: [] });
-  const { wire, scope } = MODES[mode];
+  const { wire, sources } = MODES[mode];
   const seq = s.seq + 1;
-  return out({ ...next, seq }, { type: "search", seq, mode: wire, text: input, scope });
+  return out({ ...next, seq }, { type: "search", seq, mode: wire, text: input, sources });
 }
 
 function switchMode(s: State, mode: LaunchMode, input: string): Result {
@@ -307,7 +325,7 @@ function openSelected(s: State, intent: Intent): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
   if (intent === "admin") {
-    const admin = s.mode === "commands" || s.mode === "run";
+    const admin = s.mode === "commands" || s.mode === "find";
     // Scanned programs only offer Admin when Rust listed it (.exe/.msi).
     if (!admin || (isProgram(item) && !item.actions.some((a) => a.type === "admin"))) return out(s);
     return out(s, { type: "launch", itemId: item.id, admin: true });
@@ -365,7 +383,7 @@ function resultValue(item: Item | undefined): string | null {
   return typeof v === "string" ? v : null;
 }
 
-/** Ctrl+1..4: jump to a mode, carrying typed text; disabled modes and the current mode do nothing. */
+/** Ctrl+1..5: jump to a mode, carrying typed text; disabled modes and the current mode do nothing. */
 function goMode(s: State, mode: Entered): Result {
   if (mode === s.mode || !availableModes(s.enabledModes).includes(mode)) return out(s);
   return switchMode(s, mode, s.input);

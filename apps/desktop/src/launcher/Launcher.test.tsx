@@ -76,8 +76,8 @@ const type = (text: string) =>
 describe("Launcher", () => {
   it("starts in none mode with four prefix hint rows and no search", async () => {
     await mount();
-    expect(screen.getByPlaceholderText("Type > ! / or ? to start")).toBeTruthy();
-    expect(screen.getAllByRole("option", { name: /^(>|!|\/|\?)/ })).toHaveLength(4);
+    expect(screen.getByPlaceholderText("Type / > = ? @ to start")).toBeTruthy();
+    expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(5);
     expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
     expect(screen.getByText("> commands")).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
@@ -87,26 +87,31 @@ describe("Launcher", () => {
   it("plain text keeps the hints and shows a muted line", async () => {
     await mount();
     await type("abc");
-    expect(screen.getByText("Start with > ! / or ? to search")).toBeTruthy();
+    expect(screen.getByText("Start with / > = ? @ to search")).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
   });
 
-  it("typing a prefix shows a chip, the placeholder and searches with scope", async () => {
+  it("typing a prefix shows a chip, the placeholder and searches with sources", async () => {
     await mount();
-    await type("!");
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Apps");
-    expect(screen.getByRole("combobox").getAttribute("aria-label")).toBe("Apps search");
-    expect(screen.getByPlaceholderText("Open an app or program")).toBeTruthy();
-    expect(ipc.search).toHaveBeenCalledWith({ seq: 1, mode: "command", text: "", scope: "apps" });
+    await type("/");
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Open");
+    expect(screen.getByRole("combobox").getAttribute("aria-label")).toBe("Open search");
+    expect(screen.getByPlaceholderText("Open an app, file or folder")).toBeTruthy();
+    expect(ipc.search).toHaveBeenCalledWith({
+      seq: 1,
+      mode: "find",
+      text: "",
+      sources: ["apps", "files", "nlfind"],
+    });
     expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 
   it("clicking a hint row enters its mode", async () => {
     await mount();
     act(() => {
-      fireEvent.click(screen.getByRole("option", { name: /Find/ }));
+      fireEvent.click(screen.getByRole("option", { name: /Open/ }));
     });
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Find");
+    expect(screen.getByTestId("mode-chip").textContent).toBe("Open");
   });
 
   it("shows group label, subtitle and mode footer", async () => {
@@ -118,7 +123,7 @@ describe("Launcher", () => {
     expect(screen.queryByText("Tab mode")).toBeNull();
   });
 
-  it("commands footer shows the admin hint when the selected item has an admin action", async () => {
+  it("Open footer shows the admin hint when the selected item has an admin action", async () => {
     await mount();
     vi.mocked(ipc.search).mockImplementation((req) =>
       Promise.resolve({
@@ -127,7 +132,7 @@ describe("Launcher", () => {
         group: null,
       }),
     );
-    await type(">");
+    await type("/");
     expect(screen.getByText("Ctrl Shift ↵ admin")).toBeTruthy();
   });
 
@@ -140,7 +145,7 @@ describe("Launcher", () => {
         group: null,
       }),
     );
-    await type("!");
+    await type("/");
     expect(screen.getByText("Programs")).toBeTruthy();
     expect(screen.getByText("D:/tools")).toBeTruthy();
   });

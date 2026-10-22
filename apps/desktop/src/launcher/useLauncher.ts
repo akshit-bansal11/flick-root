@@ -42,7 +42,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
       switch (e.type) {
         case "search":
           ipc
-            .search({ seq: e.seq, mode: e.mode, text: e.text, scope: e.scope })
+            .search({ seq: e.seq, mode: e.mode, text: e.text, sources: e.sources })
             .then((res) => dispatch({ type: "results", seq: res.seq, items: res.items }))
             .catch(warn);
           break;

@@ -4,7 +4,7 @@ const GROUP: Record<ItemKind, string> = {
   app: "Apps",
   command: "Commands",
   file: "Files",
-  folder: "Files",
+  folder: "Folders",
   project: "Projects",
   process: "Processes",
   result: "Results",

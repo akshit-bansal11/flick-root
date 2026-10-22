@@ -30,13 +30,22 @@ describe("ghostType", () => {
 
 describe("demoSearch", () => {
   it("filters apps, files and gives canned command results", () => {
-    expect(demoSearch("command", "apps", "spot").map((i) => i.title)).toEqual(["Spotify"]);
-    expect(demoSearch("command", "apps", "notepad").length).toBe(2);
-    expect(demoSearch("find", undefined, "report").length).toBeGreaterThan(0);
-    const math = demoSearch("command", "commands", "5 km to mi")[0];
+    expect(demoSearch("command", ["apps"], "spot").map((i) => i.title)).toEqual(["Spotify"]);
+    expect(demoSearch("command", ["apps"], "notepad").length).toBe(2);
+    expect(demoSearch("find", ["files"], "report").length).toBeGreaterThan(0);
+    const math = demoSearch("command", ["math"], "5 km to mi")[0];
     expect(math?.actions).toEqual([{ type: "copyResult" }]);
-    expect(demoSearch("command", "commands", "lock")[0]?.id).toBe("cmd:lock");
-    expect(demoSearch("query", undefined, "x")).toEqual([]);
+    expect(demoSearch("command", ["syscmd"], "lock")[0]?.id).toBe("cmd:lock");
+    expect(demoSearch("query", [], "x")).toEqual([]);
+  });
+  it("lists apps, programs, files, folders and projects in order", () => {
+    const ids = demoSearch("find", ["apps", "files"], "").map((i) => i.id);
+    expect(ids.indexOf("prog:notepadpp")).toBeGreaterThan(ids.indexOf("app:notepad"));
+    expect(ids.indexOf("file:reports")).toBeGreaterThan(ids.indexOf("file:budget"));
+    expect(demoSearch("command", ["projects"], "").map((i) => i.title)).toEqual([
+      "flick",
+      "notes-app",
+    ]);
   });
 });
 
@@ -53,7 +62,7 @@ describe("demo runner", () => {
 
   it("answers a search with demo items", () => {
     const { dispatched, runner } = setup();
-    runner.run({ type: "search", seq: 3, mode: "find", text: "report" });
+    runner.run({ type: "search", seq: 3, mode: "find", text: "report", sources: ["files"] });
     vi.advanceTimersByTime(1);
     expect(dispatched[0]).toMatchObject({ type: "results", seq: 3 });
   });

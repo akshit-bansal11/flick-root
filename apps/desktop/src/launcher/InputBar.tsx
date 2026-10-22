@@ -3,7 +3,9 @@ import type { LaunchMode } from "../types";
 import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
 
-const NONE_PLACEHOLDER = "Type > ! / or ? to start";
+const NONE_PLACEHOLDER = `Type ${Object.values(MODES)
+  .map((m) => m.prefix)
+  .join(" ")} to start`;
 
 interface Props {
   mode: LaunchMode;

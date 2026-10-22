@@ -13,17 +13,21 @@ import type {
   Mode,
   Outcome,
   SearchResponse,
-  SearchScope,
   ShownPayload,
   ThinkingModes,
 } from "./types";
 
-export const search = (req: { seq: number; mode: Mode; text: string; scope?: SearchScope }) =>
+export const search = (req: {
+  seq: number;
+  mode: Mode;
+  text: string;
+  sources: readonly string[];
+}) =>
   invoke<SearchResponse>("search", {
     seq: req.seq,
     mode: req.mode,
     text: req.text,
-    scope: req.scope,
+    sources: req.sources,
   });
 
 export const launch = (itemId: string, admin: boolean) =>

@@ -56,23 +56,17 @@ describe("reducer", () => {
     expect(r.state).toMatchObject({ mode: "none", input: "", items: [], visible: true });
   });
 
-  it("text change searches with incremented seq and the mode scope", () => {
+  it("text change searches with incremented seq and the mode sources", () => {
     const a = reduce(inMode("commands"), { type: "text", text: "ab" });
     const b = reduce(a.state, { type: "text", text: "abc" });
-    expect(a.effects).toEqual([
-      { type: "search", seq: 1, mode: "command", text: "ab", scope: "commands" },
-    ]);
-    expect(b.effects).toEqual([
-      { type: "search", seq: 2, mode: "command", text: "abc", scope: "commands" },
-    ]);
+    const sources = MODES.commands.sources;
+    expect(a.effects).toEqual([{ type: "search", seq: 1, mode: "command", text: "ab", sources }]);
+    expect(b.effects).toEqual([{ type: "search", seq: 2, mode: "command", text: "abc", sources }]);
   });
 
-  it("run mode searches command with apps scope; find has no scope", () => {
-    expect(reduce(inMode("run"), { type: "text", text: "a" }).effects).toEqual([
-      { type: "search", seq: 1, mode: "command", text: "a", scope: "apps" },
-    ]);
+  it("find searches the find wire with apps, files and nlfind", () => {
     expect(reduce(inMode("find"), { type: "text", text: "a" }).effects).toEqual([
-      { type: "search", seq: 1, mode: "find", text: "a", scope: undefined },
+      { type: "search", seq: 1, mode: "find", text: "a", sources: ["apps", "files", "nlfind"] },
     ]);
   });
 
@@ -128,13 +122,13 @@ describe("reducer", () => {
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i0" }]);
   });
 
-  it("Ctrl+Shift+Enter launches as admin in Command", () => {
-    const r = reduce(withItems(inMode("commands")), k("Enter", { ctrl: true, shift: true }));
+  it("Ctrl+Shift+Enter launches as admin in Open", () => {
+    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true, shift: true }));
     expect(r.effects).toEqual([{ type: "launch", itemId: "i0", admin: true }]);
   });
 
-  it("Ctrl+Shift+Enter ignored in Find", () => {
-    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true, shift: true }));
+  it("Ctrl+Shift+Enter ignored in Commands", () => {
+    const r = reduce(withItems(inMode("commands")), k("Enter", { ctrl: true, shift: true }));
     expect(r.effects).toEqual([]);
   });
 
@@ -187,16 +181,17 @@ describe("reducer", () => {
     expect(reduce(inMode("query"), k("C", { ctrl: true, shift: true })).effects).toEqual([]);
   });
 
-  it("Ctrl+1..4 enter modes, carry typed text and respect disabled modes", () => {
+  it("Ctrl+1..5 enter modes, carry typed text and respect disabled modes", () => {
     const typed = { ...initialState(), input: "abc" };
-    const r = reduce(typed, k("3", { ctrl: true }));
+    const r = reduce(typed, k("1", { ctrl: true }));
     expect(r.state).toMatchObject({ mode: "find", input: "abc" });
     expect(r.effects[0]).toMatchObject({ type: "search", mode: "find", text: "abc" });
-    expect(reduce(typed, k("1", { ctrl: true })).state.mode).toBe("commands");
-    expect(reduce(typed, k("2", { ctrl: true })).state.mode).toBe("run");
+    expect(reduce(typed, k("2", { ctrl: true })).state.mode).toBe("commands");
+    expect(reduce(typed, k("3", { ctrl: true })).state.mode).toBe("calc");
     expect(reduce(typed, k("4", { ctrl: true })).state.mode).toBe("query");
+    expect(reduce(typed, k("5", { ctrl: true })).state.mode).toBe("projects");
     const off = initialState(["command"]);
-    expect(reduce(off, k("3", { ctrl: true })).state).toBe(off);
+    expect(reduce(off, k("1", { ctrl: true })).state).toBe(off);
     expect(reduce(off, k("4", { ctrl: true })).state).toBe(off);
   });
 
@@ -246,14 +241,15 @@ describe("reducer", () => {
   });
 
   it.each([
-    [">", "commands", "command", "commands"],
-    ["!", "run", "command", "apps"],
-    ["/", "find", "find", undefined],
-  ] as const)("prefix %s enters %s, is consumed, and searches", (ch, mode, wire, scope) => {
+    ["/", "find", "find", ["apps", "files", "nlfind"]],
+    [">", "commands", "command", ["syscmd", "web", "media", "ports", "capture"]],
+    ["=", "calc", "command", ["math"]],
+    ["@", "projects", "command", ["projects"]],
+  ] as const)("prefix %s enters %s, is consumed, and searches", (ch, mode, wire, sources) => {
     const r = reduce(initialState(), { type: "text", text: ch });
     expect(r.state.mode).toBe(mode);
     expect(r.state.input).toBe("");
-    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: wire, text: "", scope }]);
+    expect(r.effects).toEqual([{ type: "search", seq: 1, mode: wire, text: "", sources }]);
   });
 
   it("? enters query without searching", () => {
@@ -263,7 +259,7 @@ describe("reducer", () => {
   });
 
   it("prefix table is one-to-one", () => {
-    expect(Object.values(MODES).map((m) => m.prefix)).toEqual([">", "!", "/", "?"]);
+    expect(Object.values(MODES).map((m) => m.prefix)).toEqual(["/", ">", "=", "?", "@"]);
   });
 
   it("a prefix typed on an empty field in another mode switches mode", () => {
@@ -306,16 +302,16 @@ describe("reducer", () => {
     const s = reduce(initialState(), k("ArrowDown")).state;
     expect(s.selected).toBe(1);
     const r = reduce(s, k("Enter"));
-    expect(r.state.mode).toBe("run");
+    expect(r.state.mode).toBe("commands");
     expect(r.effects).toEqual([
-      { type: "search", seq: 1, mode: "command", text: "", scope: "apps" },
+      { type: "search", seq: 1, mode: "command", text: "", sources: MODES.commands.sources },
     ]);
   });
 
   it("none mode: hints skip disabled modes", () => {
     const s = initialState(["command"]);
-    expect(reduce(s, k("ArrowUp")).state.selected).toBe(1);
-    expect(reduce({ ...s, selected: 1 }, k("Enter")).state.mode).toBe("run");
+    expect(reduce(s, k("ArrowUp")).state.selected).toBe(2);
+    expect(reduce({ ...s, selected: 1 }, k("Enter")).state.mode).toBe("calc");
   });
 
   it("enterMode event enters a mode and ignores a disabled one", () => {
@@ -326,7 +322,7 @@ describe("reducer", () => {
 
   it("Ctrl+Shift+Enter skips a program row with no Admin action", () => {
     const prog = { ...item("p"), payload: { program: true } };
-    const s = { ...inMode("run"), items: [prog] };
+    const s = { ...inMode("find"), items: [prog] };
     expect(reduce(s, k("Enter", { ctrl: true, shift: true })).effects).toEqual([]);
     const withAdmin = { ...s, items: [{ ...prog, actions: [{ type: "admin" } as const] }] };
     expect(reduce(withAdmin, k("Enter", { ctrl: true, shift: true })).effects).toEqual([
@@ -365,7 +361,7 @@ describe("reducer", () => {
     const r = reduce(inMode("commands", { input: "ab" }), k("Escape"));
     expect(r.state.mode).toBe("commands");
     expect(r.effects).toEqual([
-      { type: "search", seq: 1, mode: "command", text: "", scope: "commands" },
+      { type: "search", seq: 1, mode: "command", text: "", sources: MODES.commands.sources },
     ]);
   });
 
@@ -652,20 +648,25 @@ describe("thinking modes", () => {
 
 describe("entering modes with text", () => {
   it("Enter on a hint carries typed plain text and searches it", () => {
-    const s = { ...initialState(), input: "notepad", selected: 1 };
+    const s = { ...initialState(), input: "notepad", selected: 0 };
     const r = reduce(s, {
       type: "key",
       key: { key: "Enter", ctrl: false, shift: false, alt: false },
     });
-    expect(r.state.mode).toBe("run");
+    expect(r.state.mode).toBe("find");
     expect(r.state.input).toBe("notepad");
     expect(r.effects[0]).toMatchObject({ type: "search", text: "notepad" });
   });
   it("a pasted prefixed string enters that mode with the rest", () => {
-    const r = reduce(initialState(), { type: "text", text: "!spot" });
-    expect(r.state.mode).toBe("run");
+    const r = reduce(initialState(), { type: "text", text: "/spot" });
+    expect(r.state.mode).toBe("find");
     expect(r.state.input).toBe("spot");
     expect(reduce(initialState(), { type: "text", text: "?why" }).state.mode).toBe("query");
+  });
+  it("the old ! prefix is plain text now", () => {
+    const r = reduce(initialState(), { type: "text", text: "!spot" });
+    expect(r.state).toMatchObject({ mode: "none", input: "!spot" });
+    expect(r.effects).toEqual([]);
   });
 
   describe("actionFailed", () => {

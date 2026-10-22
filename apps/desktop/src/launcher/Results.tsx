@@ -86,6 +86,7 @@ interface HintProps {
 
 /** Prefix cheat sheet shown in the default state; each row enters its mode. */
 export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
+  const prefixes = modes.map((m) => MODES[m].prefix).join(" ");
   return (
     <div id={HINTS_ID} className="hints" role="listbox" aria-label="Modes">
       {modes.map((m, i) => (
@@ -105,7 +106,7 @@ export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
           <span className="hint-desc">{MODES[m].desc}</span>
         </button>
       ))}
-      {typed && <p className="hint-note">Start with &gt; ! / or ? to search</p>}
+      {typed && <p className="hint-note">Start with {prefixes} to search</p>}
     </div>
   );
 }

@@ -1,12 +1,11 @@
 // Mirrors crates/launcher-core/src/types.rs (serde camelCase).
 
+// `search` takes source ids with the mode: "apps", "files", "features", or one feature id
+// (math syscmd web media ports capture projects nlfind links frecency explain).
 export type Mode = "command" | "find" | "query";
 
-/** Which sources a Command-mode search draws from (Rust `SearchScope`). */
-export type SearchScope = "all" | "apps" | "commands";
-
-/** UI mode: "none" is the prefix-hint state; the others map onto a wire `Mode` (and scope). */
-export type LaunchMode = "none" | "commands" | "run" | "find" | "query";
+/** UI mode: "none" is the prefix-hint state; the others map onto a wire `Mode` and its sources. */
+export type LaunchMode = "none" | "find" | "commands" | "calc" | "query" | "projects";
 
 export type ItemKind =
   | "app"

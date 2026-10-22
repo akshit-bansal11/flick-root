@@ -69,7 +69,7 @@ describe("shortcut table", () => {
   });
 
   it("shares no chord inside one effective scope", () => {
-    const modes: Scope[] = ["none", "commands", "run", "find", "query"];
+    const modes: Scope[] = ["none", "find", "commands", "calc", "query", "projects"];
     const effective = [...modes.map((m): Scope[] => [m, "launcher"]), ["settings"] as Scope[]];
     for (const scopes of effective) {
       const chords = scopes.flatMap((s) => inScope(s).map((x) => x.keys));

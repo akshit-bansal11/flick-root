@@ -41,7 +41,7 @@ describe("tour steps", () => {
     expect(goalMet(at("open"), view({ seen: ["hotkey"] }))).toBe(true);
     expect(goalMet(at("apps"), view({ seen: ["launchApp"] }))).toBe(true);
     expect(goalMet(at("commands"), view({ mode: "commands", seen: ["copied"] }))).toBe(true);
-    expect(goalMet(at("commands"), view({ mode: "run", seen: ["copied"] }))).toBe(false);
+    expect(goalMet(at("commands"), view({ mode: "find", seen: ["copied"] }))).toBe(false);
     expect(goalMet(at("find"), view({ seen: ["openFile"] }))).toBe(true);
     expect(goalMet(at("ask"), view({ seen: ["modelSwitched"] }))).toBe(false);
     expect(goalMet(at("ask"), view({ seen: ["modelSwitched", "askSent"] }))).toBe(true);
