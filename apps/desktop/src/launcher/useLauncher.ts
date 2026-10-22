@@ -8,7 +8,10 @@ import { cancelsDefault } from "./keys";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
 
 /** Wires the pure reducer to the shell: runs effects through ipc.ts and feeds results back. */
-export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) {
+export function useLauncher(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  initialShown?: ipc.ShownEvent | null,
+) {
   const [state, setState] = useState<State>(() => initialState());
   const panelRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
@@ -120,23 +123,25 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     }
   }, []);
 
+  const first = useRef(initialShown);
   useEffect(() => {
+    const onShown = (p: ipc.ShownEvent) => {
+      applyAppearance(document.documentElement, {
+        ...(p.appearance ?? DEFAULT_APPEARANCE),
+        glassAvailable: p.glass !== false,
+      });
+      dispatch({ type: "shown" });
+      if (p.sources) {
+        dispatch({ type: "enabledSources", sources: p.sources, webTitle: p.webTitle ?? null });
+      }
+      inputRef.current?.focus();
+      requestAnimationFrame(() => {
+        syncHeight.current(true);
+        ipc.reportShown(p.shownId).catch(warn);
+      });
+    };
     const unlisten = [
-      ipc.onShown((p) => {
-        applyAppearance(document.documentElement, {
-          ...(p.appearance ?? DEFAULT_APPEARANCE),
-          glassAvailable: p.glass !== false,
-        });
-        dispatch({ type: "shown" });
-        if (p.sources) {
-          dispatch({ type: "enabledSources", sources: p.sources, webTitle: p.webTitle ?? null });
-        }
-        inputRef.current?.focus();
-        requestAnimationFrame(() => {
-          syncHeight.current(true);
-          ipc.reportShown(p.shownId).catch(warn);
-        });
-      }),
+      ipc.onShown(onShown),
       ipc.onHidden(() => {
         lastHeight.current = 0;
         dispatch({ type: "hidden" });
@@ -157,7 +162,8 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
         }),
       ),
     ];
-    dispatch({ type: "shown" });
+    if (first.current) onShown(first.current);
+    else dispatch({ type: "shown" });
     return () => {
       for (const u of unlisten) u.then((fn) => fn()).catch(warn);
     };

@@ -15,6 +15,7 @@ Flick is at v0.0.1. Features:
 - Settings window (General, Appearance, Features, AI providers, About), first run with a welcome screen, and an interactive tour.
 - Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
 - Programs on all drives, thinking modes, and a liquid glass launcher with six themes.
+- A glass tray menu (Open, Settings, updates, Quit) that opens from a right-click on the tray icon, in the same window as the launcher.
 - One shortcut table for the launcher and Settings (below), an interactive tour in its own window, and a tutorial.
 
 ## Install
@@ -156,3 +157,4 @@ Design decisions are recorded in [docs/adr/](docs/adr/):
 - [ADR-010](docs/adr/ADR-010-integrations.md) Integrations
 - [ADR-011](docs/adr/ADR-011-secret-security.md) Secret security
 - [ADR-012](docs/adr/ADR-012-prefixes-and-plain-text.md) Prefixes and plain text
+- [ADR-013](docs/adr/ADR-013-tray-menu.md) Tray menu
