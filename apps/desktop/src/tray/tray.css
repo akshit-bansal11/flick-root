@@ -1,5 +1,5 @@
-/* Tray menu. Base glass is the window's DWM acrylic: no backdrop-filter here. The lens, keycaps and
-   .keys come from launcher.css (shared with the launcher). */
+/* Tray menu. Base glass is the window's DWM acrylic: no backdrop-filter here. The lens and keycaps
+   come from lens.css and keycaps.css (imported by their components). */
 .tray-menu {
   box-sizing: border-box;
   width: var(--l-menu-w);
@@ -82,8 +82,4 @@
 .tray-list .lens {
   left: 0;
   right: 0;
-}
-
-.tray-list:not([data-lens]) .lens {
-  display: none;
 }

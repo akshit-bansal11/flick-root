@@ -1,3 +1,5 @@
+import "./keycaps.css";
+
 interface Props {
   caps: string[];
 }

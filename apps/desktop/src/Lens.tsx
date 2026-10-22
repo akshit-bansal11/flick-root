@@ -1,5 +1,6 @@
 import { type RefObject, useLayoutEffect, useRef } from "react";
 import { measureRow } from "./useMotion";
+import "./lens.css";
 
 /** The selection lens: one glass pill moved by `useLens`. Decorative. */
 export function Lens({ ref }: { ref: RefObject<HTMLDivElement | null> }) {

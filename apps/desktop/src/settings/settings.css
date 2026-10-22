@@ -89,36 +89,10 @@ body,
   font-size: var(--l-fs-micro);
 }
 
-/* The selection lens: one glass pill moved with transform only; items sit above it. */
+/* The lens itself is in lens.css; the nav list spans it edge to edge. */
 .s-nav-list .lens {
-  position: absolute;
-  z-index: 0;
-  top: 0;
   left: 0;
   right: 0;
-  height: 0;
-  border-radius: var(--l-r-control);
-  background: var(--l-lens);
-  box-shadow:
-    inset 0 1px 0 var(--l-spec),
-    inset 0 0 0 1px var(--l-lens-ring),
-    var(--l-shadow-raised);
-  pointer-events: none;
-  will-change: transform;
-}
-.s-nav-list .lens::after {
-  content: "";
-  position: absolute;
-  inset: 1px 1px auto;
-  height: 45%;
-  border-radius: var(--l-r-control) var(--l-r-control) 40% 40%;
-  background: var(--l-sheen-bg);
-}
-.s-nav-list .lens[data-glide] {
-  transition: transform var(--l-dur-slow) var(--l-ease-liquid);
-}
-.s-nav-list:not([data-lens]) .lens {
-  display: none;
 }
 
 .s-main {
