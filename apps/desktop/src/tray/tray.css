@@ -75,6 +75,7 @@
 .tray-sep {
   height: 1px;
   margin: var(--l-sp-2) var(--l-sp-4);
+  border: 0;
   background: var(--l-hairline);
 }
 

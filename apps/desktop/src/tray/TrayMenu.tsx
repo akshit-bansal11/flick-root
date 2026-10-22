@@ -65,7 +65,7 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
         <Lens ref={lens} />
         {items.map((item, i) => (
           <Fragment key={item.action}>
-            {item.action === "quit" && <div className="tray-sep" role="separator" />}
+            {item.action === "quit" && <hr className="tray-sep" />}
             <button
               type="button"
               id={itemId(item.action)}
