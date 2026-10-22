@@ -52,7 +52,8 @@ jobs:
         run: |
           $conf = Get-Content -Raw apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
           $app = [string]$conf.productName
-          $exe = Join-Path $PWD "target/release/$app.exe"
+          # The cargo binary is desktop-shell.exe; productName only names the data folders.
+          $exe = Join-Path $PWD "target/release/desktop-shell.exe"
           $log = Join-Path $env:LOCALAPPDATA "$app/logs/app.log"
           $proc = Start-Process -FilePath $exe -PassThru
           try {

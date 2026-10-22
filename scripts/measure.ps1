@@ -12,7 +12,7 @@ Length of the idle CPU averaging window. Default 5.
 .PARAMETER Json
 If set, writes the metrics (idle CPU, memory, threads, cold start, hotkey samples) to this file.
 .PARAMETER Exe
-App executable. Default target\release\<productName>.exe, else target\debug\desktop-shell.exe.
+App executable. Default target\release\desktop-shell.exe, else target\debug\desktop-shell.exe.
 .PARAMETER Toggles
 Number of show+hide pairs.
 .PARAMETER Hotkey
@@ -35,7 +35,8 @@ $conf = Get-Content -Raw -LiteralPath (Join-Path $root 'apps\desktop\src-tauri\t
 $app = [string]$conf.productName
 
 if (-not $Exe) {
-    $Exe = Join-Path $root "target\release\$app.exe"
+    # The cargo binary is desktop-shell.exe; productName only names the data folders.
+    $Exe = Join-Path $root 'target\release\desktop-shell.exe'
     if (-not (Test-Path -LiteralPath $Exe)) { $Exe = Join-Path $root 'target\debug\desktop-shell.exe' }
 }
 if (-not (Test-Path -LiteralPath $Exe)) { throw "Executable not found: $Exe" }
