@@ -56,3 +56,29 @@ Programs found by the drive scan are matched in their own index, off the keystro
 - Re-run measure.ps1 after first run is completed. The 2026-10-19 run was done with first_run_done=false, so hotkey p95, idle RAM and cold start are unproven. Idle RAM is the likeliest miss (WebView2 for the launcher alone is large); completing first run now destroys the settings window instead of hiding it.
 - Hotkey to visible p95 needs an interactive session with the settings window closed.
 - Keystroke to paint has no measurement yet.
+
+## WebView2 idle memory (F8.10)
+
+Researched 2026-10-22. Result: no option that needs no new dependency and is backed by the docs was shipped. `window.rs` and `tauri.conf.json` are unchanged.
+
+| Option | Expected saving | Show-latency cost / risk | Status |
+| --- | --- | --- | --- |
+| `TrySuspend` / `Resume` ([perf guide](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#use-memory-management-apis)) | Pauses scripts, lowers renderer use while hidden | Resume on every show sits on the hotkey path; best-effort | needs dependency approval (direct `webview2-com`) |
+| `MemoryUsageTargetLevel = Low` while hidden, `Normal` on show (same page) | Engine may drop caches or swap to disk | Restore on show may add latency; best-effort | needs dependency approval (direct `webview2-com`) |
+| `additional_browser_args` ([docs.rs](https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html#method.additional_browser_args)) | None documented | Replaces wry's default `--disable-features` set; needs the window built in code instead of `tauri.conf.json`; risk to the transparent window | not shipped: [flag list](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/webview-features-flags) says production apps should not use flags, and none is a memory saver |
+| `msWebView2SimulateMemoryPressureWhenInactive` | Unknown ("simulates memory pressure for an inactive WebView") | Unknown | not shipped (undocumented effect and behaviour) |
+| `disable-background-timer-throttling` | None (the opposite: more timer work) | More idle CPU | not shipped (wrong direction) |
+| `disable-gpu` | Likely less GPU memory | Docs say not to use it outside troubleshooting; breaks acrylic/transparent rendering risk | not shipped |
+| Renderer process limits, other memory-saving switches | n/a | n/a | not shipped (undocumented) |
+| Tauri `background_throttling` | n/a | Not supported on Windows | not applicable |
+
+Measured headroom for the two dependency options is pending a `perf.yml` run.
+
+### Pending perf.yml run
+
+| Build | perf.yml run id | Hotkey p95 (ms) | Idle private bytes | Idle working set |
+| --- | --- | --- | --- | --- |
+| Baseline (before) | pending | pending | pending | pending |
+| After | pending | pending | pending | pending |
+
+Numbers are filled in only from a real run. With no code change, the after row should match the baseline.
