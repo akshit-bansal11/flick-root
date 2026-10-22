@@ -396,7 +396,7 @@ describe("reducer", () => {
 
   it.each([
     ["/", "find", "find", ["apps", "files", "nlfind"]],
-    [">", "commands", "command", ["syscmd", "web", "media", "ports", "capture"]],
+    [">", "commands", "command", ["syscmd", "web", "media", "ports", "capture", "links"]],
     ["=", "calc", "command", ["math"]],
     ["@", "projects", "command", ["projects"]],
   ] as const)("prefix %s enters %s, is consumed, and searches", (ch, mode, wire, sources) => {
