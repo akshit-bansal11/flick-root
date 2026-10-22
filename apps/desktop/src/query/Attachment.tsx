@@ -1,5 +1,5 @@
-import type { Attachment as AttachmentData } from "../launcher/reducer";
 import { Keycaps } from "../Keycaps";
+import type { Attachment as AttachmentData } from "../launcher/reducer";
 import { caps } from "../shortcuts";
 
 interface Props {
