@@ -1,4 +1,6 @@
 import type { Ref } from "react";
+import { Keycaps } from "../Keycaps";
+import { caps } from "../shortcuts";
 import type { LaunchMode } from "../types";
 import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
@@ -41,6 +43,9 @@ export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: 
           aria-hidden={chip.leaving || undefined}
           onAnimationEnd={chip.leaving ? chip.onEnd : undefined}
         >
+          <span className="glyph" aria-hidden="true">
+            {chip.shown.prefix}
+          </span>
           {chip.shown.label}
         </span>
       )}
@@ -59,6 +64,17 @@ export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: 
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {mode === "none" ? (
+        <span className="bar-hint">
+          <Keycaps caps={caps("openSettings")} /> Settings
+        </span>
+      ) : (
+        value !== "" && (
+          <span className="bar-hint">
+            <Keycaps caps={caps("back")} /> Clear
+          </span>
+        )
+      )}
     </div>
   );
 }

@@ -161,7 +161,7 @@ describe("Launcher", () => {
   it("typing a prefix shows a chip, the placeholder and searches with sources", async () => {
     await mount();
     await type("/");
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Open");
+    expect(screen.getByTestId("mode-chip").textContent).toBe("/Open");
     expect(screen.getByRole("combobox").getAttribute("aria-label")).toBe("Open search");
     expect(screen.getByPlaceholderText("Open an app, file or folder")).toBeTruthy();
     expect(ipc.search).toHaveBeenCalledWith({
@@ -178,7 +178,7 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.click(screen.getByRole("option", { name: /Open/ }));
     });
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Open");
+    expect(screen.getByTestId("mode-chip").textContent).toBe("/Open");
   });
 
   it("shows group label, subtitle and mode footer", async () => {
@@ -240,7 +240,7 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "Tab" });
     });
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Commands");
+    expect(screen.getByTestId("mode-chip").textContent).toBe(">Commands");
   });
 
   it("Backspace on an empty input leaves the mode", async () => {
@@ -250,6 +250,14 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Backspace" });
     });
     expect(screen.queryByTestId("mode-chip")).toBeNull();
+  });
+
+  it("the chip holds the prefix glyph, and the Settings hint shows in none mode only", async () => {
+    await mount();
+    expect(screen.getByText("Settings")).toBeTruthy();
+    await type("/");
+    expect(screen.getByTestId("mode-chip").querySelector(".glyph")?.textContent).toBe("/");
+    expect(screen.queryByText("Settings")).toBeNull();
   });
 
   it("F1 opens the shortcut sheet and Esc closes it before anything else", async () => {
@@ -263,7 +271,7 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Escape" });
     });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByTestId("mode-chip").textContent).toBe("Commands");
+    expect(screen.getByTestId("mode-chip").textContent).toBe(">Commands");
     expect(ipc.hideLauncher).not.toHaveBeenCalled();
   });
 
