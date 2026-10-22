@@ -1,7 +1,8 @@
 //! Programs scan: every launchable file (exe, installers, scripts, shortcuts) under a set of roots.
 //!
 //! Scans run on launcher open, only for new or swapped drives or a stale (24 h) cache; the cache
-//! gives an instant start. ponytail: no live feed yet; D9 feeds programs from the Find watcher.
+//! gives an instant start. New or deleted programs under watched roots arrive live through the
+//! Find watcher's program hook (watch.rs); elsewhere they wait for the 24 h rescan or Reindex.
 //! [`ProgramCache`] (v2) keeps entries per drive root and volume serial.
 
 use crate::error::FilesError;

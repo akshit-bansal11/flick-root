@@ -91,7 +91,7 @@ fn overlay_create_and_delete() {
     .unwrap();
     let ix = FileIndex::new();
     ix.replace(s);
-    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default(), None).unwrap();
     let ov = w.overlay();
     let poll = |want: bool, text: &str| {
         let end = Instant::now() + Duration::from_secs(2);

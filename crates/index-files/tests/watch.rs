@@ -62,7 +62,7 @@ fn watcher_lifecycle() {
         )
         .unwrap(),
     );
-    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default(), None).unwrap();
     let ov = w.overlay();
     let has = |h: &[FileHit]| !h.is_empty();
     let none = |h: &[FileHit]| h.is_empty();
@@ -246,7 +246,7 @@ fn missing_root_is_skipped_and_the_rest_are_watched() {
     let roots = vec![root(0, &d.path().join("missing")), root(1, &live)];
     let ix = FileIndex::new();
     ix.replace(scan_of(&roots[1..]));
-    let w = FileIndex::watch(&roots, &index_files::SkipList::default()).unwrap();
+    let w = FileIndex::watch(&roots, &index_files::SkipList::default(), None).unwrap();
     assert_eq!(w.watched(), &roots[1..]);
     assert_eq!(w.failed().len(), 1);
     assert!(!w.is_stale());
@@ -255,7 +255,7 @@ fn missing_root_is_skipped_and_the_rest_are_watched() {
     assert!(wait(&ix, &ov, "walrus_new", |h| !h.is_empty()));
 
     assert!(
-        FileIndex::watch(&roots[..1], &index_files::SkipList::default()).is_err(),
+        FileIndex::watch(&roots[..1], &index_files::SkipList::default(), None).is_err(),
         "no root watchable"
     );
 }
@@ -270,7 +270,7 @@ fn watcher_ignores_creates_under_excluded_folders() {
     let skip = index_files::SkipList::new(&[skipped.to_string_lossy().into_owned()]);
     let ix = FileIndex::new();
     ix.replace(scan_of(&roots));
-    let w = FileIndex::watch(&roots, &skip).unwrap();
+    let w = FileIndex::watch(&roots, &skip, None).unwrap();
     let ov = w.overlay();
     fs::write(skipped.join("quokka_hidden.txt"), "x").unwrap();
     fs::write(kept.join("quokka_sentinel.txt"), "x").unwrap();
@@ -278,5 +278,45 @@ fn watcher_ignores_creates_under_excluded_folders() {
     assert!(
         ix.find(&ov, &q("quokka_hidden")).is_empty(),
         "excluded folder content stays out"
+    );
+}
+
+#[test]
+fn program_hook_hears_exe_creates_and_deletes_only() {
+    use index_files::{ProgramChange, ProgramHook};
+    use std::sync::{Arc, Mutex};
+    let d = tempfile::tempdir().unwrap();
+    let (skipped, kept) = (d.path().join("skipme"), d.path().join("kept"));
+    fs::create_dir_all(&skipped).unwrap();
+    fs::create_dir_all(&kept).unwrap();
+    let roots = vec![root(0, d.path())];
+    let skip = index_files::SkipList::new(&[skipped.to_string_lossy().into_owned()]);
+    let seen: Arc<Mutex<Vec<ProgramChange>>> = Arc::default();
+    let sink = Arc::clone(&seen);
+    let hook: ProgramHook = Arc::new(move |c| sink.lock().unwrap().push(c));
+    let _w = FileIndex::watch(&roots, &skip, Some(hook)).unwrap();
+    let got = |want: &ProgramChange| {
+        let end = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < end {
+            if seen.lock().unwrap().contains(want) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        false
+    };
+    let exe = kept.join("tool.exe");
+    fs::write(skipped.join("hidden.exe"), "x").unwrap();
+    fs::write(kept.join("notes.txt"), "x").unwrap();
+    fs::write(&exe, "x").unwrap();
+    assert!(got(&ProgramChange::Added(exe.clone())), "exe create heard");
+    fs::remove_file(&exe).unwrap();
+    assert!(got(&ProgramChange::Removed(exe)), "exe delete heard");
+    let all = seen.lock().unwrap();
+    assert!(
+        all.iter().all(|c| match c {
+            ProgramChange::Added(p) | ProgramChange::Removed(p) => p.ends_with("tool.exe"),
+        }),
+        "txt and excluded exe fire nothing: {all:?}"
     );
 }

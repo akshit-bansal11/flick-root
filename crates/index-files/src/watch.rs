@@ -4,11 +4,12 @@
 //! the immutable store; [`FileIndex::compact`] folds it back in.
 
 use crate::error::FilesError;
+use crate::programs::ProgramFile;
 use crate::scan::Root;
 use crate::skip::should_skip;
 use crate::skiplist::SkipList;
 use crate::store::{FileIndex, FileStore, MAX_FILES, NO_PARENT, StoreBuilder};
-use notify::event::ModifyKind;
+use notify::event::{ModifyKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
@@ -258,6 +259,43 @@ fn make_added(
     Some(added_of(root.id, path.to_path_buf(), name, md))
 }
 
+/// A program file the watcher saw appear or vanish (D9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProgramChange {
+    /// Created, or renamed to this path.
+    Added(PathBuf),
+    /// Deleted, or renamed away from this path.
+    Removed(PathBuf),
+}
+
+/// Callback for [`ProgramChange`]s; runs on the notify thread, so it must be quick.
+pub type ProgramHook = Arc<dyn Fn(ProgramChange) + Send + Sync>;
+
+/// Program-file changes in one event: a path with a program extension (or a `.app` folder)
+/// that no excluded folder above it hides.
+fn program_changes(kind: &EventKind, paths: &[PathBuf], skip: &SkipList) -> Vec<ProgramChange> {
+    let mut out = Vec::new();
+    for (i, p) in paths.iter().enumerate() {
+        if ProgramFile::from_path(p).is_none()
+            || p.ancestors().skip(1).any(|a| skip.excludes_dir(a))
+        {
+            continue;
+        }
+        let added = match kind {
+            EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(RenameMode::To)) => true,
+            EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(RenameMode::From)) => false,
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)) => i > 0,
+            _ => p.exists(),
+        };
+        out.push(if added {
+            ProgramChange::Added(p.clone())
+        } else {
+            ProgramChange::Removed(p.clone())
+        });
+    }
+    out
+}
+
 /// State the notify callback works on. One place for every event, so later hooks (program
 /// extensions, D9) can be added in [`Sink::on_event`].
 struct Sink {
@@ -267,6 +305,7 @@ struct Sink {
     index: Option<Arc<FileIndex>>,
     busy: Arc<AtomicBool>,
     stale: Arc<AtomicBool>,
+    on_program: Option<ProgramHook>,
 }
 
 impl Sink {
@@ -289,6 +328,11 @@ impl Sink {
             EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_))
         ) {
             return;
+        }
+        if let Some(hook) = &self.on_program {
+            for c in program_changes(&ev.kind, &ev.paths, &self.skip) {
+                hook(c);
+            }
         }
         for p in &ev.paths {
             let stored = self.index.as_ref().map_or(0, |ix| ix.load().len());
@@ -329,13 +373,15 @@ pub struct WatchHandle {
 
 impl WatchHandle {
     /// Start watching every root recursively. With `index`, the overlay is compacted into it
-    /// on a background thread once it passes [`COMPACT_AT`] entries. A root that cannot be
+    /// on a background thread once it passes [`COMPACT_AT`] entries. `on_program` hears program
+    /// file creates and deletes. A root that cannot be
     /// watched (drive gone) is skipped and listed in [`WatchHandle::failed`]; this errors
     /// only when roots were given and none could be watched.
     pub fn start(
         roots: &[Root],
         skip: &SkipList,
         index: Option<Arc<FileIndex>>,
+        on_program: Option<ProgramHook>,
     ) -> Result<Self, FilesError> {
         let overlay = Arc::new(Overlay::new());
         let stale = Arc::new(AtomicBool::new(false));
@@ -346,6 +392,7 @@ impl WatchHandle {
             index,
             busy: Arc::new(AtomicBool::new(false)),
             stale: Arc::clone(&stale),
+            on_program,
         };
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
             sink.on_event(res);

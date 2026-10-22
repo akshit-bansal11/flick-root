@@ -19,13 +19,17 @@ pub use query::{FileHit, FindQuery, query};
 pub use scan::{Parallelism, Root, default_roots, scan, scan_capped};
 pub use skiplist::SkipList;
 pub use store::{FileIndex, FileStore, MAX_FILES, StoreBuilder};
-pub use watch::{Overlay, WatchHandle};
+pub use watch::{Overlay, ProgramChange, ProgramHook, WatchHandle};
 
 impl FileIndex {
     /// Start watching `roots`; the handle's overlay feeds [`FileIndex::find`]. Changes under a
     /// directory `skip` excludes are ignored.
-    pub fn watch(roots: &[Root], skip: &SkipList) -> Result<WatchHandle, FilesError> {
-        WatchHandle::start(roots, skip, None)
+    pub fn watch(
+        roots: &[Root],
+        skip: &SkipList,
+        on_program: Option<ProgramHook>,
+    ) -> Result<WatchHandle, FilesError> {
+        WatchHandle::start(roots, skip, None, on_program)
     }
 
     /// Like [`FileIndex::watch`], but compacts into this index in the background when the
@@ -34,8 +38,9 @@ impl FileIndex {
         self: &Arc<Self>,
         roots: &[Root],
         skip: &SkipList,
+        on_program: Option<ProgramHook>,
     ) -> Result<WatchHandle, FilesError> {
-        WatchHandle::start(roots, skip, Some(Arc::clone(self)))
+        WatchHandle::start(roots, skip, Some(Arc::clone(self)), on_program)
     }
 
     /// Query the current store merged with `overlay`.

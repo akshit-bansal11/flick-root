@@ -10,8 +10,8 @@ use index_apps::{AppEntry, AppIndex, cache};
 use index_files::drives;
 use index_files::programs::unix_now;
 use index_files::{
-    FileIndex, FilesError, Overlay, ProgramCache, ProgramFile, Root, SkipList, WatchHandle,
-    default_roots, snapshot,
+    FileIndex, FilesError, Overlay, ProgramCache, ProgramChange, ProgramFile, ProgramHook, Root,
+    SkipList, WatchHandle, default_roots, snapshot,
 };
 use launcher_core::config::{Config, config_path, local_data_dir};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -362,6 +362,10 @@ pub struct AppState {
     /// Cancel flag of the programs scan (off, a new scan, or exit).
     pub programs_run: FindRun,
     programs_gate: Mutex<()>,
+    /// Program changes the Find watcher saw, waiting for the next coalesced apply (D9).
+    program_pending: Mutex<Vec<ProgramChange>>,
+    /// A delayed apply is queued; false while idle, so no timer runs.
+    program_scheduled: AtomicBool,
     /// An attached drive's programs walk stopped at its cap (for the settings page).
     pub programs_capped: AtomicBool,
     /// Single-flight flags of the apps, programs and Find jobs and of the on-open refresh.
@@ -482,6 +486,86 @@ pub fn build_programs(
         paths,
         removable,
         index,
+    }
+}
+
+/// Current program paths with `changes` applied in order (last change per path wins, matched
+/// case-insensitively), deduplicated. Pure; the watcher feeds it (D9).
+pub fn apply_program_changes(paths: &[Box<str>], changes: &[ProgramChange]) -> Vec<ProgramFile> {
+    let mut last: HashMap<String, &ProgramChange> = HashMap::new();
+    for c in changes {
+        let (ProgramChange::Added(p) | ProgramChange::Removed(p)) = c;
+        last.insert(p.to_string_lossy().to_lowercase(), c);
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::with_capacity(paths.len());
+    let kept = paths
+        .iter()
+        .filter(|p| !last.contains_key(&p.to_lowercase()))
+        .filter_map(|p| ProgramFile::from_path(std::path::Path::new(&**p)));
+    let added = last.values().filter_map(|c| match c {
+        ProgramChange::Added(p) => ProgramFile::from_path(p),
+        ProgramChange::Removed(_) => None,
+    });
+    for f in kept.chain(added) {
+        if seen.insert(f.path.to_string_lossy().to_lowercase()) {
+            out.push(f);
+        }
+    }
+    out
+}
+
+/// The Find watcher's program hook. Holds the state weakly so the watcher never keeps it alive.
+fn program_hook(st: &Arc<AppState>) -> ProgramHook {
+    let weak = Arc::downgrade(st);
+    Arc::new(move |change| {
+        if let Some(st) = weak.upgrade() {
+            queue_program_change(&st, change);
+        }
+    })
+}
+
+/// Queues `change`; the first one of a burst schedules a single apply 2 s later. A no-op (and
+/// the queue is cleared) while Programs is off.
+fn queue_program_change(st: &Arc<AppState>, change: ProgramChange) {
+    if !st.config.load().apps.scan_programs {
+        st.program_pending.lock().clear();
+        return;
+    }
+    st.program_pending.lock().push(change);
+    if st.program_scheduled.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let s = st.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        if let Err(err) =
+            tauri::async_runtime::spawn_blocking(move || flush_program_changes(&s)).await
+        {
+            tracing::warn!(%err, "program changes task failed");
+        }
+    });
+}
+
+/// Rebuilds the program set from the queued changes and publishes it if Programs is still on.
+/// The cache is not saved here; the next on-open does that. Blocking (drive query, index build).
+fn flush_program_changes(st: &AppState) {
+    // Cleared before draining: an event after this schedules a fresh apply.
+    st.program_scheduled.store(false, Ordering::Release);
+    let changes = std::mem::take(&mut *st.program_pending.lock());
+    if changes.is_empty() || !st.config.load().apps.scan_programs {
+        return;
+    }
+    let files = apply_program_changes(&st.programs.load().paths, &changes);
+    let removable: Vec<char> = win::drives::indexable_drives()
+        .iter()
+        .filter(|d| d.kind == DriveKind::Removable)
+        .map(|d| d.letter)
+        .collect();
+    let set = build_programs(&st.apps.entries(), &files, &removable);
+    let _gate = st.programs_gate.lock();
+    if st.config.load().apps.scan_programs {
+        st.programs.store(Arc::new(set));
     }
 }
 
@@ -634,6 +718,8 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         programs: ArcSwap::from_pointee(ProgramSet::default()),
         programs_run: FindRun::default(),
         programs_gate: Mutex::new(()),
+        program_pending: Mutex::new(Vec::new()),
+        program_scheduled: AtomicBool::new(false),
         programs_capped: AtomicBool::new(false),
         apps_busy: Busy::default(),
         programs_busy: Busy::default(),
@@ -922,6 +1008,7 @@ pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>,
 pub(crate) fn stop_programs(s: &AppState) {
     s.programs_run.cancel();
     let _gate = s.programs_gate.lock();
+    s.program_pending.lock().clear();
     s.programs.store(Arc::new(ProgramSet::default()));
     s.programs_capped.store(false, Ordering::Relaxed);
 }
@@ -1037,13 +1124,13 @@ fn scan_pool() -> index_files::Parallelism {
 /// Starts watching `roots` and publishes the watcher's overlay. Roots that cannot be watched
 /// (drive gone) are logged and skipped.
 fn watch_roots(
-    st: &AppState,
+    st: &Arc<AppState>,
     watch: &mut Option<WatchHandle>,
     roots: &[Root],
 ) -> Result<(), FilesError> {
     *watch = None; // the old watcher stops before the new one starts
     let skip = SkipList::new(&st.config.load().apps.skip);
-    let handle = st.files.watch_auto(roots, &skip)?;
+    let handle = st.files.watch_auto(roots, &skip, Some(program_hook(st)))?;
     for (root, why) in handle.failed() {
         tracing::warn!(root = %root.path.display(), why, "find root not watched");
     }
@@ -1315,6 +1402,25 @@ mod tests {
         assert!(e.target.is_none());
         assert_eq!(e.id, index_apps::make_id(r"C:\x\c.msi"));
         assert!(features::search::can_run_as_admin(&e, true));
+    }
+
+    #[test]
+    fn program_changes_apply_deduped_and_case_insensitive() {
+        let paths: Vec<Box<str>> = vec![r"C:\a\Old.exe".into(), r"C:\a\keep.exe".into()];
+        let changes = [
+            ProgramChange::Removed(r"c:\A\OLD.EXE".into()),
+            ProgramChange::Added(r"C:\b\new.exe".into()),
+            ProgramChange::Added(r"c:\B\NEW.exe".into()),
+            ProgramChange::Added(r"C:\b\readme.txt".into()),
+        ];
+        let out = apply_program_changes(&paths, &changes);
+        let got: Vec<String> = out
+            .iter()
+            .map(|f| f.path.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(got.len(), 2, "{got:?}");
+        assert!(got.contains(&r"C:\a\keep.exe".to_string()));
+        assert!(got.iter().any(|p| p.eq_ignore_ascii_case(r"C:\b\new.exe")));
     }
 
     #[test]
