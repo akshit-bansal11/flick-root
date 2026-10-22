@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual run (gh workflow run ci.yml): every job, whatever changed.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,15 +16,58 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: check
+  # Decides which jobs run from the files this push or PR changed. Anything it cannot
+  # diff (manual run, new branch, rewritten history) runs everything.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.f.outputs.rust }}
+      js: ${{ steps.f.outputs.js }}
+      web: ${{ steps.f.outputs.web }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - id: f
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE" ] && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+          else
+            files=ALL
+          fi
+          printf '%s\n' "$files"
+          hit() { [ "$files" = ALL ] || grep -qE "$1" <<<"$files"; }
+          ci='^\.github/workflows/ci\.yml$'
+          pkg='^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$'
+          out() { if hit "$2"; then echo "$1=true"; else echo "$1=false"; fi >> "$GITHUB_OUTPUT"; }
+          out rust "$ci|^crates/|^apps/desktop/src-tauri/|^Cargo\.(toml|lock)$|^deny\.toml$|^rust-toolchain\.toml$"
+          # Biome lints every JS/TS/JSON/CSS file in the repo.
+          out js "$ci|$pkg|^biome\.json$|^apps/desktop/|\.(jsx?|tsx?|mjs|cjs|jsonc?|css|html)$"
+          out web "$ci|$pkg|^apps/web/"
+          cat "$GITHUB_OUTPUT"
+
+  rust:
+    name: rust
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: windows-latest
+    env:
+      # No debug info: tests do not need it, and it is most of the compile time and cache size on Windows.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: clippy, rustfmt
+
+      - name: Rust format
+        run: cargo fmt --all --check
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
@@ -35,9 +80,6 @@ jobs:
 
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Rust format
-        run: cargo fmt --all --check
 
       # tauri::generate_context! needs frontendDist (apps/desktop/dist) to exist before clippy.
       - name: Build desktop frontend
@@ -60,6 +102,24 @@ jobs:
       - name: cargo audit
         run: cargo audit
 
+  js:
+    name: js
+    needs: changes
+    if: needs.changes.outputs.js == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: TypeScript typecheck
         run: pnpm typecheck
 
@@ -71,6 +131,24 @@ jobs:
 
       - name: pnpm audit (production)
         run: pnpm audit --prod
+
+  web:
+    name: web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Web build
         run: pnpm --filter web build
