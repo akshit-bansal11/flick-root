@@ -132,7 +132,7 @@ fn validate_entry(raw: &str) -> Result<String, SkipError> {
         return Err(SkipError::BadChar);
     }
     let body = if drive { &s[2..] } else { &s[..] };
-    if body.contains(|c: char| matches!(c, ':' | '<' | '>' | '"' | '|' | '?')) {
+    if body.contains([':', '<', '>', '"', '|', '?']) {
         return Err(SkipError::BadChar);
     }
     let trimmed = body.trim_matches('\\');
