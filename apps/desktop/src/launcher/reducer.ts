@@ -1,13 +1,5 @@
 import { idFor, type KeyInput } from "../shortcuts";
-import type {
-  AskEvent,
-  Effort,
-  Item,
-  LaunchMode,
-  Mode,
-  Outcome,
-  ThinkingMode,
-} from "../types";
+import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, ThinkingMode } from "../types";
 
 export type { KeyInput };
 
