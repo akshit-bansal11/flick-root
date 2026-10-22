@@ -145,7 +145,9 @@ async fn fetch_latest() -> anyhow::Result<Option<Found>> {
         .user_agent(format!("{APP_NAME}/{}", env!("CARGO_PKG_VERSION")))
         .build()?;
     let resp = client
-        .get(format!("https://api.github.com/repos/{REPO}/releases/latest"))
+        .get(format!(
+            "https://api.github.com/repos/{REPO}/releases/latest"
+        ))
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .send()
         .await?;
@@ -219,25 +221,39 @@ async fn run(app: &AppHandle, manual: bool) {
     match result {
         Ok(Some(f)) => {
             let title = format!("{APP_DISPLAY_NAME} {} is available", f.version);
-            if let Err(err) = st.item.set_text(format!("Download {APP_DISPLAY_NAME} {}", f.version))
+            if let Err(err) = st
+                .item
+                .set_text(format!("Download {APP_DISPLAY_NAME} {}", f.version))
             {
                 tracing::warn!(%err, "tray text update failed");
             }
             if manual || stored.notified_version.as_deref() != Some(f.version.as_str()) {
-                toast(app, title, "Open the tray menu and choose Download to get it.");
+                toast(
+                    app,
+                    title,
+                    "Open the tray menu and choose Download to get it.",
+                );
                 stored.notified_version = Some(f.version.clone());
             }
             *st.known.lock() = Some(f);
         }
         Ok(None) => {
             if manual {
-                toast(app, APP_DISPLAY_NAME.to_string(), "You're on the latest version");
+                toast(
+                    app,
+                    APP_DISPLAY_NAME.to_string(),
+                    "You're on the latest version",
+                );
             }
         }
         Err(err) => {
             tracing::warn!(%err, "update check failed");
             if manual {
-                toast(app, APP_DISPLAY_NAME.to_string(), "Couldn't check for updates");
+                toast(
+                    app,
+                    APP_DISPLAY_NAME.to_string(),
+                    "Couldn't check for updates",
+                );
             }
         }
     }
