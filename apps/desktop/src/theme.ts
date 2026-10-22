@@ -3,9 +3,10 @@ export const THEMES = ["glass", "frost", "midnight", "aurora", "ember", "solid"]
 export type ThemeId = (typeof THEMES)[number];
 export type Scheme = "system" | "dark" | "light";
 
-export const GLASS_MIN = 30;
+/** Lowest tint opacity that keeps every text role at 4.5:1 over a white or black backdrop (tokens.contrast.test.ts). */
+export const GLASS_MIN = 80;
 export const GLASS_MAX = 95;
-export const GLASS_DEFAULT = 62;
+export const GLASS_DEFAULT = 90;
 
 /** Themes whose palette only works in one scheme. */
 export const FORCED_SCHEME: Partial<Record<ThemeId, "dark" | "light">> = {

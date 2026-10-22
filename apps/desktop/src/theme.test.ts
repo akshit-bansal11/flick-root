@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAppearance, clampGlass, resolveScheme } from "./theme";
+import { applyAppearance, clampGlass, GLASS_MIN, resolveScheme } from "./theme";
 
 const base = { theme: "glass", glass: 62, scheme: "system", glassAvailable: true } as const;
 
@@ -29,7 +29,7 @@ describe("applyAppearance", () => {
     expect(resolveScheme({ theme: "ember", glass: 62, scheme: "light" }, false)).toBe("dark");
   });
   it("clamps glass", () => {
-    expect(clampGlass(5)).toBe(30);
+    expect(clampGlass(5)).toBe(GLASS_MIN);
     expect(clampGlass(200)).toBe(95);
   });
 });
