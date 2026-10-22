@@ -1,12 +1,26 @@
 use index_files::programs::ProgramFile;
-use index_files::{FilesError, Parallelism};
+use index_files::{FilesError, Parallelism, SkipList};
+use launcher_core::config::AppsConfig;
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 /// One root walked with the full cap (what the app does per drive).
 fn scan(r: &Path, par: &Parallelism, cancel: &AtomicBool) -> Result<Vec<ProgramFile>, FilesError> {
-    scan_root(r, MAX_PROGRAMS, par, cancel).map(|(v, _)| v)
+    scan_with(r, par, cancel, &default_skip())
+}
+
+fn default_skip() -> SkipList {
+    SkipList::new(&AppsConfig::default().skip)
+}
+
+fn scan_with(
+    r: &Path,
+    par: &Parallelism,
+    cancel: &AtomicBool,
+    skip: &SkipList,
+) -> Result<Vec<ProgramFile>, FilesError> {
+    scan_root(r, MAX_PROGRAMS, par, cancel, skip).map(|(v, _)| v)
 }
 
 fn touch(p: &Path) {
@@ -38,6 +52,7 @@ fn scan_filters_and_caches() {
         "Start Menu/Programs/s.lnk",
         "hid/b.exe",
         ".claude/shell-snapshots/snap.sh",
+        "Windows/w.exe",
     ] {
         touch(&r.join(f));
     }
@@ -50,7 +65,55 @@ fn scan_filters_and_caches() {
     let cancel = AtomicBool::new(false);
     let got = scan(r, &Parallelism::Serial, &cancel).unwrap();
     let names: Vec<_> = got.iter().map(|p| p.name.as_str()).collect();
-    assert_eq!(names, ["a", "app", "b", "setup", "d"]);
+    // Default rules index temp, dot-folders, Start Menu and Windows; only node_modules is
+    // skipped. Sorted by lowercase path ("temp2\\" sorts before "temp\\").
+    assert_eq!(
+        names,
+        ["snap", "a", "app", "b", "setup", "s", "d", "c", "w"]
+    );
+}
+
+#[test]
+fn user_skip_list_and_os_internals() {
+    let d = tempfile::tempdir().unwrap();
+    let r = d.path();
+    for f in [
+        "keep/a.exe",
+        "target/debug/app.exe",
+        "target/debug/deps/t-1.exe",
+        "target/debug/build/b.exe",
+        "target/release/incremental/i.exe",
+        "$RECYCLE.BIN/r.exe",
+        "System Volume Information/s.exe",
+        "Games/g.exe",
+        "x/cache1/c.exe",
+    ] {
+        touch(&r.join(f));
+    }
+    let cancel = AtomicBool::new(false);
+    let par = Parallelism::Serial;
+    let names = |skip: &SkipList| -> Vec<String> {
+        scan_with(r, &par, &cancel, skip)
+            .unwrap()
+            .into_iter()
+            .map(|p| p.name)
+            .collect()
+    };
+    // Defaults: Cargo intermediates skipped, target debug app.exe kept; OS internals always.
+    assert_eq!(names(&default_skip()), ["g", "a", "app", "c"]);
+    // An empty list excludes nothing of the user's, but OS internals stay hidden.
+    let none = SkipList::new(&[]);
+    assert_eq!(names(&none).len(), 7);
+    assert!(!names(&none).contains(&"r".to_string()));
+    assert!(!names(&none).contains(&"s".to_string()));
+    // Hand-built list: a name glob and a path prefix under the root.
+    let custom = SkipList::new(&[
+        "*cache*".to_string(),
+        r.join("games").to_string_lossy().into_owned(),
+    ]);
+    let got = names(&custom);
+    assert!(!got.contains(&"c".to_string()) && !got.contains(&"g".to_string()));
+    assert!(got.contains(&"a".to_string()));
 }
 
 #[test]
@@ -223,7 +286,12 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let roots = vec![(a.path().to_path_buf(), 1), (b.path().to_path_buf(), 2)];
     let mut c = ProgramCache::default();
     let failed = c
-        .scan_into(&roots, &Parallelism::Serial, &AtomicBool::new(false))
+        .scan_into(
+            &roots,
+            &Parallelism::Serial,
+            &AtomicBool::new(false),
+            &default_skip(),
+        )
         .unwrap();
     assert!(failed.is_empty());
     assert_eq!(c.files.len(), 2);
@@ -231,7 +299,12 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     // Cancel mid-scan: old entries stay.
     touch(&a.path().join("new.exe"));
     let before = c.clone();
-    let r = c.scan_into(&roots, &Parallelism::Serial, &AtomicBool::new(true));
+    let r = c.scan_into(
+        &roots,
+        &Parallelism::Serial,
+        &AtomicBool::new(true),
+        &default_skip(),
+    );
     assert!(matches!(r, Err(FilesError::Cancelled)));
     assert_eq!(c, before);
 
@@ -239,7 +312,12 @@ fn scan_into_replaces_per_root_and_cancel_keeps_old() {
     let gone = b.path().to_path_buf();
     drop(b);
     let failed = c
-        .scan_into(&roots, &Parallelism::Serial, &AtomicBool::new(false))
+        .scan_into(
+            &roots,
+            &Parallelism::Serial,
+            &AtomicBool::new(false),
+            &default_skip(),
+        )
         .unwrap();
     assert_eq!(failed.len(), 1);
     assert_eq!(failed[0].0, gone);
@@ -257,10 +335,13 @@ fn fair_cap_per_root() {
         touch(&d.path().join(format!("p{i}.exe")));
     }
     let cancel = AtomicBool::new(false);
-    let (files, capped) = scan_root(d.path(), 3, &Parallelism::Serial, &cancel).unwrap();
+    let (files, capped) =
+        scan_root(d.path(), 3, &Parallelism::Serial, &cancel, &default_skip()).unwrap();
     assert_eq!((files.len(), capped), (3, true));
-    let (files, capped) = scan_root(d.path(), 5, &Parallelism::Serial, &cancel).unwrap();
+    let (files, capped) =
+        scan_root(d.path(), 5, &Parallelism::Serial, &cancel, &default_skip()).unwrap();
     assert_eq!((files.len(), capped), (5, true));
-    let (files, capped) = scan_root(d.path(), 6, &Parallelism::Serial, &cancel).unwrap();
+    let (files, capped) =
+        scan_root(d.path(), 6, &Parallelism::Serial, &cancel, &default_skip()).unwrap();
     assert_eq!((files.len(), capped), (5, false));
 }

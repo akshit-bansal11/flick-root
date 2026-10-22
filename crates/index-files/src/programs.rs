@@ -6,6 +6,7 @@
 
 use crate::error::FilesError;
 use crate::scan::Parallelism;
+use crate::skiplist::SkipList;
 use jwalk::WalkDirGeneric;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -51,25 +52,13 @@ pub const MAX_PROGRAMS: usize = 50_000;
 
 const CACHE_HEADER_V2: &str = "programs v2";
 const ATTR_SYSTEM: u32 = 0x4;
-const SKIP_DIRS: &[&str] = &[
-    "windows",
+/// OS internals the scan never enters, whatever the user's skip list says. Not removable.
+const OS_DIRS: &[&str] = &[
     "$recycle.bin",
     "system volume information",
     "$winreagent",
     "$sysreset",
-    "recovery",
     "config.msi",
-    "winsxs",
-    "node_modules",
-    ".git",
-    "target",
-    "__pycache__",
-    ".cache",
-    "temp",
-    "tmp",
-    "recent",
-    "start menu", // shortcuts there duplicate the app list
-    "onedrivetemp",
 ];
 
 /// A launchable file found by [`scan_root`].
@@ -105,10 +94,9 @@ fn is_app_bundle(name: &OsStr) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("app"))
 }
 
-fn skip_dir_name(name: &OsStr) -> bool {
+fn is_os_dir(name: &OsStr) -> bool {
     let n = name.to_string_lossy();
-    // Dot-directories are tool caches (.claude, .npm, .vscode, .gradle, .m2).
-    n.starts_with('.') || SKIP_DIRS.iter().any(|s| n.eq_ignore_ascii_case(s))
+    OS_DIRS.iter().any(|s| n.eq_ignore_ascii_case(s))
 }
 
 /// Walk one root, pushing new program files (deduplicated through `seen`) into `out` until
@@ -118,17 +106,19 @@ fn walk_root(
     cap: usize,
     parallelism: &Parallelism,
     cancel: &AtomicBool,
+    skip: &SkipList,
     seen: &mut HashSet<String>,
     out: &mut Vec<ProgramFile>,
 ) -> Result<bool, FilesError> {
     if out.len() >= cap {
         return Ok(true);
     }
+    let skip = skip.clone(); // the callback must be 'static
     let walk = WalkDirGeneric::<((), ())>::new(root)
         .skip_hidden(false)
         .follow_links(false)
         .parallelism(parallelism.clone())
-        .process_read_dir(|depth, _, _, children| {
+        .process_read_dir(move |depth, _, _, children| {
             // jwalk first calls this with `depth == None` and the walk root as the only
             // child; keep it even when it is hidden/system (drive roots are).
             if depth.is_none() {
@@ -147,7 +137,9 @@ fn walk_root(
                     .ok()
                     .is_some_and(|m| m.file_attributes() & ATTR_SYSTEM != 0);
                 if e.file_type.is_dir() {
-                    !system && (is_app_bundle(&e.file_name) || !skip_dir_name(&e.file_name))
+                    !system
+                        && !is_os_dir(&e.file_name)
+                        && (is_app_bundle(&e.file_name) || !skip.excludes_dir(&e.path()))
                 } else {
                     !system
                 }
@@ -193,18 +185,23 @@ pub fn root_cap(n_roots: usize) -> usize {
 
 /// Walk one root with its own cap. Fails (instead of returning an empty list) when the root
 /// cannot be listed before or after the walk, so a removed drive never wipes its cached entries.
-/// Returns the sorted files and whether the cap was hit.
+/// `skip` is the user's exclusion list; OS internals and SYSTEM-attribute entries are always
+/// skipped. Returns the sorted files and whether the cap was hit.
 pub fn scan_root(
     root: &Path,
     cap: usize,
     parallelism: &Parallelism,
     cancel: &AtomicBool,
+    skip: &SkipList,
 ) -> Result<(Vec<ProgramFile>, bool), FilesError> {
     let gone = |e| FilesError::io(format!("list programs root {}", root.display()), e);
     std::fs::read_dir(root).map_err(gone)?;
     let mut out = Vec::new();
     let mut seen = HashSet::new();
-    let capped = walk_root(root, cap, parallelism, cancel, &mut seen, &mut out)?;
+    if skip.excludes_dir(root) {
+        return Ok((out, false));
+    }
+    let capped = walk_root(root, cap, parallelism, cancel, skip, &mut seen, &mut out)?;
     if !root.is_dir() {
         return Err(gone(std::io::Error::from(std::io::ErrorKind::NotFound)));
     }
@@ -309,11 +306,12 @@ impl ProgramCache {
         roots: &[(PathBuf, u32)],
         parallelism: &Parallelism,
         cancel: &AtomicBool,
+        skip: &SkipList,
     ) -> Result<Vec<(PathBuf, FilesError)>, FilesError> {
         let cap = root_cap(roots.len());
         let mut failed = Vec::new();
         for (root, serial) in roots {
-            match scan_root(root, cap, parallelism, cancel) {
+            match scan_root(root, cap, parallelism, cancel, skip) {
                 Ok((files, capped)) => {
                     let scanned = ScannedRoot {
                         root: root.clone(),

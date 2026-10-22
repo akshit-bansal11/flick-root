@@ -43,14 +43,149 @@ pub struct Config {
 pub struct AppsConfig {
     /// Scan every fixed drive for exe, msi, apk and other launchable files.
     pub scan_programs: bool,
+    /// Folders excluded from the programs scan (see [`validate_skip`] for the entry forms).
+    /// Absent in an old config means [`DEFAULT_SKIP`]; `skip = []` means nothing is excluded.
+    pub skip: Vec<String>,
 }
 
 impl Default for AppsConfig {
     fn default() -> Self {
         Self {
             scan_programs: true,
+            skip: DEFAULT_SKIP.map(String::from).to_vec(),
         }
     }
+}
+
+/// Exclusions a fresh config starts with, each removable in Settings. Reasons: `winsxs` holds
+/// tens of thousands of hard-linked duplicates, `node_modules` per-project shims, `recent` a
+/// shortcut per opened document, `site-packages` pip launcher stubs, and the Cargo `target`
+/// intermediates hashed test binaries (`target\release\app.exe` stays indexed).
+pub const DEFAULT_SKIP: [&str; 7] = [
+    "winsxs",
+    "node_modules",
+    "recent",
+    "site-packages",
+    r"target\*\deps",
+    r"target\*\build",
+    r"target\*\incremental",
+];
+/// Most entries `[apps] skip` may hold.
+pub const MAX_SKIP: usize = 200;
+/// Longest single skip entry, in characters.
+pub const MAX_SKIP_LEN: usize = 260;
+
+/// Why a skip entry or list was rejected. Never carries the entry text.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkipError {
+    /// The entry is empty after trimming.
+    #[error("skip entry is empty")]
+    Empty,
+    /// The entry is longer than [`MAX_SKIP_LEN`].
+    #[error("skip entry is too long")]
+    TooLong,
+    /// The entry holds a control character.
+    #[error("skip entry has a control character")]
+    Control,
+    /// The entry has a `..` segment.
+    #[error("skip entry has a .. segment")]
+    ParentDir,
+    /// UNC, device (`\\?\`, `\\.\`) or drive-less rooted path.
+    #[error("skip entry is a UNC, device or rooted path")]
+    Unc,
+    /// A character Windows paths cannot hold, `:` outside the drive, or a wildcard other than `*`.
+    #[error("skip entry has a character that is not allowed")]
+    BadChar,
+    /// An empty or `.` segment.
+    #[error("skip entry has an empty segment")]
+    Malformed,
+    /// The pattern is only `*`, which would exclude everything.
+    #[error("skip entry is only wildcards")]
+    OnlyWildcards,
+    /// More than [`MAX_SKIP`] entries.
+    #[error("too many skip entries")]
+    TooMany,
+}
+
+/// Validate and normalise one entry: trim, `/` to `\`, `e:` to `E:\`. Accepts a drive (`E:\`), a
+/// path under a drive (`E:\games`), or a pattern without a drive (`node_modules`, `*cache*`,
+/// `target\*\deps`) that matches any run of consecutive folder names. Entries are only ever
+/// compared to paths, never executed or opened.
+fn validate_entry(raw: &str) -> Result<String, SkipError> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return Err(SkipError::Empty);
+    }
+    if t.chars().count() > MAX_SKIP_LEN {
+        return Err(SkipError::TooLong);
+    }
+    if t.chars().any(char::is_control) {
+        return Err(SkipError::Control);
+    }
+    let s = t.replace('/', "\\");
+    if s.starts_with('\\') {
+        return Err(SkipError::Unc);
+    }
+    let b = s.as_bytes();
+    let drive = b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':';
+    if drive && b.len() > 2 && b[2] != b'\\' {
+        return Err(SkipError::BadChar);
+    }
+    let body = if drive { &s[2..] } else { &s[..] };
+    if body.contains(|c: char| matches!(c, ':' | '<' | '>' | '"' | '|' | '?')) {
+        return Err(SkipError::BadChar);
+    }
+    let trimmed = body.trim_matches('\\');
+    let mut segs = Vec::new();
+    if !trimmed.is_empty() {
+        for seg in trimmed.split('\\') {
+            match seg {
+                "" | "." => return Err(SkipError::Malformed),
+                ".." => return Err(SkipError::ParentDir),
+                _ => segs.push(seg),
+            }
+        }
+    }
+    if drive {
+        let letter = b[0].to_ascii_uppercase() as char;
+        return Ok(format!("{letter}:\\{}", segs.join("\\")));
+    }
+    if segs.iter().all(|g| g.bytes().all(|c| c == b'*')) {
+        return Err(SkipError::OnlyWildcards);
+    }
+    Ok(segs.join("\\"))
+}
+
+/// Validate a skip list from the UI: every entry through the entry rules (empty, over
+/// [`MAX_SKIP_LEN`], control characters, `..`, UNC or device prefixes and `?` are rejected),
+/// then deduplicated case-insensitively. More than [`MAX_SKIP`] entries is an error.
+pub fn validate_skip(entries: Vec<String>) -> Result<Vec<String>, SkipError> {
+    if entries.len() > MAX_SKIP {
+        return Err(SkipError::TooMany);
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::with_capacity(entries.len());
+    for raw in &entries {
+        let e = validate_entry(raw)?;
+        if seen.insert(e.to_lowercase()) {
+            out.push(e);
+        }
+    }
+    Ok(out)
+}
+
+/// Load-time cleanup of a hand-edited list: invalid entries are dropped (never a crash),
+/// duplicates removed, the list cut at [`MAX_SKIP`]. Only a hand edit of config.toml can add an
+/// invalid entry (the settings command validates); Settings shows the list in effect.
+fn sanitize_skip(entries: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for e in entries.iter().filter_map(|raw| validate_entry(raw).ok()) {
+        if out.len() < MAX_SKIP && seen.insert(e.to_lowercase()) {
+            out.push(e);
+        }
+    }
+    out
 }
 
 /// `[general]`
@@ -590,6 +725,7 @@ impl Config {
             path: path.to_path_buf(),
             source,
         })?;
+        c.apps.skip = sanitize_skip(std::mem::take(&mut c.apps.skip));
         // Configs written before the Custom engine existed lack it in the order.
         if !c.decision.order.iter().any(|i| i == "custom") {
             c.decision.order.push("custom".into());
@@ -788,6 +924,94 @@ scan_programs = false
         )
         .unwrap();
         assert!(!off.apps.scan_programs);
+    }
+
+    #[test]
+    fn old_config_gets_default_skip_and_empty_stays_empty() {
+        let c: Config = toml::from_str("[apps]\nscan_programs = true\n").unwrap();
+        assert_eq!(c.apps.skip, DEFAULT_SKIP.map(String::from).to_vec());
+        let e: Config = toml::from_str("[apps]\nskip = []\n").unwrap();
+        assert!(e.apps.skip.is_empty());
+    }
+
+    #[test]
+    fn load_drops_invalid_skip_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("config.toml");
+        fs::write(
+            &p,
+            "[apps]\nskip = [\"Good\", \"..\\\\x\", \"\", \"\\\\\\\\srv\\\\s\", \"good\", \"e:\"]\n",
+        )
+        .unwrap();
+        let c = Config::load(&p).unwrap();
+        assert_eq!(c.apps.skip, ["Good", r"E:\"]);
+    }
+
+    fn v(xs: &[&str]) -> Vec<String> {
+        xs.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn validate_skip_rejects() {
+        let long = "a".repeat(MAX_SKIP_LEN + 1);
+        let table: [(&str, SkipError); 15] = [
+            ("", SkipError::Empty),
+            ("   ", SkipError::Empty),
+            (long.as_str(), SkipError::TooLong),
+            ("a\u{7}b", SkipError::Control),
+            ("a\nb", SkipError::Control),
+            (r"..\x", SkipError::ParentDir),
+            (r"C:\a\..\b", SkipError::ParentDir),
+            (r"\\?\C:\x", SkipError::Unc),
+            (r"\\.\pipe", SkipError::Unc),
+            (r"\\server\share", SkipError::Unc),
+            (r"\rooted", SkipError::Unc),
+            ("a?b", SkipError::BadChar),
+            ("C:foo", SkipError::BadChar),
+            ("*", SkipError::OnlyWildcards),
+            (r"a\\b", SkipError::Malformed),
+        ];
+        for (input, want) in table {
+            assert_eq!(validate_skip(v(&[input])), Err(want), "{input:?}");
+        }
+        assert_eq!(validate_skip(v(&["**"])), Err(SkipError::OnlyWildcards));
+        assert_eq!(validate_skip(v(&["a:b"])), Err(SkipError::BadChar));
+    }
+
+    #[test]
+    fn validate_skip_normalises_dedupes_and_caps() {
+        let got = validate_skip(v(&[
+            " e: ",
+            "d:/Games/",
+            "Node_Modules",
+            "node_modules",
+            "target/*/deps",
+            ".*",
+            "*cache*",
+        ]))
+        .unwrap();
+        assert_eq!(
+            got,
+            [
+                r"E:\",
+                r"D:\Games",
+                "Node_Modules",
+                r"target\*\deps",
+                ".*",
+                "*cache*"
+            ]
+        );
+        let ok: Vec<String> = (0..MAX_SKIP).map(|i| format!("f{i}")).collect();
+        assert_eq!(validate_skip(ok.clone()).unwrap().len(), MAX_SKIP);
+        let mut over = ok;
+        over.push("extra".into());
+        assert_eq!(validate_skip(over), Err(SkipError::TooMany));
+    }
+
+    #[test]
+    fn default_skip_entries_are_valid() {
+        let d = DEFAULT_SKIP.map(String::from).to_vec();
+        assert_eq!(validate_skip(d.clone()).unwrap(), d);
     }
 
     #[test]

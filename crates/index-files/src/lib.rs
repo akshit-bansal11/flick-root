@@ -8,6 +8,7 @@ pub mod programs;
 pub mod query;
 pub mod scan;
 pub mod skip;
+pub mod skiplist;
 pub mod snapshot;
 pub mod store;
 pub mod watch;
@@ -16,6 +17,7 @@ pub use error::FilesError;
 pub use programs::{PROGRAM_EXTS, ProgramCache, ProgramFile, ScannedRoot, scan_root};
 pub use query::{FileHit, FindQuery, query};
 pub use scan::{Parallelism, Root, default_roots, scan};
+pub use skiplist::SkipList;
 pub use store::{FileIndex, FileStore, StoreBuilder};
 pub use watch::{Overlay, WatchHandle};
 

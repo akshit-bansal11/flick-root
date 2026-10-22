@@ -10,8 +10,8 @@ use index_apps::{AppEntry, AppIndex, cache};
 use index_files::drives;
 use index_files::programs::unix_now;
 use index_files::{
-    FileIndex, FilesError, Overlay, ProgramCache, ProgramFile, Root, WatchHandle, default_roots,
-    scan, snapshot,
+    FileIndex, FilesError, Overlay, ProgramCache, ProgramFile, Root, SkipList, WatchHandle,
+    default_roots, scan, snapshot,
 };
 use launcher_core::config::{Config, config_path, local_data_dir};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
@@ -804,7 +804,8 @@ pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>,
             let failed = {
                 let pool = scan_pool();
                 let _bg = win::thread::BackgroundGuard::new();
-                cache.scan_into(&targets, &pool, &cancel)?
+                let skip = SkipList::new(&st.config.load().apps.skip);
+                cache.scan_into(&targets, &pool, &cancel, &skip)?
             };
             for (root, err) in &failed {
                 tracing::warn!(root = %root.display(), %err, "programs root not scanned");
