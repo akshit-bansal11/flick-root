@@ -24,6 +24,8 @@ pub struct SettingsView {
     pub hotkey_explain: String,
     /// Launch at login, as the OS reports it.
     pub launch_at_startup: bool,
+    /// Daily update check on.
+    pub check_updates: bool,
     /// Find mode on.
     pub find_enabled: bool,
     /// Query mode on.
@@ -115,6 +117,7 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
         hotkey_launcher: c.general.hotkey.clone(),
         hotkey_explain: c.general.explain_hotkey.clone(),
         launch_at_startup,
+        check_updates: c.general.check_updates,
         find_enabled: c.modes.find.enabled,
         query_enabled: c.modes.query.enabled,
         roots: c.modes.find.roots.clone(),
@@ -223,6 +226,7 @@ pub async fn set_general(
     hotkey_explain: Option<String>,
     launch_at_startup: Option<bool>,
     scan_programs: Option<bool>,
+    check_updates: Option<bool>,
 ) -> Result<SettingsView, CommandError> {
     if let Some(h) = &hotkey_explain {
         hotkey::sync_explain(&app, h)?;
@@ -248,6 +252,9 @@ pub async fn set_general(
             }
             if let Some(on) = scan_programs {
                 c.apps.scan_programs = on;
+            }
+            if let Some(on) = check_updates {
+                c.general.check_updates = on;
             }
             Ok(())
         })

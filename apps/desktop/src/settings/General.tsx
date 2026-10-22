@@ -165,6 +165,21 @@ export function General({ settings, onChange, onTour }: Props) {
       </Row>
 
       <Row
+        label="Check for updates"
+        help="Once a day, asks GitHub whether a newer release exists. Nothing else is sent."
+        error={errors.updates}
+      >
+        <button
+          type="button"
+          role="switch"
+          aria-label="Check for updates"
+          aria-checked={settings.checkUpdates}
+          className="s-switch"
+          onClick={() => void patch("updates", { checkUpdates: !settings.checkUpdates })}
+        />
+      </Row>
+
+      <Row
         label="Index all drives (D:, E: …)"
         help="Fixed, non-system drives. System folders like Windows and Program Files are skipped."
         error={errors.drives}

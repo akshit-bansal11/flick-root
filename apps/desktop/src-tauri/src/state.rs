@@ -993,6 +993,7 @@ pub fn on_open(app: &AppHandle) {
         return;
     };
     let s = Arc::clone(&*state);
+    crate::update::check_if_stale(app);
     tauri::async_runtime::spawn(async move { refresh_on_open(&s).await });
 }
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Flick is a free, open-source, keyboard-first Windows launcher with Command, Find and Query modes in one bar. The shell is Tauri 2 (ADR-001). All logic lives in Rust crates under `crates/`, and the Tauri app in `apps/desktop/src-tauri` is a thin layer that wires state, hotkey, tray and windows to those crates. The UI is React 19 and TypeScript, rendered by WebView2. The WebView makes no network calls; all HTTPS traffic (decision engines, providers) is made from Rust. The Next.js site in `apps/web` is separate from the app.
+Flick is a free, open-source, keyboard-first Windows launcher with Command, Find and Query modes in one bar. The shell is Tauri 2 (ADR-001). All logic lives in Rust crates under `crates/`, and the Tauri app in `apps/desktop/src-tauri` is a thin layer that wires state, hotkey, tray and windows to those crates. The UI is React 19 and TypeScript, rendered by WebView2. The WebView makes no network calls; all HTTPS traffic (decision engines, providers, update check) is made from Rust. The Next.js site in `apps/web` is separate from the app.
 
 ## System diagram
 

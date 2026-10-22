@@ -27,6 +27,7 @@ const settings: SettingsView = {
   hotkeyLauncher: "Alt+Space",
   hotkeyExplain: "Alt+Shift+Space",
   launchAtStartup: false,
+  checkUpdates: true,
   findEnabled: true,
   includeDrives: true,
   scanPrograms: true,

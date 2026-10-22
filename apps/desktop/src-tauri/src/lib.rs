@@ -10,6 +10,7 @@ mod meta_store;
 mod nlhost;
 mod state;
 mod tray;
+mod update;
 mod window;
 
 use tauri::Manager;
@@ -38,6 +39,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(hotkey::plugin())
         .setup(|app| {
             state::phase("setup start");
@@ -47,6 +49,7 @@ pub fn run() {
             state::start(app.handle());
             tray::setup(app)?;
             state::phase("tray built");
+            update::start(app.handle());
             // A conflict is already logged and emitted; fall back to the default.
             let saved = app
                 .state::<std::sync::Arc<state::AppState>>()

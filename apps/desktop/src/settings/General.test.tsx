@@ -18,6 +18,7 @@ const settings: SettingsView = {
   hotkeyLauncher: "Alt+Space",
   hotkeyExplain: "Ctrl+Alt+E",
   launchAtStartup: false,
+  checkUpdates: true,
   findEnabled: false,
   queryEnabled: false,
   roots: [],

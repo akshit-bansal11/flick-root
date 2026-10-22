@@ -211,6 +211,8 @@ pub struct General {
     pub first_run_done: bool,
     /// Whether the tutorial was finished or skipped.
     pub tutorial_done: bool,
+    /// Ask GitHub at most once a day whether a newer release exists.
+    pub check_updates: bool,
 }
 
 /// Theme ids the UI ships.
@@ -446,6 +448,7 @@ impl Default for General {
             launch_at_startup: false,
             first_run_done: false,
             tutorial_done: false,
+            check_updates: true,
         }
     }
 }

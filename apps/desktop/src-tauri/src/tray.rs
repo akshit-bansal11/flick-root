@@ -20,12 +20,14 @@ pub fn show_launcher(app: &AppHandle, reason: &str) {
     }
 }
 
-/// Builds the tray icon with Open, Settings and Quit entries.
+/// Builds the tray icon with Open, Settings, update and Quit entries.
 pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
+    let upd = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &settings, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &settings, &upd, &quit])?;
+    crate::update::init(app, upd);
     let mut builder = TrayIconBuilder::new()
         .tooltip(app.package_info().name.clone())
         .menu(&menu)
@@ -37,6 +39,7 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
                     tracing::warn!(%err, "open settings failed");
                 }
             }
+            "update" => crate::update::on_tray(app),
             "quit" => app.exit(0),
             _ => {}
         })

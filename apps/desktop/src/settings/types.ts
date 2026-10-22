@@ -16,6 +16,7 @@ export interface SettingsView {
   hotkeyLauncher: string;
   hotkeyExplain: string;
   launchAtStartup: boolean;
+  checkUpdates: boolean;
   findEnabled: boolean;
   queryEnabled: boolean;
   roots: string[];
@@ -40,6 +41,7 @@ export interface GeneralPatch {
   hotkeyExplain?: string;
   launchAtStartup?: boolean;
   scanPrograms?: boolean;
+  checkUpdates?: boolean;
 }
 
 export type ClearScope = "frecency" | "nl_cache" | "all";

@@ -38,6 +38,7 @@ export const setGeneral = (patch: GeneralPatch) =>
     hotkeyExplain: patch.hotkeyExplain,
     launchAtStartup: patch.launchAtStartup,
     scanPrograms: patch.scanPrograms,
+    checkUpdates: patch.checkUpdates,
   });
 export const setTutorialDone = (done: boolean) => invoke<void>("set_tutorial_done", { done });
 export const setHotkeysPaused = (paused: boolean) => invoke<void>("set_hotkeys_paused", { paused });
