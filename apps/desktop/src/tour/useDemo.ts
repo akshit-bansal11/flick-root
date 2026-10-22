@@ -8,8 +8,7 @@ import type { TourEvent } from "./steps";
 
 const TOAST_MS = 1800;
 
-const fresh = (): State =>
-  reduce(initialState(null, DEMO_WEB_TITLE), { type: "shown" }).state;
+const fresh = (): State => reduce(initialState(null, DEMO_WEB_TITLE), { type: "shown" }).state;
 
 /**
  * The real reducer driven by the demo runner. Same wiring as useLauncher, but effects only

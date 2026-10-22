@@ -69,7 +69,7 @@ export const openLink = (url: string) => invoke<void>("open_link", { url });
 
 export const webSearch = (text: string) => invoke<Outcome>("web_search", { text });
 
-export const hideLauncher =() => invoke<void>("hide_launcher");
+export const hideLauncher = () => invoke<void>("hide_launcher");
 
 export const resizeLauncher = (height: number) => invoke<void>("resize_launcher", { height });
 

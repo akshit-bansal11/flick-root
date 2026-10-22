@@ -90,9 +90,7 @@ const type = (text: string) =>
 describe("Launcher", () => {
   it("starts in none mode with four prefix hint rows and no search", async () => {
     await mount();
-    expect(
-      screen.getByPlaceholderText("Search apps and commands, or type / > = ? @"),
-    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Search apps and commands, or type / > = ? @")).toBeTruthy();
     expect(screen.getByText("Type without a prefix to search apps and commands")).toBeTruthy();
     expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(5);
     expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
