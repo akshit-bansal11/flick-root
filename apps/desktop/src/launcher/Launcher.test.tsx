@@ -280,4 +280,20 @@ describe("Launcher explain", () => {
     await capture({ preview: "", length: 0, source_app: "x.exe", blocked: false });
     expect(screen.getByText("No text selected")).toBeTruthy();
   });
+
+  it("shows a failed launch as an alert and stays open", async () => {
+    await mount();
+    await type(">al");
+    vi.mocked(ipc.launch).mockRejectedValueOnce({
+      code: "failed",
+      message: "Sleep is not supported",
+    });
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Enter" });
+    });
+    expect(screen.getByRole("alert").textContent).toBe("Sleep is not supported");
+    expect(ipc.hideLauncher).not.toHaveBeenCalled();
+    await type(">alp");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

@@ -46,6 +46,14 @@ body,
   z-index: 1;
 }
 
+.launch-error {
+  margin: 0;
+  padding: var(--l-sp-5) var(--l-sp-8);
+  border-top: var(--l-border);
+  font-size: var(--l-fs-sub);
+  color: var(--l-err);
+}
+
 .launcher-body {
   flex: 1 1 auto;
   min-height: 0;

@@ -57,6 +57,11 @@ export function LauncherView({
         onChange={setText}
         inputRef={inputRef}
       />
+      {state.mode !== "query" && state.notice && (
+        <p role="alert" className="launch-error">
+          {state.notice}
+        </p>
+      )}
       <div className="launcher-body">
         {state.mode === "query" && state.attachment && (
           <Attachment attachment={state.attachment} onRemove={removeAttachment} />

@@ -667,4 +667,34 @@ describe("entering modes with text", () => {
     expect(r.state.input).toBe("spot");
     expect(reduce(initialState(), { type: "text", text: "?why" }).state.mode).toBe("query");
   });
+
+  describe("actionFailed", () => {
+    const failed = (s: State) =>
+      reduce(s, { type: "actionFailed", message: "Sleep failed" }).state;
+
+    it("stores the message as the notice and keeps the launcher open", () => {
+      const r = reduce(inMode("commands"), { type: "actionFailed", message: "Sleep failed" });
+      expect(r.state.notice).toBe("Sleep failed");
+      expect(r.effects).toEqual([]);
+    });
+
+    it("typing clears it", () => {
+      const s = reduce(failed(inMode("commands")), { type: "text", text: "x" }).state;
+      expect(s.notice).toBeNull();
+      expect(reduce(failed(inMode("none")), { type: "text", text: "x" }).state.notice).toBeNull();
+    });
+
+    it("hide clears it", () => {
+      expect(reduce(failed(inMode("commands")), { type: "hidden" }).state.notice).toBeNull();
+    });
+
+    it("a successful outcome clears it", () => {
+      const r = reduce(failed(inMode("commands")), {
+        type: "outcome",
+        commandId: "c",
+        outcome: { type: "done" },
+      });
+      expect(r.state.notice).toBeNull();
+    });
+  });
 });

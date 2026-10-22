@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
+import { errorText } from "../settings/types";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
 import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
@@ -26,7 +27,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
     return r.state !== prev || r.effects.length > 0;
 
     function outcome(commandId: string, p: Promise<Outcome>) {
-      p.then((o) => dispatch({ type: "outcome", commandId, outcome: o })).catch(warn);
+      p.then((o) => dispatch({ type: "outcome", commandId, outcome: o })).catch((err: unknown) => {
+        warn(err);
+        dispatch({ type: "actionFailed", message: errorText(err) });
+      });
     }
     function copy(p: Promise<void>) {
       p.then(() => dispatch({ type: "copyDone", ok: true })).catch((err: unknown) => {

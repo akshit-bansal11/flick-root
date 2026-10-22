@@ -75,6 +75,7 @@ export type Event =
   | { type: "results"; seq: number; items: Item[] }
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
+  | { type: "actionFailed"; message: string }
   | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
   | { type: "enterMode"; mode: LaunchMode }
   | { type: "enabledModes"; modes: Mode[] }
@@ -244,8 +245,10 @@ function textChange(s: State, text: string): Result {
   if (target && availableModes(s.enabledModes).includes(target)) {
     return switchMode(s, target, text.slice(1));
   }
-  if (s.mode === "none" || s.mode === "query") return out({ ...s, input: text, armed: false });
-  return search(s, s.mode, text);
+  if (s.mode === "none" || s.mode === "query") {
+    return out({ ...s, input: text, armed: false, notice: null });
+  }
+  return search({ ...s, notice: null }, s.mode, text);
 }
 
 function move(s: State, delta: number): Result {
@@ -462,6 +465,10 @@ function ask(s: State, token: number, e: AskEvent): Result {
 }
 
 function outcome(s: State, commandId: string, o: Outcome): Result {
+  return outcomeOf({ ...s, notice: null }, commandId, o);
+}
+
+function outcomeOf(s: State, commandId: string, o: Outcome): Result {
   switch (o.type) {
     case "needsConfirm":
       return out({ ...s, pendingConfirm: { commandId, token: o.token } });
@@ -494,6 +501,8 @@ export function reduce(s: State, ev: Event): Result {
       return ask(s, ev.token, ev.event);
     case "outcome":
       return outcome(s, ev.commandId, ev.outcome);
+    case "actionFailed":
+      return out({ ...s, pendingConfirm: null, notice: ev.message });
     case "captured":
       return s.enabledModes.includes("query")
         ? out(
