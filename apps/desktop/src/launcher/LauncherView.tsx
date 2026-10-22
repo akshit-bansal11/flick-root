@@ -43,6 +43,7 @@ export function LauncherView({
   const noProvider = q.errorCode === "no_provider";
   const none = state.mode === "none";
   const selected = state.items[state.selected];
+  const pathItem = selected?.id.startsWith("file:") ?? false;
   const hints = availableModes(state.enabledModes);
   const hasList = none ? hints.length > 0 : state.items.length > 0;
   const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
@@ -103,13 +104,14 @@ export function LauncherView({
         )}
       </div>
       {!state.sheet && state.mode === "find" && state.items.length > 0 && (
-        <Actions onPress={press} />
+        <Actions onPress={press} pathItem={pathItem} />
       )}
       <Footer
         mode={state.mode}
         copied={state.copied}
         copyFailed={state.copyFailed}
         ctx={{
+          pathItem,
           armedProcess: state.armed && selected?.kind === "process",
           adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,
           copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,

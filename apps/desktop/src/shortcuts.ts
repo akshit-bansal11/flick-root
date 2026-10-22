@@ -16,9 +16,16 @@ export interface KeyInput {
 export type Scope = LaunchMode | "launcher" | "settings" | "tour";
 
 /** Runtime facts a shortcut can depend on; the sheet explains them, the footer hides the hint without them. */
-export type Condition = "adminAction" | "armedProcess" | "copyValue" | "attachment" | "answer";
+export type Condition =
+  | "adminAction"
+  | "armedProcess"
+  | "copyValue"
+  | "attachment"
+  | "answer"
+  | "pathItem";
 
 export const WHEN_TEXT: Record<Condition, string> = {
+  pathItem: "result is a file or folder",
   adminAction: "result can run as admin",
   armedProcess: "after arrowing to a process",
   copyValue: "result has a value",
@@ -66,7 +73,14 @@ export const SHORTCUTS: readonly Shortcut[] = [
     when: "adminAction",
     foot: "admin",
   },
-  { id: "copyPath", keys: "Ctrl+Shift+C", label: "Copy path", scope: "find", foot: "copy path" },
+  {
+    id: "copyPath",
+    keys: "Ctrl+Shift+C",
+    label: "Copy path",
+    scope: "find",
+    when: "pathItem",
+    foot: "copy path",
+  },
   {
     id: "copyResult",
     keys: "Ctrl+Shift+C",

@@ -8,7 +8,6 @@ import type {
   Outcome,
   ThinkingMode,
 } from "../types";
-import { isProgram } from "./kinds";
 
 export type { KeyInput };
 
@@ -325,9 +324,8 @@ function openSelected(s: State, intent: Intent): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
   if (intent === "admin") {
-    const admin = s.mode === "commands" || s.mode === "find";
-    // Scanned programs only offer Admin when Rust listed it (.exe/.msi).
-    if (!admin || (isProgram(item) && !item.actions.some((a) => a.type === "admin"))) return out(s);
+    // Rust lists Admin only for apps and exe/msi programs off removable drives.
+    if (!item.actions.some((a) => a.type === "admin")) return out(s);
     return out(s, { type: "launch", itemId: item.id, admin: true });
   }
   if (intent === "location") return out(s, { type: "reveal", itemId: item.id });
@@ -431,7 +429,9 @@ function key(s: State, k: KeyInput): Result {
       // Empty input inside a mode: step back out to the hint panel.
       return s.input === "" && s.mode !== "none" ? enterMode(s, "none") : out(s);
     case "copyPath":
-      return item ? copied(s, { type: "copyPath", itemId: item.id }) : out(s);
+      return item?.id.startsWith("file:")
+        ? copied(s, { type: "copyPath", itemId: item.id })
+        : out(s);
     case "copyResult": {
       const value = resultValue(item);
       return value === null ? out(s) : copied(s, { type: "copyText", text: value });

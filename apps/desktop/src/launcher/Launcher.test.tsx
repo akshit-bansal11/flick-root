@@ -68,6 +68,16 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+/** Makes the next searches return one file row (id `file:a`). */
+const mockFileResults = () =>
+  vi.mocked(ipc.search).mockImplementation((req) =>
+    Promise.resolve({
+      seq: req.seq,
+      items: [{ ...item("file:a", "Alpha"), kind: "file" }],
+      group: null,
+    }),
+  );
+
 const type = (text: string) =>
   act(async () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: text } });
@@ -198,11 +208,12 @@ describe("Launcher", () => {
     vi.useFakeTimers();
     try {
       await mount();
+      mockFileResults();
       await type("/");
       act(() => {
         fireEvent.keyDown(window, { key: "C", ctrlKey: true, shiftKey: true });
       });
-      expect(ipc.copyPath).toHaveBeenCalledWith("a");
+      expect(ipc.copyPath).toHaveBeenCalledWith("file:a");
       expect(screen.queryByRole("status")).toBeNull();
       await act(async () => {});
       expect(screen.getByRole("status").textContent).toBe("Copied");
@@ -219,6 +230,7 @@ describe("Launcher", () => {
     vi.mocked(ipc.copyPath).mockRejectedValueOnce(new Error("clipboard busy"));
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     await mount();
+    mockFileResults();
     await type("/");
     await act(async () => {
       fireEvent.keyDown(window, { key: "C", ctrlKey: true, shiftKey: true });
@@ -227,9 +239,12 @@ describe("Launcher", () => {
     err.mockRestore();
   });
 
-  it("find footer advertises Ctrl Shift C, not Ctrl C", async () => {
+  it("find footer advertises Ctrl Shift C on a file row only, not Ctrl C", async () => {
     await mount();
     await type("/");
+    expect(screen.queryByText("Ctrl Shift C copy path")).toBeNull();
+    mockFileResults();
+    await type("/x");
     expect(screen.getAllByText("Ctrl Shift C copy path").length).toBeGreaterThan(0);
     expect(screen.queryByText("Ctrl C copy path")).toBeNull();
   });

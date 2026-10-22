@@ -122,9 +122,16 @@ describe("reducer", () => {
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i0" }]);
   });
 
-  it("Ctrl+Shift+Enter launches as admin in Open", () => {
-    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true, shift: true }));
+  it("Ctrl+Shift+Enter launches as admin in Open when the row has an admin action", () => {
+    const s = withItems(inMode("find"));
+    const first: Item = { ...item("i0"), actions: [{ type: "primary" }, { type: "admin" }] };
+    const r = reduce({ ...s, items: [first] }, k("Enter", { ctrl: true, shift: true }));
     expect(r.effects).toEqual([{ type: "launch", itemId: "i0", admin: true }]);
+  });
+
+  it("Ctrl+Shift+Enter does nothing in Open without an admin action", () => {
+    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true, shift: true }));
+    expect(r.effects).toEqual([]);
   });
 
   it("Ctrl+Shift+Enter ignored in Commands", () => {
@@ -132,9 +139,15 @@ describe("reducer", () => {
     expect(r.effects).toEqual([]);
   });
 
-  it("Ctrl+Shift+C copies the path in Find; Copied shows only after the copy lands", () => {
+  it("Ctrl+Shift+C does nothing on a non-file row", () => {
     const r = reduce(withItems(inMode("find")), k("C", { ctrl: true, shift: true }));
-    expect(r.effects).toEqual([{ type: "copyPath", itemId: "i0" }]);
+    expect(r.effects).toEqual([]);
+  });
+
+  it("Ctrl+Shift+C copies the path of a file row; Copied shows only after the copy lands", () => {
+    const s = inMode("find", { items: [item("file:i0")] });
+    const r = reduce(s, k("C", { ctrl: true, shift: true }));
+    expect(r.effects).toEqual([{ type: "copyPath", itemId: "file:i0" }]);
     expect(r.state.copied).toBe(false);
     const done = reduce(r.state, { type: "copyDone", ok: true });
     expect(done.effects).toEqual([{ type: "clearCopied", afterMs: COPIED_MS }]);
