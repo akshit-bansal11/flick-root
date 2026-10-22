@@ -26,12 +26,13 @@ describe("tour steps", () => {
   it("run open to done with unique ids", () => {
     expect(TOUR_STEPS[0]?.id).toBe("open");
     expect(TOUR_STEPS.at(-1)?.id).toBe("done");
-    expect(TOUR_STEPS).toHaveLength(10);
+    expect(TOUR_STEPS).toHaveLength(11);
     expect(new Set(TOUR_STEPS.map((s) => s.id)).size).toBe(TOUR_STEPS.length);
   });
   it("follow the prefix order and end with the five prefixes", () => {
     expect(TOUR_STEPS.map((s) => s.id)).toEqual([
       "open",
+      "plain",
       "find",
       "commands",
       "calc",
@@ -54,6 +55,8 @@ describe("tour steps", () => {
   it("each goal needs its own events", () => {
     expect(goalMet(at("open"), view())).toBe(false);
     expect(goalMet(at("open"), view({ seen: ["hotkey"] }))).toBe(true);
+    expect(goalMet(at("plain"), view({ seen: ["launchApp"] }))).toBe(true);
+    expect(goalMet(at("plain"), view({ seen: ["openFile"] }))).toBe(false);
     expect(goalMet(at("find"), view({ seen: ["launchApp"] }))).toBe(true);
     expect(goalMet(at("find"), view({ seen: ["openFile"] }))).toBe(true);
     expect(goalMet(at("find"), view({ seen: ["copied"] }))).toBe(false);
@@ -84,6 +87,7 @@ describe("tour steps", () => {
     expect(ghostInput("/")).toBe("/");
     expect(ghostInput("/ ")).toBe("");
     expect(ghostInput("/ spo")).toBe("spo");
+    expect(ghostInput("spo")).toBe("spo");
   });
   it("maps accelerators onto chords", () => {
     expect(acceleratorChord("Alt+Space")).toBe("Alt+Space");

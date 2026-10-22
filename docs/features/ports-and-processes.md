@@ -1,6 +1,6 @@
 # Ports and processes
 
-See what is holding a port, search running processes, and end one, all after typing `>` (Commands).
+See what is holding a port, search running processes, and end one, all after typing `>` (Commands). Plain text with no prefix finds these rows too.
 
 ## How to use it
 
@@ -15,7 +15,7 @@ Press Enter on the `port ...` or `proc ...` row to list processes (up to 50). Ea
 ### Ending a process
 
 1. Use the arrow keys to move onto a process row.
-2. Press `Delete`. Before you arrow, Delete just edits the text, so you cannot end a process by accident while typing.
+2. Press `Delete`. Before you arrow, Delete edits the text, so you cannot end a process by accident while typing.
 3. Press `Enter` within 3 seconds to confirm. The confirmation is single-use and expires after 3 seconds.
 
 If Windows refuses, Flick says the process may need admin rights.

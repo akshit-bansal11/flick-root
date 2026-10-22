@@ -53,15 +53,15 @@ describe("Tour", () => {
     expect(title()).toBe("Open the bar");
     fireEvent.keyDown(window, { key: " ", altKey: true });
     await wait(700);
-    expect(title()).toBe("/ Open apps and files");
+    expect(title()).toBe("Type anything");
   });
 
   it("walks with Next, Back and PageDown/PageUp", async () => {
     await mount();
     click("Next");
-    expect(title()).toBe("/ Open apps and files");
+    expect(title()).toBe("Type anything");
     fireEvent.keyDown(window, { key: "PageDown" });
-    expect(title()).toBe("> Commands");
+    expect(title()).toBe("/ Open apps and files");
     fireEvent.keyDown(window, { key: "PageUp" });
     click("Back");
     expect(title()).toBe("Open the bar");
@@ -69,6 +69,7 @@ describe("Tour", () => {
 
   it("Show me types into the real launcher and Enter completes the Open step", async () => {
     await mount();
+    click("Next");
     click("Next");
     click("Show me");
     await wait(45 * 12);
@@ -87,6 +88,19 @@ describe("Tour", () => {
     click("Next");
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
     expect(onDone).not.toHaveBeenCalled();
+    expect(title()).toBe("Type anything");
+  });
+
+  it("Show me types a plain search and Enter completes the Type anything step", async () => {
+    await mount();
+    click("Next");
+    click("Show me");
+    await wait(45 * 5);
+    const input = screen.getByRole("combobox");
+    expect((input as HTMLInputElement).value).toBe("spo");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByRole("img", { name: "Done" })).toBeTruthy();
+    await wait(700);
     expect(title()).toBe("/ Open apps and files");
   });
 
@@ -100,7 +114,7 @@ describe("Tour", () => {
 
   it("Finish marks the tutorial done", async () => {
     const { onDone } = await mount();
-    for (let i = 0; i < 9; i++) click("Next");
+    for (let i = 0; i < 10; i++) click("Next");
     expect(title()).toBe("You are set");
     click("Finish");
     await act(async () => {});
@@ -110,7 +124,7 @@ describe("Tour", () => {
 
   it("a theme swatch restyles the demo and Use this theme saves it", async () => {
     await mount();
-    for (let i = 0; i < 8; i++) click("Next");
+    for (let i = 0; i < 9; i++) click("Next");
     click("midnight");
     expect(screen.getByTestId("demo").dataset.theme).toBe("midnight");
     click("Use this theme");

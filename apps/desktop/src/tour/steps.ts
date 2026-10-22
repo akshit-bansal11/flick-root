@@ -57,6 +57,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
     goal: (v) => saw(v, "hotkey"),
   },
   {
+    id: "plain",
+    title: "Type anything",
+    body: "Type without a prefix to search apps and commands. The last rows search files, the web or ask.",
+    keys: [],
+    example: "spo",
+    show: "type",
+    goal: (v) => saw(v, "launchApp"),
+  },
+  {
     id: "find",
     title: "/ Open apps and files",
     body: `Find apps, programs, files and folders. ${key("open")} opens one, ${key("location")} shows it in Explorer.`,
@@ -158,9 +167,10 @@ export const GHOST_MS = 45;
 /**
  * What the demo's `text` event carries when the ghost has typed `typed` of an example:
  * the prefix alone first (it picks the mode), then only the text after the prefix.
+ * An example with no prefix is typed as it is.
  */
 export const ghostInput = (typed: string): string =>
-  typed.length <= 1 ? typed : typed.slice(1).trimStart();
+  /^[/>=?@]/.test(typed) && typed.length > 1 ? typed.slice(1).trimStart() : typed;
 
 const ACCEL_NAMES: Record<string, string> = {
   control: "Ctrl",
