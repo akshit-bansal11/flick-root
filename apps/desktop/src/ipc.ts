@@ -89,6 +89,20 @@ export type ShownEvent = ShownPayload & {
 export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>
   listen<ShownEvent>("launcher://shown", (e) => cb(e.payload));
 
+export type TrayMenuEvent = {
+  appVersion: string;
+  hotkey: string;
+  update: { version: string } | null;
+  glass?: boolean;
+  appearance?: Appearance;
+};
+
+export const onTrayMenu = (cb: (p: TrayMenuEvent) => void): Promise<UnlistenFn> =>
+  listen<TrayMenuEvent>("tray://menu", (e) => cb(e.payload));
+
+export const trayAction = (action: "open" | "settings" | "update" | "quit") =>
+  invoke<void>("tray_action", { action });
+
 export const onExplainCaptured = (cb: (c: ExplainCaptured) => void): Promise<UnlistenFn> =>
   listen<ExplainCaptured>("explain://captured", (e) => cb(e.payload));
 
