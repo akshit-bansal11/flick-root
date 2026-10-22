@@ -123,6 +123,7 @@ pub fn run() {
             commands::settings::get_appearance,
             commands::settings::set_appearance,
             commands::settings::set_roots,
+            commands::settings::set_program_skip,
             commands::settings::clear_history,
             commands::settings::reindex,
             commands::settings::get_about,

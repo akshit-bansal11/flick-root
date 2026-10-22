@@ -20,6 +20,7 @@ fn main() {
         "get_appearance",
         "set_appearance",
         "set_roots",
+        "set_program_skip",
         "clear_history",
         "list_features",
         "set_feature_enabled",

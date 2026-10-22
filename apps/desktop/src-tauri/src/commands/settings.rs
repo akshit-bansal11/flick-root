@@ -5,11 +5,14 @@ use crate::error::CommandError;
 use crate::hotkey;
 use crate::state::{self, AppState};
 use launcher_core::brand::APP_NAME;
+use launcher_core::config::validate_skip;
 use launcher_core::store::ClearScope;
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, State};
+use win::drives::DriveKind;
 
 /// Settings the UI shows. No secret is ever included.
 #[derive(Serialize)]
@@ -33,10 +36,80 @@ pub struct SettingsView {
     pub include_drives: bool,
     /// Scan fixed drives for programs (exe, msi, apk, ...).
     pub scan_programs: bool,
+    /// Excluded drives, folders and name patterns (`[apps] skip`).
+    pub program_skip: Vec<String>,
+    /// Indexable drives, plus excluded drives that are not connected.
+    pub drives: Vec<DriveView>,
+    /// Programs currently searchable.
+    pub programs_count: usize,
+    /// A drive's programs walk stopped at its cap.
+    pub programs_capped: bool,
+}
+
+/// One drive row of the exclusion settings.
+#[derive(Serialize, Debug, PartialEq, Eq)]
+pub struct DriveView {
+    /// Drive root, `E:\`.
+    pub root: String,
+    /// `fixed` or `removable` (`removable` for an unconnected drive, whose kind is unknown).
+    pub kind: &'static str,
+    /// Connected now.
+    pub present: bool,
+}
+
+/// Drive rows: every indexable drive, then each drive entry of `skip` that is not connected.
+fn drive_views(vols: &[(char, DriveKind)], skip: &[String]) -> Vec<DriveView> {
+    let mut out: Vec<DriveView> = vols
+        .iter()
+        .map(|&(l, k)| DriveView {
+            root: format!("{l}:\\"),
+            kind: if k == DriveKind::Removable {
+                "removable"
+            } else {
+                "fixed"
+            },
+            present: true,
+        })
+        .collect();
+    for l in skip.iter().filter_map(|e| drive_letter(e)) {
+        if !vols.iter().any(|v| v.0 == l) {
+            out.push(DriveView {
+                root: format!("{l}:\\"),
+                kind: "removable",
+                present: false,
+            });
+        }
+    }
+    out
+}
+
+/// The drive letter (uppercase) when `entry` is exactly a drive such as `E:\`.
+fn drive_letter(entry: &str) -> Option<char> {
+    let b = entry.as_bytes();
+    (b.len() == 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && b[2] == b'\\')
+        .then(|| b[0].to_ascii_uppercase() as char)
+}
+
+/// Rejects a drive entry that is neither a connected indexable drive nor already in `old`.
+fn check_drives(new: &[String], old: &[String], present: &[char]) -> Result<(), CommandError> {
+    for l in new.iter().filter_map(|e| drive_letter(e)) {
+        let known = present.contains(&l) || old.iter().any(|o| drive_letter(o) == Some(l));
+        if !known {
+            return Err(CommandError::new(
+                "invalid_skip",
+                "That drive is not connected, so it cannot be excluded.",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
     let c = state.config.load();
+    let vols: Vec<(char, DriveKind)> = win::drives::indexable_drives()
+        .into_iter()
+        .map(|d| (d.letter, d.kind))
+        .collect();
     let launch_at_startup = autostart::is_autostart(app).unwrap_or(c.general.launch_at_startup);
     SettingsView {
         hotkey_launcher: c.general.hotkey.clone(),
@@ -48,7 +121,17 @@ fn settings_view(app: &AppHandle, state: &AppState) -> SettingsView {
         extra_roots: c.modes.find.extra_roots.clone(),
         include_drives: c.modes.find.include_drives,
         scan_programs: c.apps.scan_programs,
+        program_skip: c.apps.skip.clone(),
+        drives: drive_views(&vols, &c.apps.skip),
+        programs_count: state.programs.load().paths.len(),
+        programs_capped: state.programs_capped.load(Ordering::Relaxed),
     }
+}
+
+/// [`settings_view`] on the blocking pool: it asks Windows about the drives.
+async fn view(app: &AppHandle, state: &Arc<AppState>) -> Result<SettingsView, CommandError> {
+    let (app, state) = (app.clone(), Arc::clone(state));
+    blocking(move || Ok(settings_view(&app, &state))).await
 }
 
 fn changed(app: &AppHandle, section: &str) {
@@ -66,7 +149,7 @@ pub async fn get_settings(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
 ) -> Result<SettingsView, CommandError> {
-    Ok(settings_view(&app, &state))
+    view(&app, &state).await
 }
 
 /// Theme, glass strength and scheme, as the UI applies them.
@@ -181,7 +264,37 @@ pub async fn set_general(
         None => {}
     }
     changed(&app, "general");
-    Ok(settings_view(&app, &state))
+    view(&app, &state).await
+}
+
+/// Replaces the exclusion list (`[apps] skip`) after validating it, then applies the change
+/// incrementally. Errors use code `invalid_skip`; the message never repeats the entry text.
+#[tauri::command]
+pub async fn set_program_skip(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    skip: Vec<String>,
+) -> Result<SettingsView, CommandError> {
+    let s = Arc::clone(&state);
+    let diff = blocking(move || {
+        let new = validate_skip(skip).map_err(|e| {
+            CommandError::new("invalid_skip", format!("That exclusion is not valid: {e}."))
+        })?;
+        let present: Vec<char> = win::drives::indexable_drives()
+            .iter()
+            .map(|d| d.letter)
+            .collect();
+        s.update_config(|c| {
+            check_drives(&new, &c.apps.skip, &present)?;
+            let old = std::mem::replace(&mut c.apps.skip, new.clone());
+            Ok(state::skip_diff(&old, &new))
+        })
+    })
+    .await?;
+    let s = Arc::clone(&state);
+    tauri::async_runtime::spawn(async move { state::apply_skip(&s, diff).await });
+    changed(&app, "general");
+    view(&app, &state).await
 }
 
 /// Replaces the user-added Find roots and/or sets "index all drives", then rescans when Find is on.
@@ -220,7 +333,7 @@ pub async fn set_roots(
         tauri::async_runtime::spawn(async move { state::start_find(&s).await });
     }
     changed(&app, "roots");
-    Ok(settings_view(&app, &state))
+    view(&app, &state).await
 }
 
 fn scope_of(scope: &str) -> Result<ClearScope, CommandError> {
@@ -339,6 +452,47 @@ pub async fn get_about(app: AppHandle) -> Result<About, CommandError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn strs(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn drive_entries_need_a_connected_drive_or_an_existing_entry() {
+        let present = ['C', 'E'];
+        assert!(check_drives(&strs(&[r"E:\", "node_modules", r"Z:\games"]), &[], &present).is_ok());
+        let err = check_drives(&strs(&[r"F:\"]), &[], &present).unwrap_err();
+        assert_eq!(err.code, "invalid_skip");
+        assert!(!err.message.contains("F:"), "the entry text is not echoed");
+        // Already excluded while detached: it may stay.
+        assert!(check_drives(&strs(&[r"F:\"]), &strs(&[r"f:\"]), &present).is_ok());
+    }
+
+    #[test]
+    fn drive_letter_is_a_single_drive_only() {
+        assert_eq!(drive_letter(r"e:\"), Some('E'));
+        assert_eq!(drive_letter(r"E:\games"), None);
+        assert_eq!(drive_letter("E:"), None);
+        assert_eq!(drive_letter("node_modules"), None);
+    }
+
+    #[test]
+    fn drive_rows_list_present_then_missing_excluded() {
+        let vols = [('C', DriveKind::Fixed), ('E', DriveKind::Removable)];
+        let rows = drive_views(&vols, &strs(&[r"E:\", r"G:\", r"D:\x", "tmp"]));
+        let got: Vec<(&str, &str, bool)> = rows
+            .iter()
+            .map(|r| (r.root.as_str(), r.kind, r.present))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (r"C:\", "fixed", true),
+                (r"E:\", "removable", true),
+                (r"G:\", "removable", false)
+            ]
+        );
+    }
 
     #[test]
     fn scopes() {

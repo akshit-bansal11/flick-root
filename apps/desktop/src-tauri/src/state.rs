@@ -272,6 +272,57 @@ pub fn plan_refresh(
     plan
 }
 
+/// What changed between two validated skip lists, compared case-insensitively and ignoring a
+/// trailing separator.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct SkipDiff {
+    /// Entries only in the new list.
+    pub added: Vec<String>,
+    /// Removed drive or folder entries (`E:\`, `D:\games`).
+    pub removed_paths: Vec<String>,
+    /// Removed name patterns (`node_modules`, `*cache*`, `target\*\deps`).
+    pub removed_globs: Vec<String>,
+}
+
+impl SkipDiff {
+    /// Nothing changed.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed_paths.is_empty() && self.removed_globs.is_empty()
+    }
+}
+
+fn skip_key(e: &str) -> String {
+    e.trim().trim_end_matches(['\\', '/']).to_lowercase()
+}
+
+/// Whether `e` starts with a drive (`X:`), i.e. is a drive or a folder path rather than a pattern.
+pub fn is_path_entry(e: &str) -> bool {
+    let b = e.as_bytes();
+    b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':'
+}
+
+/// Diff of two skip lists. Pure.
+pub fn skip_diff(old: &[String], new: &[String]) -> SkipDiff {
+    let old_keys: Vec<String> = old.iter().map(|e| skip_key(e)).collect();
+    let new_keys: Vec<String> = new.iter().map(|e| skip_key(e)).collect();
+    let mut d = SkipDiff::default();
+    for (e, k) in new.iter().zip(&new_keys) {
+        if !old_keys.contains(k) {
+            d.added.push(e.clone());
+        }
+    }
+    for (e, k) in old.iter().zip(&old_keys) {
+        if !new_keys.contains(k) {
+            if is_path_entry(e) {
+                d.removed_paths.push(e.clone());
+            } else {
+                d.removed_globs.push(e.clone());
+            }
+        }
+    }
+    d
+}
+
 /// Letters of the whole-drive roots (path `X:\`, label `X:`) among Find's `roots`.
 fn drive_letters(roots: &[Root]) -> Vec<char> {
     roots
@@ -308,6 +359,8 @@ pub struct AppState {
     /// Cancel flag of the programs scan (off, a new scan, or exit).
     pub programs_run: FindRun,
     programs_gate: Mutex<()>,
+    /// An attached drive's programs walk stopped at its cap (for the settings page).
+    pub programs_capped: AtomicBool,
     /// Single-flight flags of the apps, programs and Find jobs and of the on-open refresh.
     apps_busy: Busy,
     programs_busy: Busy,
@@ -573,6 +626,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         programs: ArcSwap::from_pointee(ProgramSet::default()),
         programs_run: FindRun::default(),
         programs_gate: Mutex::new(()),
+        programs_capped: AtomicBool::new(false),
         apps_busy: Busy::default(),
         programs_busy: Busy::default(),
         find_busy: Busy::default(),
@@ -832,6 +886,13 @@ pub(crate) async fn run_programs(s: &Arc<AppState>, all: bool, roots: Vec<char>,
             .filter_map(|r| Some((r.letter()?, r.serial)))
             .collect();
         let count = cache.files.len();
+        st.programs_capped.store(
+            cache
+                .roots
+                .iter()
+                .any(|r| r.capped && r.letter().is_some_and(|l| present.iter().any(|p| p.0 == l))),
+            Ordering::Relaxed,
+        );
         drop(cache); // the scanned list is not needed once published
         let mut f = st.fresh.lock();
         f.programs_full = oldest;
@@ -854,6 +915,91 @@ pub(crate) fn stop_programs(s: &AppState) {
     s.programs_run.cancel();
     let _gate = s.programs_gate.lock();
     s.programs.store(Arc::new(ProgramSet::default()));
+    s.programs_capped.store(false, Ordering::Relaxed);
+}
+
+/// Drops from the cached programs every file under a folder the current skip list excludes, and
+/// saves. Uses the whole current list (idempotent), so a superseded apply loses nothing.
+/// Blocking; returns how many entries went.
+fn filter_programs(st: &AppState) -> Result<usize, FilesError> {
+    let Some((_busy, _cancel)) = acquire(&st.programs_busy, &st.programs_run, true) else {
+        return Err(FilesError::Cancelled);
+    };
+    let path = st.programs_path();
+    let Some(mut cache) = ProgramCache::load(&path)? else {
+        return Ok(0);
+    };
+    let skip = SkipList::new(&st.config.load().apps.skip);
+    let before = cache.files.len();
+    cache.retain(|p| !p.path.ancestors().skip(1).any(|a| skip.excludes_dir(a)));
+    let gone = before - cache.files.len();
+    if gone > 0 {
+        cache.save(&path)?;
+    }
+    Ok(gone)
+}
+
+/// Drops from the Find store the subtrees of the newly added drive or folder entries (no I/O).
+/// ponytail: name patterns are not applied to Find until F8.14 teaches its scan the skip list.
+fn filter_find(st: &AppState, added: &[String]) {
+    if !st.config.load().modes.find.enabled {
+        return;
+    }
+    let mut store = None;
+    for e in added.iter().filter(|e| is_path_entry(e)) {
+        let n = store
+            .as_ref()
+            .unwrap_or(&*st.files.load())
+            .without_prefix(std::path::Path::new(e));
+        store = Some(n);
+    }
+    if let Some(n) = store {
+        st.files.replace(n);
+        st.save_snapshot();
+    }
+}
+
+/// Applies a skip-list change: added entries filter the cached programs and the Find store with no
+/// walk; a removed drive or folder rescans only its drive; a removed pattern rescans every drive,
+/// all at background priority. A newer change cancels the apply in flight (the runs supersede).
+/// ponytail: a removed folder rescans its whole drive, not only that folder.
+pub(crate) async fn apply_skip(s: &Arc<AppState>, diff: SkipDiff) {
+    if diff.is_empty() {
+        return;
+    }
+    if !diff.added.is_empty() {
+        let st = s.clone();
+        let added = diff.added.clone();
+        let res = tauri::async_runtime::spawn_blocking(move || {
+            filter_find(&st, &added);
+            filter_programs(&st)
+        })
+        .await;
+        match res {
+            Ok(Ok(gone)) => tracing::info!(gone, "programs filtered by new exclusions"),
+            Ok(Err(FilesError::Cancelled)) => tracing::debug!("exclusion filter superseded"),
+            Ok(Err(err)) => tracing::warn!(%err, "exclusion filter failed"),
+            Err(err) => tracing::warn!(%err, "exclusion filter task failed"),
+        }
+    }
+    if !s.config.load().apps.scan_programs {
+        return;
+    }
+    if !diff.removed_globs.is_empty() {
+        run_programs(s, true, Vec::new(), true).await;
+        return;
+    }
+    let mut letters: Vec<char> = diff
+        .removed_paths
+        .iter()
+        .filter_map(|e| e.chars().next().map(|c| c.to_ascii_uppercase()))
+        .collect();
+    letters.sort_unstable();
+    letters.dedup();
+    if !letters.is_empty() || !diff.added.is_empty() {
+        // With no letters this only republishes the filtered cache.
+        run_programs(s, false, letters, true).await;
+    }
 }
 
 /// Two background-mode workers for one run. The pool is dropped with the returned value when the
@@ -1400,6 +1546,56 @@ mod tests {
         let cancel = next.join().unwrap().unwrap();
         assert!(!cancel.load(Ordering::Relaxed));
         assert!(!busy.is_busy(), "the superseding run's guard was dropped");
+    }
+
+    fn strs(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn skip_diff_table() {
+        let cases = [
+            ("same", vec!["a"], vec!["a"], SkipDiff::default()),
+            (
+                "case and trailing separator are the same entry",
+                vec![r"E:\", r"D:\Games"],
+                vec!["e:", r"d:\games\"],
+                SkipDiff::default(),
+            ),
+            (
+                "added",
+                vec!["node_modules"],
+                vec!["node_modules", r"E:\", "*cache*"],
+                SkipDiff {
+                    added: strs(&[r"E:\", "*cache*"]),
+                    ..SkipDiff::default()
+                },
+            ),
+            (
+                "removed drive, folder and glob",
+                vec![r"E:\", r"D:\games", "node_modules", r"target\*\deps"],
+                vec![],
+                SkipDiff {
+                    removed_paths: strs(&[r"E:\", r"D:\games"]),
+                    removed_globs: strs(&["node_modules", r"target\*\deps"]),
+                    ..SkipDiff::default()
+                },
+            ),
+            (
+                "swap",
+                vec!["recent"],
+                vec![r"F:\x"],
+                SkipDiff {
+                    added: strs(&[r"F:\x"]),
+                    removed_globs: strs(&["recent"]),
+                    ..SkipDiff::default()
+                },
+            ),
+        ];
+        for (name, old, new, want) in cases {
+            assert_eq!(skip_diff(&strs(&old), &strs(&new)), want, "{name}");
+        }
+        assert!(SkipDiff::default().is_empty());
     }
 
     #[test]
