@@ -1,5 +1,6 @@
 import type { Attachment as AttachmentData } from "../launcher/reducer";
-import { capsText } from "../shortcuts";
+import { Keycaps } from "../Keycaps";
+import { caps } from "../shortcuts";
 
 interface Props {
   attachment: AttachmentData;
@@ -17,7 +18,7 @@ export function Attachment({ attachment: a, onRemove }: Props) {
         </span>
         <button type="button" className="attach-remove" tabIndex={-1} onClick={onRemove}>
           Remove
-          <kbd className="kbd">{capsText("removeAttachment")}</kbd>
+          <Keycaps caps={caps("removeAttachment")} />
         </button>
       </div>
       {a.blocked ? (

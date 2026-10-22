@@ -3,53 +3,123 @@
   display: flex;
   flex-direction: column;
   gap: var(--l-sp-5);
-  padding: var(--l-sp-7) var(--l-sp-8) var(--l-sp-8);
-  border-top: var(--l-border);
+  padding: var(--l-sp-8) var(--l-sp-9) var(--l-sp-9);
+  border-top: var(--l-border-hair);
+}
+
+.query-empty {
+  align-items: center;
+  gap: var(--l-sp-4);
+  padding: var(--l-sp-10) var(--l-sp-10) var(--l-sp-9);
+  text-align: center;
 }
 
 .query-q {
+  font-size: var(--l-fs-body);
+  line-height: var(--l-lh-body);
   font-weight: 600;
 }
 
-.query-chips {
-  display: flex;
-  gap: var(--l-sp-4);
-  align-items: center;
-}
-
-.query-chip,
-.query-pill {
-  font: 500 var(--l-fs-meta) var(--l-mono);
+/* Persistent AI disclosure: stays above the answer while it is on screen. */
+.ai-mark {
+  align-self: flex-start;
+  margin: 0;
+  padding: var(--l-sp-1) var(--l-sp-4) var(--l-sp-1) var(--l-sp-3);
   border-radius: var(--l-r-pill);
-  padding: var(--l-sp-1) var(--l-sp-5);
+  font-size: var(--l-fs-micro);
+  line-height: var(--l-lh-micro);
+  color: var(--l-muted);
 }
 
-.query-chip {
+/* Raised glass bar floating over the scrolled answer. Blur fallback first, refraction after. */
+.liquid {
+  background: var(--l-raise);
+  -webkit-backdrop-filter: blur(8px) saturate(1.6);
+  backdrop-filter: blur(8px) saturate(1.6);
+  backdrop-filter: url(#liquid) blur(5px) saturate(1.7) brightness(1.04);
+  box-shadow:
+    inset 0 1px 0 var(--l-spec),
+    inset 0 0 0 1px var(--l-hairline),
+    var(--l-shadow-raised);
+}
+
+.float-bar {
+  position: sticky;
+  bottom: var(--l-sp-4);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--l-sp-5);
+  min-height: var(--l-foot-h);
+  margin-top: auto;
+  padding: 0 var(--l-sp-3) 0 var(--l-sp-5);
+  border-radius: var(--l-r-card);
+  font-size: var(--l-fs-caption);
+  line-height: var(--l-lh-caption);
+  color: var(--l-muted);
+}
+
+.mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--l-sp-3);
+  min-height: var(--l-tile-lg);
+  padding: 0 var(--l-sp-5);
+  border-radius: var(--l-r-control);
+  color: var(--l-text);
+  font-weight: 500;
   animation: chip-swap var(--l-dur) var(--l-ease-out);
-  background: var(--l-accent);
-  color: var(--l-ink);
+}
+
+.dot {
+  width: var(--l-sp-4);
+  height: var(--l-sp-4);
+  border-radius: var(--l-r-pill);
+  background: var(--l-ok);
 }
 
 .query-pill {
+  min-height: var(--l-tile-row);
+  padding: 0 var(--l-sp-5);
+  border: 0;
+  border-radius: var(--l-r-control);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--l-hairline);
+  font: 500 var(--l-fs-caption) var(--l-ui);
+  color: var(--l-muted);
+  cursor: pointer;
   transition:
     background var(--l-dur-fast) var(--l-ease-out),
     color var(--l-dur-fast) var(--l-ease-out),
     transform var(--l-dur-fast) var(--l-ease-out);
-  background: none;
-  border: var(--l-border);
-  color: var(--l-muted);
-  cursor: pointer;
+}
+
+.query-pill:hover {
+  background: var(--l-raise-hover);
 }
 
 .query-pill.on {
-  background: var(--l-accent);
-  border-color: var(--l-accent);
-  color: var(--l-ink);
+  background: var(--l-lens);
+  box-shadow: inset 0 0 0 1px var(--l-lens-ring);
+  color: var(--l-text);
 }
 
 .query-pill:active,
 .query-btn:active {
   transform: scale(0.98);
+}
+
+.query-pill:focus-visible,
+.query-btn:focus-visible {
+  outline: 2px solid var(--l-focus);
+  outline-offset: 2px;
+}
+
+.float-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--l-sp-3);
+  margin-left: auto;
 }
 
 @keyframes chip-swap {
@@ -58,16 +128,17 @@
   }
 }
 
-/* Soft blinking caret after the streamed text; the text itself is never animated. */
+/* Rounded accent caret after the streamed text; the text itself is never animated. */
 [data-answer][aria-busy="true"] > :last-child::after {
   content: "";
   display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 2px;
+  width: var(--l-sp-4);
+  height: var(--l-sp-8);
+  margin-left: var(--l-sp-1);
   vertical-align: text-bottom;
+  border-radius: var(--l-r-key);
   background: var(--l-accent);
-  animation: caret var(--l-dur-caret) var(--l-ease-in-out) infinite;
+  animation: caret var(--l-dur-caret) var(--l-ease-out) infinite;
 }
 
 @keyframes caret {
@@ -77,36 +148,43 @@
 }
 
 .query-thinking {
-  font: 500 var(--l-fs-meta) var(--l-mono);
+  font: 500 var(--l-fs-caption) var(--l-mono);
   color: var(--l-muted);
 }
 
 [data-answer] {
   white-space: pre-wrap;
+  font-size: var(--l-fs-body);
   line-height: var(--l-lh-answer);
 }
 
 .query-error {
+  font-size: var(--l-fs-body);
+  line-height: var(--l-lh-body);
   color: var(--l-err);
 }
 
 .query-empty-title {
+  font-size: var(--l-fs-title);
+  line-height: var(--l-lh-title);
   font-weight: 600;
 }
 
 .query-empty-body {
-  font-size: var(--l-fs-toast);
+  max-width: 380px;
+  font-size: var(--l-fs-body);
+  line-height: var(--l-lh-body);
   color: var(--l-muted);
 }
 
 .query-btn {
-  align-self: flex-start;
-  font: 500 var(--l-fs-action) var(--l-ui);
+  margin-top: var(--l-sp-4);
+  font: 500 var(--l-fs-body) var(--l-ui);
   background: var(--l-accent);
-  color: var(--l-ink);
+  color: var(--l-on-accent);
   border: 0;
-  border-radius: var(--l-r2);
-  padding: var(--l-sp-3) var(--l-sp-6);
+  border-radius: var(--l-r-control);
+  padding: var(--l-sp-3) var(--l-sp-8);
   cursor: pointer;
   transition: transform var(--l-dur-fast) var(--l-ease-out);
 }

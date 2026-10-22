@@ -7,6 +7,7 @@ let root: Root | undefined;
 const base = {
   question: "why",
   provider: "Ollama",
+  model: null,
   effort: "fast" as const,
   text: "",
   error: null,
@@ -40,6 +41,20 @@ describe("QueryView", () => {
     expect(chip?.getAttribute("aria-live")).toBe("polite");
     act(() => root?.render(<QueryView {...base} modes={modes} selectedMode="a/m1" />));
     expect(c.querySelector(".query-chip")?.textContent).toBe("Ollama · m1 · local");
+  });
+
+  it("keeps the AI answer marker while streaming and after the answer is done", () => {
+    const ai = { provider: "Local", model: "llama3.2" };
+    const c = render({ ...ai, streaming: true });
+    expect(c.querySelector(".ai-mark")?.textContent).toBe("AI answer · Local · llama3.2");
+    act(() => root?.render(<QueryView {...base} {...ai} streaming text="Hi" />));
+    expect(c.querySelector(".ai-mark")?.textContent).toBe("AI answer · Local · llama3.2");
+    act(() => root?.render(<QueryView {...base} {...ai} text="Hi there" />));
+    expect(c.querySelector(".ai-mark")?.textContent).toBe("AI answer · Local · llama3.2");
+  });
+
+  it("shows no AI marker without text or streaming", () => {
+    expect(render({ provider: "Local", model: "llama3.2" }).querySelector(".ai-mark")).toBeNull();
   });
 
   it("appends streamed deltas in order", () => {

@@ -2,6 +2,7 @@ import type { Ref, RefObject } from "react";
 import { Attachment } from "../query/Attachment";
 import type { LaunchMode } from "../types";
 import "../query/attachment.css";
+import { LiquidFilter } from "../query/LiquidFilter";
 import { QueryView } from "../query/QueryView";
 import { Actions } from "./Actions";
 import { Footer } from "./Footer";
@@ -50,6 +51,7 @@ export function LauncherView({
 
   return (
     <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
+      <LiquidFilter />
       <InputBar
         mode={state.mode}
         value={state.input}
@@ -74,6 +76,7 @@ export function LauncherView({
           <QueryView
             question={q.status === "idle" ? "" : state.input || DEFAULT_QUESTION}
             provider={q.provider}
+            model={q.model}
             effort={q.effort}
             text={q.text}
             error={noProvider ? null : q.error}

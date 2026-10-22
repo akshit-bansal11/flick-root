@@ -2,6 +2,10 @@
 
 The launcher is a rounded panel with an acrylic backdrop. Its height follows the results. When Windows transparency effects are off, the panel is opaque.
 
+## The launcher
+
+The panel is acrylic glass. The input bar, the keycaps, the prefix chip and the selection are raised glass pieces on top of it, and the selection is one lens that glides between rows. In Ask, every generated answer carries the line "AI answer · provider · model" above it, and a floating glass bar at the bottom shows the model, the Fast or Think switch and the Tab hint when more than one model is set up.
+
 ## Settings, Appearance
 
 - **Theme:** Glass, Frost, Midnight, Aurora, Ember or Solid. Default Glass.

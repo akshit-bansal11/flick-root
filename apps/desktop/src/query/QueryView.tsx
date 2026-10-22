@@ -1,3 +1,5 @@
+import { Keycaps } from "../Keycaps";
+import { caps } from "../shortcuts";
 import type { Effort, ThinkingMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { Markdown } from "./Markdown";
@@ -6,6 +8,7 @@ import "./query.css";
 interface Props {
   question: string;
   provider: string | null;
+  model: string | null;
   effort: Effort;
   /** False when the active provider has no reasoning control; hides the pill. */
   reasoning?: boolean;
@@ -26,32 +29,13 @@ export function QueryView(p: Props) {
   const modes = p.modes ?? [];
   const mode = modes.find((m) => m.id === p.selectedMode) ?? modes[0];
   if (p.noProvider) return <EmptyState onOpenSettings={p.onOpenSettings} />;
+  // EU AI Act Art. 50: the disclosure stays on screen with every generated answer.
+  const who = [p.provider ?? mode?.providerLabel, p.model ?? mode?.model].filter(Boolean);
+  const marker = ["AI answer", ...who].join(" · ");
   return (
     <div className="query">
       {p.question && <div className="query-q">{p.question}</div>}
-      <div className="query-chips">
-        {mode ? (
-          <span
-            key={`${mode.providerLabel}/${mode.model}`}
-            className="query-chip"
-            aria-live="polite"
-          >
-            {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
-          </span>
-        ) : (
-          p.provider && <span className="query-chip">{p.provider}</span>
-        )}
-        {p.reasoning !== false && (
-          <button
-            type="button"
-            className={p.effort === "think" ? "query-pill on" : "query-pill"}
-            aria-pressed={p.effort === "think"}
-            onClick={p.onToggleEffort}
-          >
-            {p.effort === "think" ? "Think" : "Fast"}
-          </button>
-        )}
-      </div>
+      {(p.text !== "" || p.streaming) && <p className="ai-mark">{marker}</p>}
       {p.thinking && !p.text && <div className="query-thinking">thinking…</div>}
       {p.text && (
         <div data-answer aria-live="polite" aria-busy={p.streaming}>
@@ -63,6 +47,36 @@ export function QueryView(p: Props) {
           {p.error}
         </div>
       )}
+      <div className="float-bar liquid">
+        {mode ? (
+          <span
+            key={`${mode.providerLabel}/${mode.model}`}
+            className="query-chip mode-pill"
+            aria-live="polite"
+          >
+            <span className="dot" aria-hidden="true" />
+            {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
+          </span>
+        ) : (
+          p.provider && <span className="query-chip mode-pill">{p.provider}</span>
+        )}
+        {p.reasoning !== false && (
+          <button
+            type="button"
+            className={p.effort === "think" ? "query-pill on" : "query-pill"}
+            aria-pressed={p.effort === "think"}
+            onClick={p.onToggleEffort}
+          >
+            {p.effort === "think" ? "Think" : "Fast"}
+          </button>
+        )}
+        {modes.length >= 2 && (
+          <span className="float-hint">
+            <Keycaps caps={caps("model")} />
+            Model
+          </span>
+        )}
+      </div>
     </div>
   );
 }
