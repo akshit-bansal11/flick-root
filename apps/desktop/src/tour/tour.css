@@ -232,7 +232,10 @@
 /* Logo: the bar slides in and glows once. */
 .logo-tile {
   fill: var(--l-bg);
-  stroke: var(--l-line);
+}
+
+.logo-glyph {
+  fill: var(--l-text);
 }
 
 .logo-bar {

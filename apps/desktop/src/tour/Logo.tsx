@@ -4,7 +4,7 @@ interface Props {
   animated?: boolean;
 }
 
-/** The brand mark: a dark rounded square holding a cyan pill bar. Colors come from tokens. */
+/** The brand mark (assets/logo/mark.svg): a dark tile, a light "f", a cyan bar and dot. Colors come from tokens. */
 export function Logo({ size = 64, animated = false }: Props) {
   return (
     <svg
@@ -15,8 +15,14 @@ export function Logo({ size = 64, animated = false }: Props) {
       role="img"
       aria-label="Launcher logo"
     >
-      <rect className="logo-tile" x="2" y="2" width="60" height="60" rx="14" />
-      <rect className="logo-bar" x="12" y="27" width="40" height="10" rx="5" />
+      <rect className="logo-tile" width="64" height="64" rx="15" />
+      <path className="logo-glyph" d="M20.5 40.5H29.5V50A4.5 4.5 0 0 1 20.5 50Z" />
+      <path
+        className="logo-glyph"
+        d="M20.5 25.5V24A13.5 13.5 0 0 1 34 10.5H35A4.5 4.5 0 0 1 35 19.5H34A4.5 4.5 0 0 0 29.5 24V25.5Z"
+      />
+      <path className="logo-bar" d="M16 28.5H46A4.5 4.5 0 0 1 46 37.5H16A4.5 4.5 0 0 1 16 28.5Z" />
+      <path className="logo-bar" d="M44.5 15A4.5 4.5 0 1 1 53.5 15A4.5 4.5 0 1 1 44.5 15Z" />
     </svg>
   );
 }
