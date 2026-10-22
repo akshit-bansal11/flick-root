@@ -94,6 +94,16 @@ describe("Launcher", () => {
     expect(screen.queryByTestId("mode-chip")).toBeNull();
   });
 
+  it("shown with sources [apps] hides the other four prefix hint rows", async () => {
+    vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+      cb({ shownId: 1, reason: "hotkey", sources: ["apps"] });
+      return Promise.resolve(() => {});
+    });
+    await mount();
+    expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(1);
+    expect(screen.queryByText("> commands")).toBeNull();
+  });
+
   it("plain text keeps the hints and shows a muted line", async () => {
     await mount();
     await type("abc");

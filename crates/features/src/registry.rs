@@ -286,6 +286,11 @@ impl Registry {
         }
     }
 
+    /// Ids of the running features, in registration order. Lock-free.
+    pub fn running_ids(&self) -> Vec<&'static str> {
+        self.running.load().iter().map(|f| f.id()).collect()
+    }
+
     /// Looks up a feature by id, for `execute`.
     pub async fn get(&self, id: &str) -> Option<Arc<dyn Feature>> {
         self.running.load().iter().find(|f| f.id() == id).cloned()
@@ -501,6 +506,19 @@ mod tests {
         r.apply_config(&c.config.load(), &c).await;
         r.set_enabled("a", false, &c).await.unwrap();
         assert!(r.knows("a") && r.knows("bad"));
+    }
+
+    #[tokio::test]
+    async fn running_ids_lists_only_running_features() {
+        let r = Registry::new();
+        let c = ctx();
+        r.register(stub("a", false, &[Mode::Command])).await;
+        r.register(stub("bad", true, &[Mode::Command])).await;
+        r.register(stub("off", false, &[Mode::Find])).await;
+        assert!(r.running_ids().is_empty());
+        r.apply_config(&c.config.load(), &c).await;
+        r.set_enabled("off", false, &c).await.unwrap();
+        assert_eq!(r.running_ids(), ["a"]);
     }
 
     #[tokio::test]

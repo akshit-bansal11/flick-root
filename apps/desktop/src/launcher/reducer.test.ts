@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Item, LaunchMode } from "../types";
 import {
   type Attachment,
+  availableModes,
   COPIED_MS,
   type Event,
   initialState,
@@ -203,9 +204,31 @@ describe("reducer", () => {
     expect(reduce(typed, k("3", { ctrl: true })).state.mode).toBe("calc");
     expect(reduce(typed, k("4", { ctrl: true })).state.mode).toBe("query");
     expect(reduce(typed, k("5", { ctrl: true })).state.mode).toBe("projects");
-    const off = initialState(["command"]);
+    const off = initialState(["syscmd"]);
     expect(reduce(off, k("1", { ctrl: true })).state).toBe(off);
     expect(reduce(off, k("4", { ctrl: true })).state).toBe(off);
+  });
+
+  it("a prefix is offered only while one of its needs is live", () => {
+    expect(availableModes(initialState(["apps"]).enabledSources)).toEqual(["find"]);
+    expect(availableModes(["apps", "syscmd"])).toEqual(["find", "commands"]);
+    expect(availableModes(null)).toEqual(["find", "commands", "calc", "query", "projects"]);
+  });
+
+  it("? stays text when ask is not live", () => {
+    const r = reduce(initialState(["apps", "syscmd"]), { type: "text", text: "?" });
+    expect(r.state).toMatchObject({ mode: "none", input: "?" });
+    expect(reduce(initialState(["apps", "ask"]), { type: "text", text: "?" }).state.mode).toBe(
+      "query",
+    );
+  });
+
+  it("the enabledSources event updates the hint list and survives shown and hidden", () => {
+    const s = reduce(initialState(), { type: "enabledSources", sources: ["apps", "math"] }).state;
+    expect(s.enabledSources).toEqual(["apps", "math"]);
+    expect(availableModes(s.enabledSources)).toEqual(["find", "calc"]);
+    expect(reduce(s, { type: "shown" }).state.enabledSources).toEqual(["apps", "math"]);
+    expect(reduce(s, { type: "hidden" }).state.enabledSources).toEqual(["apps", "math"]);
   });
 
   it("Ctrl+, opens Settings", () => {
@@ -287,7 +310,7 @@ describe("reducer", () => {
   });
 
   it.each(["/", "?"])("prefix %s for a disabled mode stays as text", (ch) => {
-    const s = initialState(["command"]);
+    const s = initialState(["syscmd"]);
     const r = reduce(s, { type: "text", text: ch });
     expect(r.state).toMatchObject({ mode: "none", input: ch });
     expect(r.effects).toEqual([]);
@@ -322,14 +345,14 @@ describe("reducer", () => {
   });
 
   it("none mode: hints skip disabled modes", () => {
-    const s = initialState(["command"]);
-    expect(reduce(s, k("ArrowUp")).state.selected).toBe(2);
-    expect(reduce({ ...s, selected: 1 }, k("Enter")).state.mode).toBe("calc");
+    const s = initialState(["apps", "syscmd", "math", "projects"]);
+    expect(reduce(s, k("ArrowUp")).state.selected).toBe(3);
+    expect(reduce({ ...s, selected: 2 }, k("Enter")).state.mode).toBe("calc");
   });
 
   it("enterMode event enters a mode and ignores a disabled one", () => {
     expect(reduce(initialState(), { type: "enterMode", mode: "find" }).state.mode).toBe("find");
-    const s = initialState(["command"]);
+    const s = initialState(["apps"]);
     expect(reduce(s, { type: "enterMode", mode: "query" }).state).toBe(s);
   });
 
@@ -587,7 +610,7 @@ describe("explain attachment", () => {
   });
 
   it("ignores a capture while Query mode is off", () => {
-    const s = initialState(["command", "find"]);
+    const s = initialState(["apps", "files", "syscmd"]);
     expect(captured(att(), s).attachment).toBeNull();
   });
 

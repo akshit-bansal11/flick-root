@@ -75,7 +75,12 @@ export const reportShown = (shownId: number) => invoke<void>("report_shown", { s
 
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });
 
-export type ShownEvent = ShownPayload & { glass?: boolean; appearance?: Appearance };
+export type ShownEvent = ShownPayload & {
+  glass?: boolean;
+  appearance?: Appearance;
+  /** Live source ids (apps, files, ask, running feature ids); absent from older shells. */
+  sources?: string[];
+};
 
 export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>
   listen<ShownEvent>("launcher://shown", (e) => cb(e.payload));

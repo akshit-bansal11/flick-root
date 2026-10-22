@@ -44,7 +44,7 @@ export function LauncherView({
   const none = state.mode === "none";
   const selected = state.items[state.selected];
   const pathItem = selected?.id.startsWith("file:") ?? false;
-  const hints = availableModes(state.enabledModes);
+  const hints = availableModes(state.enabledSources);
   const hasList = none ? hints.length > 0 : state.items.length > 0;
   const activeId = !hasList ? undefined : none ? hintId(state.selected) : optionId(state.selected);
 

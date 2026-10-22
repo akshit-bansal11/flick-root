@@ -122,6 +122,7 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           glassAvailable: p.glass !== false,
         });
         dispatch({ type: "shown" });
+        if (p.sources) dispatch({ type: "enabledSources", sources: p.sources });
         inputRef.current?.focus();
         requestAnimationFrame(() => {
           syncHeight.current(true);

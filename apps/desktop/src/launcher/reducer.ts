@@ -41,7 +41,8 @@ export interface QueryState {
 
 export interface State {
   mode: LaunchMode;
-  enabledModes: Mode[];
+  /** Live source ids from launcher://shown; null until reported, then every prefix is offered. */
+  enabledSources: string[] | null;
   input: string;
   seq: number;
   /** Id of the current ask; events carrying another token are stale and ignored. */
@@ -76,7 +77,7 @@ export type Event =
   | { type: "actionFailed"; message: string }
   | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
   | { type: "enterMode"; mode: LaunchMode }
-  | { type: "enabledModes"; modes: Mode[] }
+  | { type: "enabledSources"; sources: string[] }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
   | { type: "copyDone"; ok: boolean }
@@ -181,13 +182,13 @@ const ENTERED = Object.keys(MODES) as Entered[];
 const modeOf = (prefix: string): Entered | undefined =>
   ENTERED.find((m) => MODES[m].prefix === prefix);
 
-/** Modes the user can enter now, in hint-panel order; Query and Find follow enabledModes. */
-export const availableModes = (enabled: Mode[]): Entered[] =>
-  ENTERED.filter((m) => MODES[m].wire === "command" || enabled.includes(MODES[m].wire));
+/** Modes the user can enter now, in hint-panel order: those with a live source in `needs`. */
+export const availableModes = (enabled: string[] | null): Entered[] =>
+  ENTERED.filter((m) => enabled === null || MODES[m].needs.some((n) => enabled.includes(n)));
 
-export const initialState = (enabledModes: Mode[] = ["command", "find", "query"]): State => ({
+export const initialState = (enabledSources: string[] | null = null): State => ({
   mode: "none",
-  enabledModes,
+  enabledSources,
   input: "",
   seq: 0,
   askToken: 0,
@@ -252,14 +253,14 @@ function switchMode(s: State, mode: LaunchMode, input: string): Result {
 
 /** Enter a mode; plain text typed on the hint panel is carried into it. */
 function enterMode(s: State, mode: LaunchMode): Result {
-  if (mode !== "none" && !availableModes(s.enabledModes).includes(mode)) return out(s);
+  if (mode !== "none" && !availableModes(s.enabledSources).includes(mode)) return out(s);
   return switchMode(s, mode, mode !== "none" && s.mode === "none" ? s.input : "");
 }
 
 function textChange(s: State, text: string): Result {
   // A prefix counts as the first character into an empty field, typed or pasted.
   const target = s.input === "" ? modeOf(text.slice(0, 1)) : undefined;
-  if (target && availableModes(s.enabledModes).includes(target)) {
+  if (target && availableModes(s.enabledSources).includes(target)) {
     return switchMode(s, target, text.slice(1));
   }
   if (s.mode === "none" || s.mode === "query") {
@@ -269,7 +270,7 @@ function textChange(s: State, text: string): Result {
 }
 
 function move(s: State, delta: number): Result {
-  const n = s.mode === "none" ? availableModes(s.enabledModes).length : s.items.length;
+  const n = s.mode === "none" ? availableModes(s.enabledSources).length : s.items.length;
   if (n === 0) return out(s);
   return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
@@ -311,7 +312,7 @@ function enter(s: State): Result {
     );
   }
   if (s.mode === "none") {
-    const mode = availableModes(s.enabledModes)[s.selected];
+    const mode = availableModes(s.enabledSources)[s.selected];
     return mode ? enterMode(s, mode) : out(s);
   }
   return openSelected(s, "open");
@@ -383,7 +384,7 @@ function resultValue(item: Item | undefined): string | null {
 
 /** Ctrl+1..5: jump to a mode, carrying typed text; disabled modes and the current mode do nothing. */
 function goMode(s: State, mode: Entered): Result {
-  if (mode === s.mode || !availableModes(s.enabledModes).includes(mode)) return out(s);
+  if (mode === s.mode || !availableModes(s.enabledSources).includes(mode)) return out(s);
   return switchMode(s, mode, s.input);
 }
 
@@ -522,7 +523,7 @@ export function reduce(s: State, ev: Event): Result {
     case "actionFailed":
       return out({ ...s, pendingConfirm: null, notice: ev.message });
     case "captured":
-      return s.enabledModes.includes("query")
+      return s.enabledSources === null || s.enabledSources.includes("ask")
         ? out(
             {
               ...s,
@@ -556,11 +557,11 @@ export function reduce(s: State, ev: Event): Result {
       return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
     case "enterMode":
       return enterMode(s, ev.mode);
-    case "enabledModes":
-      return out({ ...s, enabledModes: ev.modes });
+    case "enabledSources":
+      return out({ ...s, enabledSources: ev.sources });
     case "shown":
       return out({
-        ...initialState(s.enabledModes),
+        ...initialState(s.enabledSources),
         thinkingModes: s.thinkingModes,
         seq: s.seq,
         askToken: s.askToken,
@@ -569,7 +570,7 @@ export function reduce(s: State, ev: Event): Result {
     case "hidden":
       return out(
         {
-          ...initialState(s.enabledModes),
+          ...initialState(s.enabledSources),
           thinkingModes: s.thinkingModes,
           seq: s.seq,
           askToken: s.askToken,

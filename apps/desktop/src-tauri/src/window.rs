@@ -182,11 +182,37 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
         .config
         .load();
     let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
+    let running = app
+        .state::<std::sync::Arc<crate::state::AppState>>()
+        .registry
+        .running_ids();
+    let sources = live_sources(&config, &running);
     emit(
         app,
         "launcher://shown",
-        json!({ "shownId": shown_id, "reason": reason, "glass": glass, "appearance": appearance }),
+        json!({
+            "shownId": shown_id,
+            "reason": reason,
+            "glass": glass,
+            "appearance": appearance,
+            "sources": sources,
+        }),
     );
+}
+
+/// Source ids the launcher can offer now: `apps` always, `files` while Find is on, `ask` while
+/// Query is on, then every running feature id. The UI shows a prefix only while one of its
+/// sources is live.
+fn live_sources(cfg: &launcher_core::Config, running: &[&'static str]) -> Vec<String> {
+    let mut v = vec!["apps".to_string()];
+    if cfg.modes.find.enabled {
+        v.push("files".into());
+    }
+    if cfg.modes.query.enabled {
+        v.push("ask".into());
+    }
+    v.extend(running.iter().map(|id| (*id).to_string()));
+    v
 }
 
 /// Applies or removes the acrylic effect to match the Windows transparency setting;
@@ -372,6 +398,25 @@ mod tests {
         assert!((max_height(728, 1.25) - (582.4 - WORK_MARGIN)).abs() < 1e-9);
         assert_eq!(max_height(2000, 1.0), PANEL_MAX_H);
         assert_eq!(max_height(10, 1.0), PANEL_MIN_H);
+    }
+
+    #[test]
+    fn live_sources_follow_modes_and_running_features() {
+        let mut cfg = launcher_core::Config::default();
+        let run = ["math", "syscmd"];
+        assert_eq!(
+            live_sources(&cfg, &run),
+            ["apps", "files", "ask", "math", "syscmd"]
+        );
+        cfg.modes.find.enabled = false;
+        assert_eq!(live_sources(&cfg, &run), ["apps", "ask", "math", "syscmd"]);
+        cfg.modes.find.enabled = true;
+        cfg.modes.query.enabled = false;
+        assert_eq!(
+            live_sources(&cfg, &run),
+            ["apps", "files", "math", "syscmd"]
+        );
+        assert_eq!(live_sources(&cfg, &[]), ["apps", "files"]);
     }
 
     #[test]
