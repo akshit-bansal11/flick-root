@@ -232,7 +232,10 @@ export function General({ settings, onChange, onTour }: Props) {
                     aria-label={`Remove ${s}`}
                     disabled={!settings.scanPrograms}
                     onClick={() =>
-                      void editSkip("skip", settings.programSkip.filter((x) => x !== s))
+                      void editSkip(
+                        "skip",
+                        settings.programSkip.filter((x) => x !== s),
+                      )
                     }
                   >
                     Remove
