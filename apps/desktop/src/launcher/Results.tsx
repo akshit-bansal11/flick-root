@@ -1,6 +1,8 @@
-import { Fragment, useLayoutEffect, useRef } from "react";
+import { Fragment, useRef } from "react";
+import { Keycaps } from "../Keycaps";
+import { Lens, useLens } from "../Lens";
+import { caps } from "../shortcuts";
 import type { Item, LaunchMode } from "../types";
-import { measureRow } from "../useMotion";
 import { groupLabel } from "./kinds";
 import { ResultRow } from "./ResultRow";
 import { MODES } from "./reducer";
@@ -22,32 +24,15 @@ export function Results({ items, selected, query, onActivate }: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
   const list = useRef<HTMLDivElement>(null);
-  const hl = useRef<HTMLDivElement>(null);
-  // One highlight layer glides to the selected row; without a measurement the row paints its own background.
-  useLayoutEffect(() => {
-    const el = list.current;
-    const layer = hl.current;
-    if (!el || !layer) return;
-    const box = measureRow(el.querySelector<HTMLElement>(`#${optionId(selected)}`));
-    if (!box) {
-      delete el.dataset.hl;
-      return;
-    }
-    layer.style.height = `${box.height}px`;
-    layer.style.transform = `translateY(${box.top}px)`;
-    if (!el.dataset.hl) {
-      el.dataset.hl = "1";
-      // Placed instantly the first time; later moves glide.
-      requestAnimationFrame(() => {
-        layer.dataset.glide = "1";
-      });
-    }
-  });
+  const lens = useRef<HTMLDivElement>(null);
+  const visible = items.slice(start, start + MAX_ROWS);
+  // One lens glides to the selected row; it moves only when the selection or the rows change.
+  useLens(list, lens, items[selected] ? optionId(selected) : undefined, [start, ...visible]);
   return (
     <>
       <div ref={list} id={LISTBOX_ID} role="listbox" aria-label="Results" className="results">
-        <div ref={hl} className="row-hl" aria-hidden="true" />
-        {items.slice(start, start + MAX_ROWS).map((item, k) => {
+        <Lens ref={lens} />
+        {visible.map((item, k) => {
           const index = start + k;
           const label = groupLabel(item);
           const prev = items[index - 1];
@@ -87,8 +72,15 @@ interface HintProps {
 /** Prefix cheat sheet shown in the default state; each row enters its mode. */
 export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
   const prefixes = modes.map((m) => MODES[m].prefix).join(" ");
+  const list = useRef<HTMLDivElement>(null);
+  const lens = useRef<HTMLDivElement>(null);
+  useLens(list, lens, modes[selected] ? hintId(selected) : undefined, modes);
   return (
-    <div id={HINTS_ID} className="hints" role="listbox" aria-label="Modes">
+    <div ref={list} id={HINTS_ID} className="hints" role="listbox" aria-label="Modes">
+      <div className="group" aria-hidden="true">
+        Narrow with a prefix
+      </div>
+      <Lens ref={lens} />
       {modes.map((m, i) => (
         <button
           key={m}
@@ -101,9 +93,12 @@ export function PrefixHints({ modes, selected, typed, onEnter }: HintProps) {
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onEnter(m)}
         >
-          <kbd className="kbd">{MODES[m].prefix}</kbd>
-          <span className="hint-label">{MODES[m].label}</span>
-          <span className="hint-desc">{MODES[m].desc}</span>
+          <span className="tile tile-ico tile-glyph">{MODES[m].prefix}</span>
+          <span className="hint-text">
+            <span className="hint-label">{MODES[m].label}</span>
+            <span className="hint-desc">{MODES[m].desc}</span>
+          </span>
+          <Keycaps caps={caps(`go:${m}`)} />
         </button>
       ))}
       {typed && <p className="hint-note">Start with {prefixes} to search</p>}

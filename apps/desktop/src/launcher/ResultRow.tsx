@@ -1,3 +1,4 @@
+import { Keycaps } from "../Keycaps";
 import type { Item } from "../types";
 import { highlight } from "./highlight";
 import { kindName, rowKind } from "./kinds";
@@ -53,9 +54,16 @@ export function ResultRow({ item, id, index, selected, order, query, onActivate 
         </span>
         <span className="row-sub">{item.subtitle || kindName(item.kind)}</span>
       </span>
-      <span className="row-meta" aria-hidden="true">
-        {selected ? `↵ ${primaryLabel(item)}` : rowKind(item)}
-      </span>
+      {selected ? (
+        <span className="row-act" aria-hidden="true">
+          <Keycaps caps={["↵"]} />
+          {primaryLabel(item)}
+        </span>
+      ) : (
+        <span className="row-meta" aria-hidden="true">
+          {rowKind(item)}
+        </span>
+      )}
     </div>
   );
 }

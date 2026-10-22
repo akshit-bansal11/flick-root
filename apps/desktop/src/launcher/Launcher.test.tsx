@@ -1,10 +1,12 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
-import type { ExplainCaptured, Item } from "../types";
+import type { ExplainCaptured, Item, ItemKind } from "../types";
 import { footHints } from "./Footer";
+import { KindIcon } from "./KindIcon";
 import { Launcher } from "./Launcher";
 
 vi.mock("../ipc", () => ({
@@ -93,6 +95,45 @@ describe("Launcher", () => {
     expect(screen.getByText("> commands")).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
     expect(screen.queryByTestId("mode-chip")).toBeNull();
+  });
+
+  it("hint rows carry Ctrl+N caps and the list has one aria-hidden lens", async () => {
+    await mount();
+    const rows = screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ });
+    const caps = rows.map((r) =>
+      [...r.querySelectorAll("kbd")].map((k) => k.textContent).join(" "),
+    );
+    expect(caps).toEqual(["Ctrl 1", "Ctrl 2", "Ctrl 3", "Ctrl 4", "Ctrl 5"]);
+    expect(screen.getByText("Narrow with a prefix")).toBeTruthy();
+    const lenses = document.querySelectorAll(".lens");
+    expect(lenses).toHaveLength(1);
+    expect(lenses[0]?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("ArrowDown moves aria-selected and aria-activedescendant, with one lens", async () => {
+    await mount();
+    await type(">");
+    const input = screen.getByRole("combobox");
+    const before = input.getAttribute("aria-activedescendant");
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+    });
+    expect(input.getAttribute("aria-activedescendant")).not.toBe(before);
+    const selected = screen
+      .getAllByRole("option")
+      .filter((o) => o.getAttribute("aria-selected") === "true");
+    expect(selected).toHaveLength(1);
+    expect(selected[0]?.id).toBe(input.getAttribute("aria-activedescendant"));
+    expect(document.querySelectorAll(".lens")).toHaveLength(1);
+  });
+
+  it("file rows render a kind icon tile and app rows without an icon a letter tile", async () => {
+    await mount();
+    await type(">");
+    expect(document.querySelectorAll(".tile-letter").length).toBeGreaterThan(0);
+    mockFileResults();
+    await type("/x");
+    expect(document.querySelector(".row .tile-ico svg")).not.toBeNull();
   });
 
   it("shown with sources [apps] hides the other four prefix hint rows", async () => {
@@ -360,5 +401,25 @@ describe("footHints", () => {
     expect(hints.map((h) => h.id)).toEqual(["go:find", "go:calc", "sheet"]);
     expect(hints[0]).toEqual({ id: "go:find", caps: ["/"], label: "open" });
     expect(hints[2]?.label).toBe("shortcuts");
+  });
+});
+
+describe("KindIcon", () => {
+  it("draws an svg for every kind", () => {
+    const kinds: ItemKind[] = [
+      "app",
+      "command",
+      "file",
+      "folder",
+      "project",
+      "result",
+      "process",
+      "media",
+      "capture",
+      "choice",
+    ];
+    for (const kind of kinds) {
+      expect(renderToStaticMarkup(<KindIcon kind={kind} />)).toContain("<svg");
+    }
   });
 });
