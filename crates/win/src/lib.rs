@@ -14,6 +14,7 @@ pub mod radios;
 pub mod recycle;
 pub mod thread;
 pub mod uia;
+pub mod webview;
 
 pub use com::ComGuard;
 pub use error::WinError;

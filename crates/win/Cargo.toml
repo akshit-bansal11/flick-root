@@ -18,3 +18,4 @@ windows = { workspace = true, features = [
     "Win32_Graphics_Dwm", "Win32_System_Registry", "Win32_UI_Controls", "Win32_System_LibraryLoader",
 ] }
 thiserror = { workspace = true }
+webview2-com = "=0.39.1"

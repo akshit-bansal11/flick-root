@@ -97,6 +97,15 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
 fn hide(app: &AppHandle, win: &WebviewWindow) {
     if let Err(err) = win.hide() {
         tracing::warn!(%err, "hide failed");
+    } else {
+        #[cfg(windows)]
+        if let Err(err) = win.with_webview(|w| {
+            if let Err(err) = win::webview::on_hidden(&w.controller()) {
+                tracing::debug!(%err, "webview suspend failed");
+            }
+        }) {
+            tracing::debug!(%err, "webview suspend dispatch failed");
+        }
     }
     emit(app, "launcher://hidden", json!({}));
 }
@@ -140,6 +149,15 @@ pub fn show(app: &AppHandle, reason: &str) {
 fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) {
     if let Err(err) = place(app, win) {
         tracing::warn!(%err, "positioning failed");
+    }
+    // Resume before show so the first frame paints from a live page.
+    #[cfg(windows)]
+    if let Err(err) = win.with_webview(|w| {
+        if let Err(err) = win::webview::on_shown(&w.controller()) {
+            tracing::debug!(%err, "webview resume failed");
+        }
+    }) {
+        tracing::debug!(%err, "webview resume dispatch failed");
     }
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {
         tracing::warn!(%err, "show failed");
