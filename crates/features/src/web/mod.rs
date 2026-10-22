@@ -8,6 +8,7 @@ use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;
 use crate::feature::Feature;
 use crate::schema::{self, Column, Field, FieldKind, SettingsSchema};
+use crate::search::fuzzy_pick;
 use async_trait::async_trait;
 use launcher_core::{Action, ActionKind, Input, Item, ItemId, ItemKind, Mode, Outcome};
 use parking_lot::RwLock;
@@ -158,7 +159,14 @@ impl State {
             Some((w, r)) => (w, r.trim()),
             None => (text, ""),
         };
-        let Some(&i) = self.by_keyword.get(word.to_ascii_lowercase().as_str()) else {
+        let lower = word.to_ascii_lowercase();
+        let found = self.by_keyword.get(lower.as_str()).copied().or_else(|| {
+            // Typo: keywords of 4+ characters only; short ones would match too much.
+            let long = self.list.iter().map(|s| s.keyword.as_str());
+            let k = fuzzy_pick(&lower, long.filter(|k| k.chars().count() >= 4))?;
+            self.by_keyword.get(k).copied()
+        });
+        let Some(i) = found else {
             return Vec::new();
         };
         let s = &self.list[i];
@@ -299,6 +307,14 @@ mod tests {
         let st = State::defaults();
         let keys: Vec<_> = st.list.iter().map(|s| s.keyword.as_str()).collect();
         assert_eq!(keys, ["g", "yt", "gh", "amz", "maps", "wiki"]);
+    }
+
+    #[test]
+    fn fuzzy_keyword_of_four_or_more_chars() {
+        let st = State::defaults();
+        let items = st.query(&input("mpas cats"));
+        assert_eq!(items[0].id.0, "web:maps");
+        assert!(st.query(&input("gg cats")).is_empty());
     }
 
     #[test]

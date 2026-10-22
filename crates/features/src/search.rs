@@ -3,7 +3,7 @@
 use crate::registry::Registry;
 use index_apps::AppEntry;
 use index_files::{FileHit, FileIndex, FindQuery, Overlay};
-use launcher_core::matcher::{FuzzyMatcher, MatchIndex};
+use launcher_core::matcher::{FuzzyMatcher, MatchIndex, keyword_score, one_edit};
 use launcher_core::{ActionKind, Input, Item, ItemId, ItemKind};
 use std::cmp::Ordering;
 
@@ -93,6 +93,54 @@ fn top_k_sorted(mut items: Vec<Item>, k: usize) -> Vec<Item> {
     items
 }
 
+/// Typo fallback for apps when nucleo found nothing: a single query word of 4+ characters within one
+/// edit of any word of an app name scores `0.3 * APP_CEIL`. At most `k` rows.
+fn one_edit_apps(apps: &[AppEntry], text: &str, k: usize) -> Vec<Item> {
+    let q = text.trim();
+    if q.chars().count() < 4 || q.contains(char::is_whitespace) {
+        return Vec::new();
+    }
+    apps.iter()
+        .enumerate()
+        .filter(|(_, a)| {
+            a.name
+                .split(|c: char| !c.is_alphanumeric())
+                .any(|w| one_edit(q, w))
+        })
+        .take(k)
+        .map(|(i, a)| app_item(a, i, 0.3 * APP_CEIL, false, false))
+        .collect()
+}
+
+/// Picks the keyword a typed word means: the word itself when it is one, else the single keyword
+/// it is a fuzzy (subsequence or one-edit) match for. Prefixes are not accepted, so the fuzzy
+/// path never changes what correct or half-typed input does. Words under 4 characters match nothing;
+/// a tie between keywords matches nothing.
+pub(crate) fn fuzzy_pick<'a>(
+    word: &str,
+    keywords: impl IntoIterator<Item = &'a str>,
+) -> Option<&'a str> {
+    if word.chars().count() < 4 {
+        return None;
+    }
+    let mut best: Option<(f32, &str)> = None;
+    let mut tie = false;
+    for k in keywords {
+        let Some(s) = keyword_score(word, k).filter(|s| *s >= 1.0 || *s < 0.5) else {
+            continue;
+        };
+        match best {
+            Some((b, _)) if s < b => {}
+            Some((b, _)) if s == b => tie = true,
+            _ => {
+                best = Some((s, k));
+                tie = false;
+            }
+        }
+    }
+    best.filter(|_| !tie).map(|(_, k)| k)
+}
+
 /// Command-mode results over all sources; see [`command_search_scoped`].
 pub fn command_search(
     apps: &[AppEntry],
@@ -135,6 +183,9 @@ pub fn command_search_scoped(
             );
         } else {
             let hits = matcher.top_k(&input.text, app_index, k);
+            if hits.is_empty() {
+                items.extend(one_edit_apps(apps, &input.text, k));
+            }
             let best = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
             let max = best.max(matcher.perfect_score(&input.text) as f32);
             items.extend(hits.into_iter().filter_map(|h| {
@@ -327,6 +378,32 @@ mod tests {
         assert_eq!(got[0].id.0, "app:p.Code");
         let all = command_search(&apps, &idx, &mut m, &r, &input(""), 2);
         assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn typo_finds_spotify_app() {
+        let apps = vec![app("Spotify"), app("Notepad")];
+        let ai = idx_of(&apps);
+        let mut m = FuzzyMatcher::new();
+        let r = Registry::new();
+        for q in ["spotfy", "spotifu"] {
+            let got =
+                command_search_scoped(&apps, SearchScope::Apps, &ai, &mut m, &r, &input(q), 5);
+            assert_eq!(
+                got.first().map(|i| i.title.as_str()),
+                Some("Spotify"),
+                "{q}"
+            );
+        }
+    }
+
+    #[test]
+    fn fuzzy_pick_rules() {
+        let kws = ["port", "proc"];
+        assert_eq!(fuzzy_pick("port", kws), Some("port"));
+        assert_eq!(fuzzy_pick("prot", kws), None);
+        assert_eq!(fuzzy_pick("potr", kws), Some("port"));
+        assert_eq!(fuzzy_pick("por", kws), None);
     }
 
     fn idx_of(list: &[AppEntry]) -> MatchIndex {

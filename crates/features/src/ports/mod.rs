@@ -7,6 +7,7 @@ use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;
 use crate::feature::Feature;
 use crate::schema::{Field, FieldKind, SettingsSchema};
+use crate::search::fuzzy_pick;
 use crate::syscmd::Clock;
 use arc_swap::ArcSwap;
 use async_trait::async_trait;
@@ -41,7 +42,9 @@ pub fn parse(text: &str) -> Option<Ask> {
     let t = text.trim();
     let (head, rest) = t.split_once(char::is_whitespace).unwrap_or((t, ""));
     let rest = rest.trim();
-    match head.to_lowercase().as_str() {
+    let head = head.to_lowercase();
+    let head = fuzzy_pick(&head, ["port", "proc"]).unwrap_or(&head);
+    match head {
         "port" if rest.is_empty() => Some(Ask::Port(None)),
         "port" => rest.parse::<u16>().ok().map(|n| Ask::Port(Some(n))),
         "proc" if !rest.is_empty() => Some(Ask::Proc(rest.to_lowercase())),
@@ -522,6 +525,8 @@ mod tests {
         assert_eq!(parse("port 3000"), Some(Ask::Port(Some(3000))));
         assert_eq!(parse(" Port "), Some(Ask::Port(None)));
         assert_eq!(parse("proc Chrome"), Some(Ask::Proc("chrome".into())));
+        assert_eq!(parse("potr 3000"), Some(Ask::Port(Some(3000))));
+        assert_eq!(parse("prco chrome"), Some(Ask::Proc("chrome".into())));
         for bad in ["", "proc", "port abc", "port 99999", "portal", "chrome"] {
             assert_eq!(parse(bad), None, "{bad}");
         }

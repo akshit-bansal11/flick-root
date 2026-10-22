@@ -15,6 +15,7 @@ use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;
 use crate::feature::Feature;
 use crate::schema::SettingsSchema;
+use crate::search::fuzzy_pick;
 use async_trait::async_trait;
 use gsmtc::{Backend, Gsmtc};
 use launcher_core::{Action, ActionKind, Input, Item, ItemId, ItemKind, Mode, Outcome};
@@ -56,6 +57,15 @@ pub fn parse(text: &str) -> Option<Ask> {
         "like" => return Some(Ask::Like),
         "devices" => return Some(Ask::Devices),
         _ => {}
+    }
+    if !t.contains(char::is_whitespace) {
+        // A single mistyped verb ("plya", "pasue"); retried as the verb itself.
+        const VERBS: [&str; 7] = [
+            "play", "pause", "next", "previous", "stop", "like", "devices",
+        ];
+        if let Some(v) = fuzzy_pick(&t.to_lowercase(), VERBS) {
+            return parse(v);
+        }
     }
     for (prefix, make) in [
         ("queue ", Ask::Queue as fn(String) -> Ask),
@@ -481,6 +491,12 @@ mod tests {
             kind: ActionKind::Primary,
             confirm_token: None,
         }
+    }
+
+    #[test]
+    fn fuzzy_verbs() {
+        assert_eq!(parse("pasue"), Some(Ask::Cmd(MediaCmd::Pause)));
+        assert_eq!(parse("devcies"), Some(Ask::Devices));
     }
 
     #[test]

@@ -160,6 +160,7 @@ fn bench(c: &mut Criterion) {
         "5pm ist in pst",
         "notepad",
         "zzzz",
+        "spotfy",
         "port 3000",
         "proc chrome",
         "play lofi on spotify",

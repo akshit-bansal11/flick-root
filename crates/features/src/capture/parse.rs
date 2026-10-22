@@ -1,6 +1,7 @@
 //! Local parser for capture input: `log 250 lunch #food yesterday 12:30`, `note ...`, `todo ...`.
 //! Pure; no I/O. Amount, tags, date and time are found offline; the rest is the text.
 
+use crate::search::fuzzy_pick;
 use chrono::{Duration, NaiveDate, NaiveTime};
 use serde_json::{Value, json};
 
@@ -36,11 +37,17 @@ pub struct Parsed {
 pub fn split_keyword(text: &str) -> Option<(Kind, &str)> {
     let t = text.trim_start();
     let (head, rest) = t.split_once(char::is_whitespace)?;
-    let kind = match head.to_lowercase().as_str() {
+    let head = head.to_lowercase();
+    // "log" is too short to fuzz ("logs" would collide), so only note and todo accept a typo.
+    let kind = match head.as_str() {
         "log" => Kind::Log,
         "note" => Kind::Note,
         "todo" => Kind::Todo,
-        _ => return None,
+        h => match fuzzy_pick(h, ["note", "todo"]) {
+            Some("note") => Kind::Note,
+            Some("todo") => Kind::Todo,
+            _ => return None,
+        },
     };
     Some((kind, rest.trim()))
 }
@@ -207,6 +214,8 @@ mod tests {
         assert_eq!(split_keyword("todo  buy milk").unwrap().1, "buy milk");
         assert!(split_keyword("log").is_none());
         assert!(split_keyword("logs 1 x").is_none());
+        assert_eq!(split_keyword("tood buy milk").unwrap().0, Kind::Todo);
+        assert_eq!(split_keyword("noet hi").unwrap().0, Kind::Note);
         assert!(split_keyword("hello world").is_none());
     }
 
