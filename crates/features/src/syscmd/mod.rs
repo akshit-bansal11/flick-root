@@ -222,7 +222,18 @@ fn user_message(e: &WinError) -> String {
         WinError::AccessDenied => {
             "Windows denied the request. Check the permission or setting in Windows.".into()
         }
+        WinError::Unavailable(what) if what == "sleep" => {
+            "This PC reports no sleep mode (neither S3 nor Modern Standby).".into()
+        }
+        WinError::Unavailable(what) if what == "hibernate" => {
+            "Hibernate is turned off on this PC (powercfg /hibernate on enables it).".into()
+        }
         WinError::Unavailable(what) => format!("Not available on this PC: {what}"),
+        WinError::Denied(what) => {
+            format!("Windows denied access to {what}. Check Settings > Privacy > Radios.")
+        }
+        WinError::Failed(text) => text.clone(),
+        WinError::Cancelled => "The command was cancelled.".into(),
         other => format!("The command failed: {other}"),
     }
 }
@@ -336,6 +347,19 @@ impl Feature for SysCmd {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn user_messages_are_readable() {
+        assert!(user_message(&WinError::Unavailable("sleep".into())).contains("no sleep mode"));
+        assert!(user_message(&WinError::Unavailable("hibernate".into())).contains("Hibernate"));
+        assert!(user_message(&WinError::Unavailable("Wi-Fi".into())).ends_with("Wi-Fi"));
+        assert!(user_message(&WinError::Denied("Bluetooth".into())).contains("Bluetooth"));
+        assert_eq!(
+            user_message(&WinError::Failed("Explorer did not come back.".into())),
+            "Explorer did not come back."
+        );
+        assert!(user_message(&WinError::AccessDenied).contains("denied"));
+    }
 
     #[derive(Default)]
     struct Fake {

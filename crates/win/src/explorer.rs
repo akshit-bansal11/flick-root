@@ -75,17 +75,36 @@ pub fn restart_explorer() -> Result<(), WinError> {
         unsafe { WaitForSingleObject(h.0, 3000) };
     }
     // The shell normally relaunches itself; give it a moment before starting our own.
-    let deadline = Instant::now() + Duration::from_millis(1500);
-    while Instant::now() < deadline {
-        if !explorer_pids()?.is_empty() {
-            return Ok(());
-        }
-        std::thread::sleep(Duration::from_millis(100));
+    if wait_for_explorer(Duration::from_millis(1500))? {
+        return Ok(());
     }
     std::process::Command::new("explorer.exe")
         .spawn()
-        .map(drop)
-        .map_err(|_| WinError::Unavailable("explorer.exe".into()))
+        .map_err(|e| {
+            WinError::Failed(format!("Explorer was closed but could not be started: {e}"))
+        })?;
+    if wait_for_explorer(Duration::from_millis(3000))? {
+        Ok(())
+    } else {
+        Err(WinError::Failed(
+            "Explorer was closed and did not come back. Start explorer.exe from Task Manager."
+                .into(),
+        ))
+    }
+}
+
+/// True once an explorer.exe of this session is running, polling until `limit` passes.
+fn wait_for_explorer(limit: Duration) -> Result<bool, WinError> {
+    let deadline = Instant::now() + limit;
+    loop {
+        if !explorer_pids()?.is_empty() {
+            return Ok(true);
+        }
+        if Instant::now() >= deadline {
+            return Ok(false);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 #[cfg(test)]

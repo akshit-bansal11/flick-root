@@ -19,6 +19,12 @@ pub enum WinError {
     /// The capability does not exist on this system.
     #[error("not available on this system: {0}")]
     Unavailable(String),
+    /// Windows refused the request for this named thing (for example "Wi-Fi").
+    #[error("Windows denied access to {0}")]
+    Denied(String),
+    /// The call returned but the job was not done; the text says what is wrong.
+    #[error("{0}")]
+    Failed(String),
     /// The operation was cancelled.
     #[error("cancelled")]
     Cancelled,
