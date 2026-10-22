@@ -1,15 +1,16 @@
 # Flick
 
-Flick is a free, open-source, keyboard-first launcher for Windows. Commands, apps, Find and Ask share one bar, each behind a one-character prefix: run a command, open an app or program, find a file, or ask a model, without leaving the keyboard. It is a wrapper. It ships no models, no API keys, no account and no default provider, and nothing AI-related is switched on out of the box. You choose every provider, and commands, apps and Find work fully with no AI at all. There is no telemetry, no sign-in, and the license is MIT.
+Flick is a free, open-source, keyboard-first launcher for Windows. Open, Commands, Calc, Ask and Projects share one bar, each behind a one-character prefix: open an app, program, file or folder, run a command, calculate, ask a model, or jump into a project, without leaving the keyboard. It is a wrapper. It ships no models, no API keys, no account and no default provider, and nothing AI-related is switched on out of the box. You choose every provider, and everything except Ask works fully with no AI at all. There is no telemetry, no sign-in, and the license is MIT.
 
 ## Status
 
 Flick is at v0.0.1. Features:
 
-- Apps (`!`): fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them, plus programs found on your drives.
-- Commands (`>`): system commands, math, units, web shortcuts, ports, media, capture.
-- Find (`/`): fuzzy search of files and folders under the indexed roots, with Open, Open file location and Copy path.
+- Open (`/`): fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them, plus programs found on your drives, and files and folders under the indexed roots, with Open, Open file location and Copy path.
+- Commands (`>`): system commands, web shortcuts, ports, media, capture.
+- Calc (`=`): math, units, currency and time zones.
 - Ask (`?`): streams an answer from the provider and model you pick, with Fast/Think, thinking modes and provider fallback.
+- Projects (`@`): code folders under your dev roots, most used first.
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
 - Settings window (General, Appearance, Features, AI providers, About), first run with a welcome screen, and an interactive tour.
 - Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
@@ -24,25 +25,26 @@ The installer is unsigned, so Windows SmartScreen shows "Windows protected your 
 
 ## Hotkeys and modes
 
-Modes are chosen only by a prefix typed first in the empty bar; there is no Tab switcher. Plain text with no prefix searches nothing and shows the four prefixes. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode.
+Modes are chosen only by a prefix typed first in the empty bar; there is no Tab switcher. Plain text with no prefix searches nothing and shows the prefix list. A prefix is offered only while a feature it needs is on. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode. With `@` and nothing after it, Flick lists your projects, most used first.
 
-| Prefix | Mode |
-| --- | --- |
-| `>` | Commands: system commands, math, units, web shortcuts, ports, media, capture |
-| `!` | Apps and programs |
-| `/` | Find files and folders (plain-language too) |
-| `?` | Ask your AI providers |
+| Prefix | Mode | Sources |
+| --- | --- | --- |
+| `/` | Open | Apps, programs, files and folders (plain-language file requests too), grouped |
+| `>` | Commands | System commands, web shortcuts, media, ports and processes, quick capture |
+| `=` | Calc | Math, units, currency and time zones |
+| `?` | Ask | Your AI providers (never searches) |
+| `@` | Projects | Code folders under your dev folders |
 
 | Key | Action |
 | --- | --- |
 | `Alt+Space` | Show or hide Flick (configurable). It replaces Windows' window menu; the hotkey picker warns about it. |
 | `Up` / `Down` | Move the selection |
 | `Enter` | Primary action (open, launch, ask) |
-| `Ctrl+Enter` | Show location (Commands, Apps, Find) |
-| `Ctrl+Shift+Enter` | Run as admin (Commands, Apps, when the result can) |
-| `Ctrl+Shift+C` | Copy: path in Find, result in Commands, answer in Ask |
+| `Ctrl+Enter` | Show location (Open, Commands, Calc, Projects) |
+| `Ctrl+Shift+Enter` | Run as admin (Open: apps and exe/msi programs, when the result can) |
+| `Ctrl+Shift+C` | Copy: path in Open (files and folders), result in Commands and Calc, answer in Ask |
 | `Delete` | End a process, after arrowing to its row in Commands; `Enter` confirms |
-| `Ctrl+1` to `Ctrl+4` | Go to Commands, Apps, Find, Ask |
+| `Ctrl+1` to `Ctrl+5` | Go to Open, Commands, Calc, Ask, Projects |
 | `Tab` / `Shift+Tab` | Next / previous thinking mode (Ask) |
 | `Ctrl+T` | Fast/Think toggle (Ask) |
 | `Ctrl+Shift+X` | Remove the attached Explain text (Ask) |
@@ -60,21 +62,21 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 
 ## Features
 
-- **Programs:** `!` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
-- **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); Find matches letters in order. [Details](docs/features/search.md).
+- **Programs:** `/` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
+- **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); file search matches letters in order. [Details](docs/features/search.md).
 - **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
 - **Themes:** Glass, Frost, Midnight, Aurora, Ember and Solid, in Settings, Appearance. [Details](docs/features/appearance.md).
 - **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).
 - **Frecency:** ranks items you use often and recently higher, with a 7-day half-life. You can turn on prefix learning, change the half-life, clear history, or turn ranking off to get pure match order.
-- **Math and units:** type arithmetic, units, currency or time zones in Commands mode (`>`), for example `2.5 kg to lb`, `250 usd in inr` or `5pm ist in pst`. Enter copies the result. Currency uses the ECB daily reference rates, fetched at most once a day and cached. When offline, Flick uses the last cached rate and shows its age. The rates are published by the European Central Bank.
+- **Math and units:** type arithmetic, units, currency or time zones after `=`, for example `2.5 kg to lb`, `250 usd in inr` or `5pm ist in pst`. Enter copies the result. Currency uses the ECB daily reference rates, fetched at most once a day and cached. When offline, Flick uses the last cached rate and shows its age. The rates are published by the European Central Bank.
 - **System commands:** Lock, Sleep, Hibernate, Restart, Shut down, Sign out, Empty Recycle Bin, Restart Explorer, Wi-Fi on/off and Bluetooth on/off. Restart, Shut down, Sign out and Empty Recycle Bin need Enter twice within 3 seconds.
 - **Web shortcuts:** a keyword plus a query opens a URL. Defaults: `g` (Google), `yt` (YouTube), `gh` (GitHub), `amz` (amazon.in), `maps` (Google Maps), `wiki` (Wikipedia). Add, edit, remove and reorder them in Settings.
-- **Project launcher:** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder.
-- **Natural-language finder:** in Find, `the invoice i downloaded last week` is parsed offline and opens only a clear winner of a safe file type; otherwise it lists the candidates. Decision engines (Laya, Kev, your AI provider, Jev) are optional and off by default. [Details](docs/features/natural-language-finder.md).
-- **Ports and processes:** `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Delete`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
-- **Media controls:** `play`, `pause`, `next`, `previous`, `now playing` work on any player. `play X on spotify` / `on youtube` open a search; connecting your own Spotify developer app is optional. [Details](docs/features/media-controls.md).
-- **Explain this:** a second hotkey (`Alt+Shift+Space`) captures the selected text and shows it in Ask mode (`?`) before anything is sent; secret-looking text is blocked. [Details](docs/features/explain-this.md).
-- **Quick capture:** `log 250 lunch #food`, `note ...`, `todo ...` go to an Obsidian daily note, a Markdown file, Notion or a webhook. [Details](docs/features/quick-capture.md).
+- **Project launcher (`@`):** folders with `.git`, `package.json`, `Cargo.toml`, `pyproject.toml` or `go.mod` under your dev roots, plus recent VS Code workspaces. `code <name>` opens the editor (VS Code by default; Cursor and Zed are selectable), `term <name>` opens Windows Terminal there, and a bare name opens the folder. `@` with nothing after it lists projects, most used first.
+- **Natural-language finder:** after `/`, `the invoice i downloaded last week` is parsed offline and opens only a clear winner of a safe file type; otherwise it lists the candidates. Decision engines (Laya, Kev, your AI provider, Jev) are optional and off by default. [Details](docs/features/natural-language-finder.md).
+- **Ports and processes:** after `>`, `port 3000` shows what holds a port, `proc node` searches processes. Arrow to a row, press `Delete`, then `Enter` to end it. [Details](docs/features/ports-and-processes.md).
+- **Media controls:** after `>`, `play`, `pause`, `next`, `previous`, `now playing` work on any player. `play X on spotify` / `on youtube` open a search; connecting your own Spotify developer app is optional. [Details](docs/features/media-controls.md).
+- **Explain this:** a second hotkey (`Alt+Shift+Space`) captures the selected text and shows it in Ask (`?`) before anything is sent; secret-looking text is blocked. [Details](docs/features/explain-this.md).
+- **Quick capture:** after `>`, `log 250 lunch #food`, `note ...`, `todo ...` go to an Obsidian daily note, a Markdown file, Notion or a webhook. [Details](docs/features/quick-capture.md).
 
 ## AI providers
 
@@ -152,3 +154,4 @@ Design decisions are recorded in [docs/adr/](docs/adr/):
 - [ADR-009](docs/adr/ADR-009-feature-modules.md) Feature modules and toggles
 - [ADR-010](docs/adr/ADR-010-integrations.md) Integrations
 - [ADR-011](docs/adr/ADR-011-secret-security.md) Secret security
+- [ADR-012](docs/adr/ADR-012-prefixes-and-plain-text.md) Prefixes and plain text

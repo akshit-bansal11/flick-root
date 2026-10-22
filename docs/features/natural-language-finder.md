@@ -4,7 +4,7 @@ Find a file by describing it, for example `the invoice i downloaded last week` o
 
 ## How to use it
 
-In Find mode, type a plain-language phrase. A phrase counts as natural language when it has three or more words, or contains one of: `my`, `from`, `in`, `the`, `that`, `last`, `yesterday`. Flick adds a row `Find: <phrase>`; press Enter to run it. Shorter inputs stay ordinary fuzzy file search.
+After typing `/` (Open), type a plain-language phrase. A phrase counts as natural language when it has three or more words, or contains one of: `my`, `from`, `in`, `the`, `that`, `last`, `yesterday`. Flick adds a row `Find: <phrase>`; press Enter to run it. Shorter inputs stay ordinary fuzzy file search.
 
 What the offline parser understands:
 

@@ -1,6 +1,6 @@
 # System commands
 
-Run Windows actions from Command mode (`>`). Type part of a name and press Enter.
+Run Windows actions after typing `>` (Commands). Type part of a name and press Enter.
 
 ## Commands
 

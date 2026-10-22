@@ -64,9 +64,9 @@ Node count: 21 (3 UI, 5 shell, 7 crates including planned decision, 6 OS/service
 
 | Crate | Responsibility | May use unsafe? |
 | --- | --- | --- |
-| `launcher-core` | Shared types, Mode and prefix parsing, nucleo matcher wrapper, ranking hooks, SQLite store, config model, brand constants | No |
+| `launcher-core` | Shared types, nucleo matcher wrapper, ranking hooks, SQLite store, config model, brand constants | No |
 | `index-apps` | AppsFolder enumeration, filters, launch (normal, runas, reveal), icon extraction, app cache | Yes (SAFETY comments) |
-| `index-files` | File index: scan, skip rules, filesystem watcher, snapshot persistence, query for Find mode | No |
+| `index-files` | File index: scan, skip rules, filesystem watcher, snapshot persistence, query for the `files` source of Open (`/`) | No |
 | `providers` | Provider trait, OpenAI-compatible and Anthropic clients, presets, local detection, fallback order, cancellation, secret store (ADR-011) | No |
 | `decision` | NL parser, /v1/systemone client for Laya, Kev and Jev, LLM picker with strict JSON parsing | No |
 | `features` | Feature trait, registry, settings schema, start/stop lifecycle (`TaskScope`), frecency, math, projects and other feature modules | No |
@@ -82,12 +82,12 @@ Workspace members (from `Cargo.toml`): `crates/launcher-core`, `crates/index-app
 2. The launcher window was created at startup and hidden, so it is only shown, not built (ADR-001).
 3. The UI reports shown through `report_shown`, and focus moves to the input.
 
-### Keystroke to Command results
+### Keystroke to results
 
-1. The UI sends the input through the `search` command.
-2. The shell routes it by prefix (`launcher-core` prefix parsing) to Command mode.
-3. The matcher (`nucleo-matcher`, ADR-004) scores the app list from `index-apps`.
-4. Each enabled feature's `query()` runs (synchronous, cheap, ADR-009).
+1. The UI parses the prefix (the `MODES` table in the launcher reducer, ADR-012) and sends the mode, the text and the source ids for that prefix through the `search` command.
+2. Rust composes the results from those sources: apps, programs, files, and the enabled features named in the list.
+3. The matcher (`nucleo-matcher`, ADR-004) scores the app list from `index-apps` and the file index from `index-files`.
+4. Each enabled feature in the list runs its `query()` (synchronous, cheap, ADR-009).
 5. Frecency boosts are added only when the Frecency feature is on, then results are ranked.
 
 ### Enter to launch

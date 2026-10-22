@@ -1,6 +1,6 @@
 # Media controls
 
-Control whatever is playing, and search Spotify or YouTube, from Command mode. Everything works without an account; connecting Spotify is optional.
+Control whatever is playing, and search Spotify or YouTube, after typing `>`. Everything works without an account; connecting Spotify is optional.
 
 ## How to use it (no setup)
 

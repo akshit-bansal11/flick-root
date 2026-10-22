@@ -1,6 +1,6 @@
 # Ports and processes
 
-See what is holding a port, search running processes, and end one, all from Command mode.
+See what is holding a port, search running processes, and end one, all after typing `>` (Commands).
 
 ## How to use it
 

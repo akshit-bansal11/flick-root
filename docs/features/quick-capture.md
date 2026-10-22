@@ -4,7 +4,7 @@ Jot a line from the launcher: `log 250 lunch #food`, `note call the bank`, `todo
 
 ## How to use it
 
-Type `log`, `note` or `todo` followed by text, in Command mode. One row appears for each target you have set up; pick one and press Enter. With no target set up, the row says "Set up quick capture" and points to Settings, Integrations.
+Type `log`, `note` or `todo` followed by text, after typing `>`. One row appears for each target you have set up; pick one and press Enter. With no target set up, the row says "Set up quick capture" and points to Settings, Integrations.
 
 - `log 250 lunch #food yesterday 12:30`: finds an amount (`250`, `$12.50`, `1.5k`), `#tags`, a date (`today`, `yesterday`, `tomorrow` or `2026-10-19`) and a time (`HH:MM`, 24 hour). What is left is the text.
 - `note ...` and `todo ...`: the text is kept as typed (tags are still read).

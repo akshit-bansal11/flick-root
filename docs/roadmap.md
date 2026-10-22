@@ -5,10 +5,12 @@ Flick is a free, open-source, keyboard-first launcher for Windows. This page lis
 ## v0.0.1
 
 - A global hotkey (Alt+Space, configurable) that shows and hides the launcher.
-- Command mode: fuzzy search of installed apps, including Store apps, with launch, run as admin and open location.
-- Find mode: fuzzy search of files and folders under the indexed roots, with open, open file location and copy path.
-- Query mode: streams an answer from the first enabled provider that responds, with Fast/Think and provider fallback.
-- Modes chosen by the `>`, `!`, `/` and `?` prefixes.
+- Open (`/`): fuzzy search of installed apps (including Store apps), programs, files and folders, with launch, run as admin, open location and copy path.
+- Commands (`>`): system commands, web shortcuts, media, ports and capture.
+- Calc (`=`): math, units, currency and time zones.
+- Ask (`?`): streams an answer from the first enabled provider that responds, with Fast/Think and provider fallback.
+- Projects (`@`): code folders under your dev folders.
+- Modes chosen by the `/`, `>`, `=`, `?` and `@` prefixes. A prefix is offered only while a feature it needs is on.
 - Feature toggles for frecency ranking, inline math and units, system commands, web shortcuts and the project launcher.
 - Integrations: natural-language finder (ADR-005), ports and processes, media controls with optional Spotify and YouTube connections (ADR-010), Explain this, and Quick capture to Obsidian, a Markdown file, Notion and webhooks (ADR-010).
 - A Settings window, a first-run flow, and a tray icon with Open, Settings and Quit, single-instance behaviour, and a launch-at-startup toggle.

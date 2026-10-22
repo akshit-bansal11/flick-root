@@ -1,10 +1,10 @@
 # Programs
 
-`!` lists your installed apps and, below them, programs Flick finds by scanning every fixed and removable drive.
+`/` (Open) lists your installed apps and, below them, programs Flick finds by scanning every fixed and removable drive.
 
 ## How to use it
 
-Type `!` first in the empty bar, then part of a name. Installed apps rank first. A program row shows "Program" and its folder. Enter opens it. `Ctrl+Shift+Enter` runs it as admin, only for `.exe` and `.msi` files. Programs on a removable drive are labelled "Removable" and can never run as admin.
+Type `/` first in the empty bar, then part of a name. Installed apps rank first. A program row shows "Program" and its folder. Enter opens it. `Ctrl+Shift+Enter` runs it as admin, only for `.exe` and `.msi` files. Programs on a removable drive are labelled "Removable" and can never run as admin.
 
 ## What is scanned
 
@@ -58,4 +58,4 @@ A program is listed only if its name contains what you typed, or every word you 
 
 ## Turn it off
 
-Settings, General, "Find programs on all drives" (`apps.scan_programs`). Off stops the scan and removes programs from `!`. Off also stops the watcher that picks up new programs.
+Settings, General, "Find programs on all drives" (`apps.scan_programs`). Off stops the scan and removes programs from `/`. Off also stops the watcher that picks up new programs.
