@@ -63,7 +63,8 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 
 ## Features
 
-- **Programs:** `!` also lists programs found by scanning every fixed drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
+- **Programs:** `!` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
+- **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); Find matches letters in order. [Details](docs/features/search.md).
 - **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
 - **Themes:** Glass, Frost, Midnight, Aurora, Ember and Solid, in Settings, Appearance. [Details](docs/features/appearance.md).
 - **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).

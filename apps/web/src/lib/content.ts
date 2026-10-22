@@ -27,6 +27,8 @@ export const DOCS: Doc[] = [
   feature("explain-this", "Explain this"),
   feature("quick-capture", "Quick capture"),
   feature("programs", "Programs"),
+  feature("search", "Search"),
+  feature("system-commands", "System commands"),
   feature("thinking-modes", "Thinking modes"),
   feature("appearance", "Appearance"),
   feature("tutorial", "Tutorial"),
