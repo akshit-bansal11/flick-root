@@ -47,6 +47,7 @@ export function LauncherView({
   const plain = state.mode === "none" && !prefixList;
   const selected = state.items[state.selected];
   const pathItem = selected?.id.startsWith("file:") ?? false;
+  const revealable = selected?.actions.some((a) => a.type === "location") ?? false;
   const hints = availableModes(state.enabledSources);
   const hasList = prefixList ? hints.length > 0 : state.items.length > 0;
   const activeId = !hasList
@@ -109,7 +110,7 @@ export function LauncherView({
         )}
       </div>
       {!state.sheet && state.mode === "find" && state.items.length > 0 && (
-        <Actions onPress={press} pathItem={pathItem} />
+        <Actions onPress={press} pathItem={pathItem} revealable={revealable} />
       )}
       <Footer
         mode={state.mode}
@@ -119,6 +120,7 @@ export function LauncherView({
         copyFailed={state.copyFailed}
         ctx={{
           pathItem,
+          revealable,
           armedProcess: state.armed && selected?.kind === "process",
           adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,
           copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,

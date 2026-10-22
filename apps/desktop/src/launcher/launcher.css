@@ -242,6 +242,8 @@ body,
 }
 
 .hint-desc {
+  min-width: 0;
+  color: var(--l-muted);
   font-size: var(--l-fs-caption);
   line-height: var(--l-lh-caption);
 }
@@ -258,13 +260,8 @@ body,
   box-shadow: none;
 }
 
-.hint-desc {
-  min-width: 0;
-  color: var(--l-muted);
-}
-
 /* Glass keycap. No backdrop-filter: a footer and a shortcut list hold many per frame.
-   ponytail: .kbd stays grouped here until Results, Tour, Welcome and Attachment move to Keycaps. */
+   ponytail: .kbd stays grouped here until Welcome.tsx and Tour.tsx move to Keycaps. */
 .key,
 .kbd {
   display: inline-grid;

@@ -435,7 +435,11 @@ describe("Launcher explain", () => {
 
 describe("footHints", () => {
   it("find lists open and location, and admin only when the selection has it", () => {
-    expect(footHints("find").map((h) => h.label)).toEqual(["open", "location"]);
+    expect(footHints("find").map((h) => h.label)).toEqual(["open"]);
+    expect(footHints("find", { revealable: true }).map((h) => h.label)).toEqual([
+      "open",
+      "location",
+    ]);
     const admin = footHints("find", { adminAction: true }).find((h) => h.id === "admin");
     expect(admin?.caps).toEqual(["Ctrl", "Shift", "↵"]);
   });

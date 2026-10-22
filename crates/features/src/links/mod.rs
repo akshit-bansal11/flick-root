@@ -39,6 +39,42 @@ const TLDS: [&str; 23] = [
 /// quoting downstream.
 const BAD_PATH_CHARS: [char; 6] = ['<', '>', '"', '|', '?', '*'];
 
+/// Extensions Enter never opens from a typed path: programs, scripts, shortcuts and installers.
+const BLOCKED_EXTS: [&str; 28] = [
+    "exe",
+    "com",
+    "bat",
+    "cmd",
+    "ps1",
+    "psm1",
+    "psd1",
+    "vbs",
+    "vbe",
+    "js",
+    "jse",
+    "wsf",
+    "wsh",
+    "hta",
+    "msi",
+    "msp",
+    "msc",
+    "reg",
+    "lnk",
+    "scr",
+    "pif",
+    "cpl",
+    "jar",
+    "appref-ms",
+    "application",
+    "url",
+    "inf",
+    "scf",
+];
+
+/// Shown when a typed path is a program or script.
+const BLOCKED_MSG: &str =
+    "Flick does not run programs from a typed path. Type / to find the app instead.";
+
 /// Allow-listed variables, uppercase name to value, captured in `start`.
 type Vars = HashMap<&'static str, String>;
 
@@ -152,6 +188,10 @@ fn is_drive_abs(s: &str) -> bool {
 fn classify_path(t: &str, vars: &Vars) -> Option<String> {
     let expanded = if let Some(rest) = t.strip_prefix('%') {
         let (name, tail) = rest.split_once('%')?;
+        // `%APPDATA%foo` would glue the value and the name together; a separator must follow.
+        if !tail.starts_with('\\') {
+            return None;
+        }
         let upper = name.to_ascii_uppercase();
         let value = vars.get(upper.as_str())?;
         format!("{value}{tail}")
@@ -171,6 +211,18 @@ fn classify_path(t: &str, vars: &Vars) -> Option<String> {
         return None;
     }
     Some(expanded)
+}
+
+/// True when a path ends in a program or script type. Pure string check, no I/O. Windows drops
+/// trailing dots and spaces from names, so `a.exe.` counts as `a.exe`.
+fn is_blocked(path: &str) -> bool {
+    let name = path
+        .trim_end_matches(['.', ' ', '\\', '/'])
+        .rsplit(['\\', '/'])
+        .next()
+        .unwrap_or_default();
+    name.rsplit_once('.')
+        .is_some_and(|(_, ext)| BLOCKED_EXTS.iter().any(|b| ext.eq_ignore_ascii_case(b)))
 }
 
 impl Links {
@@ -214,6 +266,9 @@ impl Feature for Links {
             return Vec::new();
         };
         let s = target.as_str();
+        if matches!(target, Target::Path(_)) && is_blocked(s) {
+            return Vec::new();
+        }
         vec![Item {
             id: ItemId(format!("links:{s}")),
             kind: ItemKind::Command,
@@ -244,6 +299,9 @@ impl Feature for Links {
             Target::Url(u) => index_apps::launch::open_path(Path::new(&u))
                 .map_err(|_| format!("could not open {u}")),
             Target::Path(p) => {
+                if is_blocked(&p) {
+                    return Err(BLOCKED_MSG.to_owned());
+                }
                 let path = Path::new(&p);
                 if !path.exists() {
                     return Err("That path does not exist".to_owned());
@@ -368,11 +426,56 @@ mod tests {
             r"%WINDIR%\x",
             r"%PATH%",
             r"%APPDATA",
+            r"%APPDATA%foo",
+            r"%APPDATA%",
             &long,
         ];
         for text in cases {
             assert_eq!(c(text), None, "{text:?}");
         }
+    }
+
+    #[test]
+    fn blocks_programs_and_scripts() {
+        for p in [
+            r"C:\x\a.exe",
+            r"C:\x\A.EXE",
+            r"C:\x\run.Bat",
+            r"C:\x\s.ps1",
+            r"C:\x\a.exe.",
+            r"C:\x\a.exe ",
+            "C:/x/a.lnk",
+            r"C:\x\setup.msi",
+            r"C:\x\a.appref-ms",
+        ] {
+            assert!(is_blocked(p), "{p}");
+            assert!(links().query(&input(p)).is_empty(), "{p}");
+        }
+        for p in [
+            r"C:\Users\me\Docs",
+            r"C:\x\notes.txt",
+            r"C:\x\a.exe.txt",
+            r"C:\x\exe",
+            r"C:\x.exe\readme.md",
+        ] {
+            assert!(!is_blocked(p), "{p}");
+            assert_eq!(links().query(&input(p)).len(), 1, "{p}");
+        }
+        // Links are never blocked by this check.
+        assert_eq!(links().query(&input("github.com/a.exe")).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn execute_refuses_programs_with_a_hint() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let exe = dir.path().join("a.exe");
+        std::fs::write(&exe, b"").expect("write file");
+        let target = exe.to_string_lossy().into_owned();
+        let r = links().execute(&item(&target, "path"), primary()).await;
+        assert!(
+            matches!(r, Err(FeatureError::Other(ref m)) if m == BLOCKED_MSG && m.contains('/')),
+            "{r:?}"
+        );
     }
 
     #[test]

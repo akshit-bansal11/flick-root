@@ -29,6 +29,10 @@ const k = (key: string, o: Partial<KeyInput> = {}): Event => ({
   type: "key",
   key: { key, ctrl: false, shift: false, alt: false, ...o },
 });
+const located = (id: string): Item => ({
+  ...item(id),
+  actions: [{ type: "primary" }, { type: "location" }],
+});
 const withItems = (s: State, n = 3): State => ({
   ...s,
   items: Array.from({ length: n }, (_, i) => item(`i${i}`)),
@@ -206,6 +210,20 @@ describe("reducer", () => {
     expect(r.state.items).toEqual([]);
   });
 
+  it("ignores results in query mode", () => {
+    const s = reduce(inMode("commands"), { type: "text", text: "a" }).state;
+    const asking = { ...s, mode: "query" as const, items: [] };
+    const r = reduce(asking, { type: "results", seq: asking.seq, items: [item("x")] });
+    expect(r.state.items).toEqual([]);
+  });
+
+  it("searchFailed clears pending for the current search only", () => {
+    const s = reduce(inMode("commands"), { type: "text", text: "a" }).state;
+    expect(s.pending).toBe(true);
+    expect(reduce(s, { type: "searchFailed", seq: s.seq }).state.pending).toBe(false);
+    expect(reduce(s, { type: "searchFailed", seq: s.seq - 1 }).state.pending).toBe(true);
+  });
+
   it("accepts current results and resets selection", () => {
     const s = { ...reduce(inMode("commands"), { type: "text", text: "a" }).state, selected: 2 };
     const r = reduce(s, { type: "results", seq: 1, items: [item("x")] });
@@ -236,8 +254,13 @@ describe("reducer", () => {
   });
 
   it("Ctrl+Enter reveals location", () => {
-    const r = reduce(withItems(inMode("find")), k("Enter", { ctrl: true }));
+    const r = reduce({ ...inMode("find"), items: [located("i0")] }, k("Enter", { ctrl: true }));
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i0" }]);
+  });
+
+  it("Ctrl+Enter does nothing on a row without a location action", () => {
+    expect(reduce(withItems(inMode("none")), k("Enter", { ctrl: true })).effects).toEqual([]);
+    expect(reduce(withItems(inMode("find")), k("Enter", { ctrl: true })).effects).toEqual([]);
   });
 
   it("Ctrl+Shift+Enter launches as admin in Open when the row has an admin action", () => {
@@ -608,10 +631,12 @@ describe("reducer", () => {
     expect(second.effects).toEqual([{ type: "confirm", commandId: "i1", token: "t", kill: false }]);
   });
 
-  it("activate with ctrl reveals the clicked row", () => {
-    const r = reduce(withItems(inMode("commands"), 3), { type: "activate", index: 2, ctrl: true });
+  it("activate with ctrl reveals the clicked row when it has a location", () => {
+    const s = { ...inMode("commands"), items: [item("i0"), item("i1"), located("i2")] };
+    const r = reduce(s, { type: "activate", index: 2, ctrl: true });
     expect(r.state.selected).toBe(2);
     expect(r.effects).toEqual([{ type: "reveal", itemId: "i2" }]);
+    expect(reduce(s, { type: "activate", index: 1, ctrl: true }).effects).toEqual([]);
   });
 
   it("showItems outcome replaces the list", () => {
@@ -789,6 +814,14 @@ describe("thinking modes", () => {
   it("ask carries the selected thinkingMode", () => {
     const r = reduce({ ...withModes("b/2"), input: "hi" }, k("Enter"));
     expect(r.effects).toContainEqual(expect.objectContaining({ type: "ask", thinkingMode: "b/2" }));
+  });
+
+  it("thinking modes arriving rebuild the Ask fallback title in plain text", () => {
+    const typed = reduce(initialState(["apps", "ask"]), { type: "text", text: "cats" }).state;
+    const titles = (s: State) => s.items.filter((i) => i.id === "ui:ask").map((i) => i.title);
+    expect(titles(typed)).toEqual(["Ask your AI: “cats”"]);
+    const r = reduce(typed, { type: "thinkingModes", modes: tm, selected: "b/2" });
+    expect(titles(r.state)).toEqual(["Ask b/2 · 2: “cats”"]);
   });
 
   it("entering query loads modes; the event stores them", () => {

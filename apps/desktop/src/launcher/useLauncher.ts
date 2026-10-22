@@ -44,7 +44,10 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           ipc
             .search({ seq: e.seq, mode: e.mode, text: e.text, sources: e.sources })
             .then((res) => dispatch({ type: "results", seq: res.seq, items: res.items }))
-            .catch(warn);
+            .catch((err: unknown) => {
+              warn(err);
+              dispatch({ type: "searchFailed", seq: e.seq });
+            });
           break;
         case "launch":
           outcome(e.itemId, ipc.launch(e.itemId, e.admin));

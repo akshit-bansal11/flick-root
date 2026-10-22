@@ -31,6 +31,7 @@ export function QueryView(p: Props) {
   if (p.noProvider) return <EmptyState onOpenSettings={p.onOpenSettings} />;
   // EU AI Act Art. 50: the disclosure stays on screen with every generated answer.
   const who = [p.provider ?? mode?.providerLabel, p.model ?? mode?.model].filter(Boolean);
+  const showBar = Boolean(mode || p.provider || p.reasoning !== false);
   const marker = ["AI answer", ...who].join(" · ");
   return (
     <div className="query">
@@ -47,36 +48,38 @@ export function QueryView(p: Props) {
           {p.error}
         </div>
       )}
-      <div className="float-bar liquid">
-        {mode ? (
-          <span
-            key={`${mode.providerLabel}/${mode.model}`}
-            className="query-chip mode-pill"
-            aria-live="polite"
-          >
-            <span className="dot" aria-hidden="true" />
-            {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
-          </span>
-        ) : (
-          p.provider && <span className="query-chip mode-pill">{p.provider}</span>
-        )}
-        {p.reasoning !== false && (
-          <button
-            type="button"
-            className={p.effort === "think" ? "query-pill on" : "query-pill"}
-            aria-pressed={p.effort === "think"}
-            onClick={p.onToggleEffort}
-          >
-            {p.effort === "think" ? "Think" : "Fast"}
-          </button>
-        )}
-        {modes.length >= 2 && (
-          <span className="float-hint">
-            <Keycaps caps={caps("model")} />
-            Model
-          </span>
-        )}
-      </div>
+      {showBar && (
+        <div className="float-bar liquid">
+          {mode ? (
+            <span
+              key={`${mode.providerLabel}/${mode.model}`}
+              className="query-chip mode-pill"
+              aria-live="polite"
+            >
+              <span className="dot" aria-hidden="true" />
+              {`${mode.providerLabel} · ${mode.model}${mode.local ? " · local" : ""}`}
+            </span>
+          ) : (
+            p.provider && <span className="query-chip mode-pill">{p.provider}</span>
+          )}
+          {p.reasoning !== false && (
+            <button
+              type="button"
+              className={p.effort === "think" ? "query-pill on" : "query-pill"}
+              aria-pressed={p.effort === "think"}
+              onClick={p.onToggleEffort}
+            >
+              {p.effort === "think" ? "Think" : "Fast"}
+            </button>
+          )}
+          {modes.length >= 2 && (
+            <span className="float-hint">
+              <Keycaps caps={caps("model")} />
+              Model
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

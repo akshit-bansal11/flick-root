@@ -69,6 +69,13 @@ describe("QueryView", () => {
     expect(document.body.textContent).not.toContain("thinking…");
   });
 
+  it("renders no float bar when there is no mode, provider or reasoning control", () => {
+    const c = render({ provider: null, reasoning: false });
+    expect(c.querySelector(".float-bar")).toBeNull();
+    act(() => root?.render(<QueryView {...base} provider={null} />));
+    expect(c.querySelector(".float-bar")).not.toBeNull();
+  });
+
   it("empty state renders copy and button opens settings", () => {
     const open = vi.fn();
     const c = render({ noProvider: true, onOpenSettings: open });

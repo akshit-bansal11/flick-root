@@ -22,10 +22,12 @@ export type Condition =
   | "copyValue"
   | "attachment"
   | "answer"
-  | "pathItem";
+  | "pathItem"
+  | "revealable";
 
 export const WHEN_TEXT: Record<Condition, string> = {
   pathItem: "result is a file or folder",
+  revealable: "result has a location",
   adminAction: "result can run as admin",
   armedProcess: "after arrowing to a process",
   copyValue: "result has a value",
@@ -63,6 +65,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     keys: "Ctrl+Enter",
     label: "Show location",
     scope: ["none", "find"],
+    when: "revealable",
     foot: "location",
   },
   {

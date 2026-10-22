@@ -9,16 +9,18 @@ Type a link or a folder path and Flick adds one Open row for it. Nothing opens u
 | `https://github.com/x` or `http://localhost:3000` | Open the link |
 | `github.com/x` (a bare domain) | Open `https://github.com/x` |
 | `C:\Users\me\Docs` or `C:/tmp/a` | Open the path |
-| `%APPDATA%\Foo` | Open the path with the variable filled in |
+| `%APPDATA%\Foo` | Open the path with the variable filled in (a `\` must follow the closing `%`) |
 | `~\Downloads` | Open the path in your user folder |
 
 Bare domains must end in a common top-level domain: com, org, net, io, dev, app, ai, co, in, uk, de, fr, us, edu, gov, info, me, tv, xyz, tech, cloud, site or online. Allowed variables are APPDATA, LOCALAPPDATA, USERPROFILE, TEMP, PROGRAMDATA and PROGRAMFILES. Text longer than 2048 characters is ignored.
 
 A path opens only if it exists. Otherwise Flick says "That path does not exist".
 
+Flick does not run programs or scripts from a typed path. Folders and documents open; executable and script types (such as `.exe`, `.bat`, `.ps1`, `.js`, `.lnk` and `.msi`) get no Open row. To start a program, search for it by name or type `/`.
+
 ## What is never detected
 
-- Network paths (`\server\share`) and device paths (`\?\C:\...`).
+- Network paths (`\\server\share`) and device paths (`\\?\C:\...`).
 - Any path with `..` in it, or with `< > " | ? *`, or with a second `:` after the drive letter.
 - Schemes other than http and https, such as `file:` or `javascript:`.
 - Links with a user name or password in them, such as `https://bank.com@evil.com`.

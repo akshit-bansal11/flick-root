@@ -68,6 +68,7 @@ export type Event =
   | { type: "activate"; index: number; ctrl?: boolean; shift?: boolean }
   | { type: "text"; text: string }
   | { type: "results"; seq: number; items: Item[] }
+  | { type: "searchFailed"; seq: number }
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
   | { type: "actionFailed"; message: string }
@@ -401,7 +402,11 @@ function openSelected(s: State, intent: Intent): Result {
     if (!item.actions.some((a) => a.type === "admin")) return out(s);
     return out(s, { type: "launch", itemId: item.id, admin: true });
   }
-  if (intent === "location") return out(s, { type: "reveal", itemId: item.id });
+  if (intent === "location") {
+    // Rust lists Location only for apps and files; commands, math and links have none.
+    if (!item.actions.some((a) => a.type === "location")) return out(s);
+    return out(s, { type: "reveal", itemId: item.id });
+  }
   const pending = s.pendingConfirm;
   if (pending && pending.commandId === item.id) {
     return out(
@@ -586,7 +591,7 @@ export function reduce(s: State, ev: Event): Result {
     case "text":
       return textChange(s, ev.text);
     case "results":
-      if (ev.seq !== s.seq || isPrefixList(s)) return out(s);
+      if (ev.seq !== s.seq || s.mode === "query" || isPrefixList(s)) return out(s);
       return out({
         ...s,
         items: s.mode === "none" ? [...ev.items, ...fallbackRows(s)] : ev.items,
@@ -594,6 +599,8 @@ export function reduce(s: State, ev: Event): Result {
         armed: false,
         pending: false,
       });
+    case "searchFailed":
+      return ev.seq === s.seq ? out({ ...s, pending: false }) : out(s);
     case "ask":
       return ask(s, ev.token, ev.event);
     case "outcome":
@@ -631,8 +638,15 @@ export function reduce(s: State, ev: Event): Result {
           );
     case "copiedDone":
       return out({ ...s, copied: false, copyFailed: false });
-    case "thinkingModes":
-      return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
+    case "thinkingModes": {
+      const next: State = { ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } };
+      // The Ask fallback row names the chosen model; rebuild it when the modes arrive.
+      const plainText = next.mode === "none" && !isPrefixList(next);
+      const items = plainText
+        ? [...next.items.filter((i) => i.source !== "ui"), ...fallbackRows(next)]
+        : next.items;
+      return out({ ...next, items });
+    }
     case "enterMode":
       return enterMode(s, ev.mode);
     case "enabledSources": {
