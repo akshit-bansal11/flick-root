@@ -960,7 +960,7 @@ scan_programs = false
     #[test]
     fn validate_skip_rejects() {
         let long = "a".repeat(MAX_SKIP_LEN + 1);
-        let table: [(&str, SkipError); 15] = [
+        let table: [(&str, SkipError); 17] = [
             ("", SkipError::Empty),
             ("   ", SkipError::Empty),
             (long.as_str(), SkipError::TooLong),
