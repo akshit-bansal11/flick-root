@@ -126,9 +126,139 @@ impl FuzzyMatcher {
     }
 }
 
+/// True when `a` and `b` are within one Damerau-Levenshtein edit (insert, delete, substitute or
+/// adjacent swap), case-insensitively. Equal strings count as within one edit.
+pub fn one_edit(a: &str, b: &str) -> bool {
+    let a: Vec<char> = a.chars().flat_map(char::to_lowercase).collect();
+    let b: Vec<char> = b.chars().flat_map(char::to_lowercase).collect();
+    if a.len().abs_diff(b.len()) > 1 {
+        return false;
+    }
+    let pre = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+    let (a, b) = (&a[pre..], &b[pre..]);
+    let suf = a
+        .iter()
+        .rev()
+        .zip(b.iter().rev())
+        .take_while(|(x, y)| x == y)
+        .count();
+    let (a, b) = (&a[..a.len() - suf], &b[..b.len() - suf]);
+    match (a.len(), b.len()) {
+        (0, 0) | (1, 0) | (0, 1) | (1, 1) => true,
+        (2, 2) => a[0] == b[1] && a[1] == b[0],
+        _ => false,
+    }
+}
+
+fn is_subsequence(q: &str, hay: impl Iterator<Item = char>) -> bool {
+    let mut q = q.chars();
+    let mut next = q.next();
+    for c in hay {
+        if next == Some(c) {
+            next = q.next();
+        }
+    }
+    next.is_none()
+}
+
+/// Fuzzy tier of one query word against one keyword word: prefix or subsequence 0.45, one edit 0.4.
+fn word_fuzzy(q: &str, w: &str) -> Option<f32> {
+    if w.starts_with(q) {
+        return Some(0.45);
+    }
+    if q.chars().count() < 3 {
+        return None;
+    }
+    if is_subsequence(q, w.chars()) {
+        Some(0.45)
+    } else if one_edit(q, w) {
+        Some(0.4)
+    } else {
+        None
+    }
+}
+
+/// Scores a query against one keyword (alias): exact 1.0, prefix 0.95, a later word's prefix 0.6,
+/// then fuzzy tiers (subsequence 0.45, one edit 0.4) that need a query of at least 3 characters.
+/// A multi-word query must match the keyword's words one by one; the worst word sets the score.
+pub fn keyword_score(query: &str, keyword: &str) -> Option<f32> {
+    let q = query.trim().to_lowercase();
+    let k = keyword.to_lowercase();
+    if q.is_empty() {
+        return None;
+    }
+    if q == k {
+        return Some(1.0);
+    }
+    if k.starts_with(&q) {
+        return Some(0.95);
+    }
+    if k.split(' ').skip(1).any(|w| w.starts_with(&q)) {
+        return Some(0.6);
+    }
+    if q.chars().count() < 3 {
+        return None;
+    }
+    let mut words = q.split_whitespace();
+    let (first, second) = (words.next()?, words.next());
+    if second.is_none() {
+        // Single word: also try the keyword with its spaces removed ("shtdwn" in "shut down").
+        if is_subsequence(first, k.chars().filter(|c| *c != ' ')) {
+            return Some(0.45);
+        }
+        return k
+            .split(' ')
+            .filter_map(|w| word_fuzzy(first, w))
+            .reduce(f32::max);
+    }
+    q.split_whitespace()
+        .map(|qw| {
+            k.split(' ')
+                .filter_map(|w| word_fuzzy(qw, w))
+                .reduce(f32::max)
+        })
+        .try_fold(1.0f32, |acc, s| s.map(|s| acc.min(s)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn keyword_score_tiers() {
+        let cases: [(&str, &str, Option<f32>); 10] = [
+            ("lock", "lock", Some(1.0)),
+            ("loc", "lock", Some(0.95)),
+            ("off", "bluetooth off", Some(0.6)),
+            ("slep", "sleep", Some(0.45)),
+            ("shtdwn", "shut down", Some(0.45)),
+            ("sleeo", "sleep", Some(0.4)),
+            ("lcok", "lock", Some(0.4)),
+            ("blutooth off", "bluetooth off", Some(0.45)),
+            ("sl", "lock", None),
+            ("xyz", "lock", None),
+        ];
+        for (q, k, want) in cases {
+            assert_eq!(keyword_score(q, k), want, "{q} vs {k}");
+        }
+    }
+
+    #[test]
+    fn one_edit_table() {
+        for (a, b, want) in [
+            ("lcok", "lock", true),
+            ("lock", "locks", true),
+            ("locks", "lock", true),
+            ("lack", "lock", true),
+            ("lock", "LOCK", true),
+            ("lock", "lock", true),
+            ("lcokk", "lock", false),
+            ("abc", "xyz", false),
+            ("ab", "abcd", false),
+        ] {
+            assert_eq!(one_edit(a, b), want, "{a} vs {b}");
+        }
+    }
 
     #[test]
     fn empty_query_is_empty() {

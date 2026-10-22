@@ -5,6 +5,7 @@ use crate::error::FeatureError;
 use crate::feature::Feature;
 use crate::schema::SettingsSchema;
 use async_trait::async_trait;
+use launcher_core::matcher::keyword_score;
 use launcher_core::{Action, ActionKind, Input, Item, ItemId, ItemKind, Mode, Outcome};
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -282,16 +283,11 @@ impl Feature for SysCmd {
             if c.id == "hibernate" && !hib {
                 continue;
             }
-            let mut best = 0.0f32;
-            for a in c.aliases {
-                if a.starts_with(&q) {
-                    best = 1.0;
-                    break;
-                }
-                if a.split(' ').skip(1).any(|w| w.starts_with(&q)) {
-                    best = best.max(0.6);
-                }
-            }
+            let best = c
+                .aliases
+                .iter()
+                .filter_map(|a| keyword_score(&q, a))
+                .fold(0.0f32, f32::max);
             if best > 0.0 {
                 out.push(Item {
                     id: ItemId(format!("syscmd:{}", c.id)),
@@ -480,5 +476,38 @@ mod tests {
         assert_eq!(s.query(&input("hib")).len(), 1);
         let (s, ..) = setup(true);
         assert!(s.query(&input("hib")).is_empty());
+    }
+
+    fn top(s: &SysCmd, q: &str) -> Option<String> {
+        s.query(&input(q))
+            .into_iter()
+            .max_by(|a, b| a.score.total_cmp(&b.score))
+            .map(|i| i.title)
+    }
+
+    #[test]
+    fn fuzzy_queries_find_commands() {
+        let (s, ..) = setup(false);
+        assert_eq!(top(&s, "slep").as_deref(), Some("Sleep"));
+        assert_eq!(top(&s, "shtdwn").as_deref(), Some("Shut down"));
+        assert_eq!(top(&s, "blutooth off").as_deref(), Some("Bluetooth off"));
+        assert_eq!(top(&s, "sleeo").as_deref(), Some("Sleep"));
+        assert_eq!(top(&s, "lock").as_deref(), Some("Lock"));
+        assert!(s.query(&input("ab")).iter().all(|i| i.score >= 0.6));
+    }
+
+    #[test]
+    fn query_stays_within_budget() {
+        let (s, ..) = setup(false);
+        let qs = ["slep", "shtdwn", "blutooth off", "lock", "wifi", "xyzzy"];
+        let t = Instant::now();
+        for i in 0..1000 {
+            std::hint::black_box(s.query(&input(qs[i % qs.len()])));
+        }
+        assert!(
+            t.elapsed() < Duration::from_millis(500),
+            "{:?}",
+            t.elapsed()
+        );
     }
 }
