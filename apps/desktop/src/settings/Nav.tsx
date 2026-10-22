@@ -1,6 +1,6 @@
-import { type KeyboardEvent, useLayoutEffect, useRef } from "react";
+import { type KeyboardEvent, useRef } from "react";
 import { APP_DISPLAY_NAME } from "../brand";
-import { measureRow } from "../useMotion";
+import { Lens, useLens } from "../Lens";
 
 export const PAGES = [
   { id: "general", label: "General" },
@@ -20,20 +20,14 @@ interface Props {
   featuresCount: string | null;
 }
 
+const itemId = (id: PageId) => `nav-${id}`;
+
 export function Nav({ active, onSelect, featuresCount }: Props) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const bar = useRef<HTMLSpanElement>(null);
-  // The indicator bar glides to the active item; it is placed without animation the first time.
-  useLayoutEffect(() => {
-    const el = bar.current;
-    const box = measureRow(refs.current[PAGES.findIndex((p) => p.id === active)]);
-    if (!el || !box) return;
-    el.style.height = `${box.height}px`;
-    el.style.transform = `translateY(${box.top}px) scaleY(0.44)`;
-    requestAnimationFrame(() => {
-      el.dataset.glide = "1";
-    });
-  }, [active]);
+  const list = useRef<HTMLDivElement>(null);
+  const lens = useRef<HTMLDivElement>(null);
+  // One glass lens glides to the active item; it is placed without animation the first time.
+  useLens(list, lens, itemId(active), []);
   const focusAt = (i: number) => refs.current[(i + PAGES.length) % PAGES.length]?.focus();
   const onKeyDown = (e: KeyboardEvent, i: number) => {
     if (e.key === "ArrowDown") focusAt(i + 1);
@@ -47,27 +41,30 @@ export function Nav({ active, onSelect, featuresCount }: Props) {
   return (
     <nav className="s-nav" aria-label="Settings">
       <div className="s-brand">{APP_DISPLAY_NAME}</div>
-      <span ref={bar} className="s-nav-bar" aria-hidden="true" />
-      {PAGES.map((p, i) => (
-        <button
-          key={p.id}
-          type="button"
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          className="s-nav-item"
-          tabIndex={p.id === active ? 0 : -1}
-          aria-current={p.id === active ? "page" : undefined}
-          onClick={() => onSelect(p.id)}
-          onFocus={() => onSelect(p.id)}
-          onKeyDown={(e) => onKeyDown(e, i)}
-        >
-          <span>{p.label}</span>
-          {p.id === "features" && featuresCount && (
-            <span className="s-nav-count">{featuresCount}</span>
-          )}
-        </button>
-      ))}
+      <div ref={list} className="s-nav-list">
+        <Lens ref={lens} />
+        {PAGES.map((p, i) => (
+          <button
+            key={p.id}
+            id={itemId(p.id)}
+            type="button"
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            className="s-nav-item"
+            tabIndex={p.id === active ? 0 : -1}
+            aria-current={p.id === active ? "page" : undefined}
+            onClick={() => onSelect(p.id)}
+            onFocus={() => onSelect(p.id)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+          >
+            <span>{p.label}</span>
+            {p.id === "features" && featuresCount && (
+              <span className="s-nav-count">{featuresCount}</span>
+            )}
+          </button>
+        ))}
+      </div>
     </nav>
   );
 }

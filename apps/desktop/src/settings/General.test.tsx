@@ -130,6 +130,16 @@ describe("program exclusions", () => {
   });
 });
 
+describe("General switches", () => {
+  afterEach(cleanup);
+  it("uses the one Toggle component for every switch", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    expect(screen.getByRole("switch", { name: "Launch at startup" })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "Check for updates" })).toBeTruthy();
+    expect(document.querySelectorAll('button[role="switch"]:not(.s-switch)')).toHaveLength(0);
+  });
+});
+
 describe("programs scan toggle", () => {
   afterEach(cleanup);
   it("sends scanPrograms", () => {

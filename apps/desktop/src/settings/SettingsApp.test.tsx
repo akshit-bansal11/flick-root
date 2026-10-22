@@ -88,6 +88,20 @@ describe("SettingsApp", () => {
     expect(general.tabIndex).toBe(-1);
   });
 
+  it("the nav lens is decorative and moves to the selected page", async () => {
+    await mount();
+    const lens = document.querySelector(".s-nav .lens");
+    expect(lens?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByRole("heading", { name: "General" })).toBeTruthy();
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+    });
+    expect(screen.getByRole("button", { name: "Appearance" }).getAttribute("aria-current")).toBe(
+      "page",
+    );
+    expect(screen.queryByRole("heading", { name: "General" })).toBeNull();
+  });
+
   it("Ctrl+Tab and Ctrl+Shift+Tab step through the pages", async () => {
     await mount();
     act(() => {

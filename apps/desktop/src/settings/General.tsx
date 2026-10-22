@@ -154,13 +154,10 @@ export function General({ settings, onChange, onTour }: Props) {
       </Row>
 
       <Row label="Launch at startup" error={errors.startup}>
-        <button
-          type="button"
-          role="switch"
-          aria-label="Launch at startup"
-          aria-checked={settings.launchAtStartup}
-          className="s-switch"
-          onClick={() => void patch("startup", { launchAtStartup: !settings.launchAtStartup })}
+        <Toggle
+          label="Launch at startup"
+          checked={settings.launchAtStartup}
+          onChange={(on) => void patch("startup", { launchAtStartup: on })}
         />
       </Row>
 
@@ -169,13 +166,10 @@ export function General({ settings, onChange, onTour }: Props) {
         help="Once a day, asks GitHub whether a newer release exists. Nothing else is sent."
         error={errors.updates}
       >
-        <button
-          type="button"
-          role="switch"
-          aria-label="Check for updates"
-          aria-checked={settings.checkUpdates}
-          className="s-switch"
-          onClick={() => void patch("updates", { checkUpdates: !settings.checkUpdates })}
+        <Toggle
+          label="Check for updates"
+          checked={settings.checkUpdates}
+          onChange={(on) => void patch("updates", { checkUpdates: on })}
         />
       </Row>
 

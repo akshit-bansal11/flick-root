@@ -6,7 +6,7 @@ interface Props {
   describedBy?: string;
 }
 
-/** Pill switch. A native button, so Space and Enter toggle it. Same look as the `.s-switch` in General. */
+/** Pill switch. A native button, so Space and Enter toggle it. The one switch in Settings. */
 export function Toggle({ checked, onChange, label, disabled, describedBy }: Props) {
   return (
     <button
