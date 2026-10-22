@@ -59,12 +59,12 @@ Programs found by the drive scan are matched in their own index, off the keystro
 
 ## WebView2 idle memory (F8.10)
 
-Researched 2026-10-22. Result: no option that needs no new dependency and is backed by the docs was shipped. `window.rs` and `tauri.conf.json` are unchanged.
+Researched 2026-10-22. No documented option works without a new dependency, so the user approved a direct `webview2-com` dependency (the version wry already uses). The two documented memory APIs now run while the launcher is hidden; the numbers are below.
 
 | Option | Expected saving | Show-latency cost / risk | Status |
 | --- | --- | --- | --- |
-| `TrySuspend` / `Resume` ([perf guide](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#use-memory-management-apis)) | Pauses scripts, lowers renderer use while hidden | Resume on every show sits on the hotkey path; best-effort | needs dependency approval (direct `webview2-com`) |
-| `MemoryUsageTargetLevel = Low` while hidden, `Normal` on show (same page) | Engine may drop caches or swap to disk | Restore on show may add latency; best-effort | needs dependency approval (direct `webview2-com`) |
+| `TrySuspend` / `Resume` ([perf guide](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#use-memory-management-apis)) | Pauses scripts, lowers renderer use while hidden | Resume on every show sits on the hotkey path; best-effort | **shipped** (F8.10b, user approved `webview2-com` 0.39.1; controller set invisible first, as [TrySuspend](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_3#trysuspend) requires, since F8.R3) |
+| `MemoryUsageTargetLevel = Low` while hidden, `Normal` on show (same page) | Engine may drop caches or swap to disk | Restore on show may add latency; best-effort | **shipped** (F8.10b) |
 | `additional_browser_args` ([docs.rs](https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html#method.additional_browser_args)) | None documented | Replaces wry's default `--disable-features` set; needs the window built in code instead of `tauri.conf.json`; risk to the transparent window | not shipped: [flag list](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/webview-features-flags) says production apps should not use flags, and none is a memory saver |
 | `msWebView2SimulateMemoryPressureWhenInactive` | Unknown ("simulates memory pressure for an inactive WebView") | Unknown | not shipped (undocumented effect and behaviour) |
 | `disable-background-timer-throttling` | None (the opposite: more timer work) | More idle CPU | not shipped (wrong direction) |
@@ -72,13 +72,16 @@ Researched 2026-10-22. Result: no option that needs no new dependency and is bac
 | Renderer process limits, other memory-saving switches | n/a | n/a | not shipped (undocumented) |
 | Tauri `background_throttling` | n/a | Not supported on Windows | not applicable |
 
-Measured headroom for the two dependency options is pending a `perf.yml` run.
+### Measured (perf.yml, GitHub `windows-latest` runner, 2026-10-22)
 
-### Pending perf.yml run
+Process tree = the app plus its WebView2 processes (7 processes, 128 threads in every run). Idle CPU was 0 % of one core and no scan ran during the 60 s idle window in every run.
 
-| Build | perf.yml run id | Hotkey p95 (ms) | Idle private bytes | Idle working set |
-| --- | --- | --- | --- | --- |
-| Baseline (before) | pending | pending | pending | pending |
-| After | pending | pending | pending | pending |
+| Build | perf.yml run id | Hotkey p95 (ms) | Idle private MB | Idle working set MB | Cold start (ms) |
+| --- | --- | --- | --- | --- | --- |
+| Before (be103de, no WebView2 change) | 39728001281 (attempt 1) | 148.4 | 111.8 | 326.7 | 728 |
+| Before (be103de) | 39728001281 (attempt 2) | 136.6 | 111.6 | 327.1 | 1134 |
+| Low memory level only (4141132; TrySuspend then failed with ERROR_INVALID_STATE) | 39729486251 (attempt 1) | 172.4 | 112.0 | 83.4 | 1376 |
+| Low memory level only (4141132) | 39729486251 (attempt 2) | 128.1 | 113.7 | 75.5 | 909 |
+| Low level + TrySuspend (dc43791, F8.R3) | 39739170373 | 181.4 | 109.8 | 64.2 | 813 |
 
-Numbers are filled in only from a real run. With no code change, the after row should match the baseline.
+Reading: the working set (physical RAM in use while hidden) drops from about 327 MB to 64 MB. Private bytes stay flat because suspended pages are released from RAM, not freed. Timings swing by hundreds of milliseconds between identical runs on this shared VM (cold start 728 vs 1134 ms for the same commit), so the hotkey p95 differences are within noise; the hotkey is over its 50 ms budget on the runner with or without the change and needs a check on real hardware.
