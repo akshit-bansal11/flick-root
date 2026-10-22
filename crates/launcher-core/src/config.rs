@@ -220,7 +220,7 @@ pub const THEMES: [&str; 6] = ["glass", "frost", "midnight", "aurora", "ember", 
 /// Colour schemes.
 pub const SCHEMES: [&str; 3] = ["system", "dark", "light"];
 /// Allowed range of the glass tint opacity, percent.
-pub const GLASS_RANGE: std::ops::RangeInclusive<u8> = 30..=95;
+pub const GLASS_RANGE: std::ops::RangeInclusive<u8> = 80..=95;
 
 /// `[appearance]`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -238,7 +238,7 @@ impl Default for Appearance {
     fn default() -> Self {
         Self {
             theme: "glass".into(),
-            glass: 62,
+            glass: 90,
             scheme: "system".into(),
         }
     }
@@ -254,7 +254,11 @@ impl Appearance {
             return Err("scheme must be system, dark or light".into());
         }
         if !GLASS_RANGE.contains(&self.glass) {
-            return Err("glass must be between 30 and 95".into());
+            return Err(format!(
+                "glass must be between {} and {}",
+                GLASS_RANGE.start(),
+                GLASS_RANGE.end()
+            ));
         }
         Ok(())
     }
@@ -893,13 +897,19 @@ threshold = 0.7
         let c = Config::load(&p).unwrap();
         assert_eq!(c.appearance.scheme, "light");
         assert_eq!(c.appearance.theme, "glass");
-        assert_eq!(c.appearance.glass, 62);
+        assert_eq!(c.appearance.glass, 90);
         assert!(c.appearance.validate().is_ok());
-        let bad = Appearance {
-            glass: 20,
+        let with_glass = |glass| Appearance {
+            glass,
             ..Appearance::default()
         };
-        assert!(bad.validate().is_err());
+        assert!(with_glass(79).validate().is_err());
+        assert!(with_glass(80).validate().is_ok());
+        assert!(with_glass(95).validate().is_ok());
+        assert_eq!(
+            with_glass(96).validate().unwrap_err(),
+            "glass must be between 80 and 95"
+        );
         assert_eq!(c.general.hotkey, "Alt+Space");
     }
 }

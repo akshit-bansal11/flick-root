@@ -231,7 +231,7 @@
   --l-hover-mix: 7%;
   --l-mask: var(--l-raw-black);
   --l-blur: none;
-  --l-glass-alpha: 62%;
+  --l-glass-alpha: 90%;
   --l-tile-hue-default: 220;
   --l-tile-hue-s: 48%;
   --l-tile-hue-l: 38%;

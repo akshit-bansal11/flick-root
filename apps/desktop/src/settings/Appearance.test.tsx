@@ -5,7 +5,7 @@ import * as api from "./api";
 
 vi.mock("./api", () => ({ getAppearance: vi.fn(), setAppearance: vi.fn() }));
 
-const cur = { theme: "glass", glass: 62, scheme: "system" } as const;
+const cur = { theme: "glass", glass: 90, scheme: "system" } as const;
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
@@ -29,11 +29,11 @@ describe("Appearance", () => {
   it("saves the glass slider and disables it for solid", async () => {
     render(<Appearance />);
     const slider = await screen.findByRole("slider");
-    fireEvent.change(slider, { target: { value: "70" } });
-    fireEvent.change(slider, { target: { value: "80" } });
+    fireEvent.change(slider, { target: { value: "85" } });
+    fireEvent.change(slider, { target: { value: "92" } });
     expect(api.setAppearance).not.toHaveBeenCalled();
     fireEvent.pointerUp(slider);
-    await waitFor(() => expect(api.setAppearance).toHaveBeenCalledWith({ glass: 80 }));
+    await waitFor(() => expect(api.setAppearance).toHaveBeenCalledWith({ glass: 92 }));
     expect(api.setAppearance).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("radio", { name: "Solid" }));
     await waitFor(() => expect((slider as HTMLInputElement).disabled).toBe(true));
