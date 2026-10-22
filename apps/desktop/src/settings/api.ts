@@ -47,6 +47,8 @@ export const setAppearance = (patch: Partial<AppearanceView>) =>
 export const setRoots = (roots: string[]) => invoke<SettingsView>("set_roots", { roots });
 export const setIncludeDrives = (includeDrives: boolean) =>
   invoke<SettingsView>("set_roots", { includeDrives });
+export const setProgramSkip = (skip: string[]) =>
+  invoke<SettingsView>("set_program_skip", { skip });
 export const clearHistory = (scope: ClearScope) => invoke<void>("clear_history", { scope });
 export const reindex = (kind: ReindexKind) => invoke<void>("reindex", { kind });
 export const getAbout = () => invoke<About>("get_about");

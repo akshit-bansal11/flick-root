@@ -10,6 +10,10 @@ interface Props {
   onTour?: () => void;
 }
 
+const DRIVE_RE = /^[A-Za-z]:\\?$/;
+const sameDrive = (a: string, b: string) =>
+  DRIVE_RE.test(a) && a.charAt(0).toUpperCase() === b.charAt(0).toUpperCase();
+
 function Row({
   label,
   help,
@@ -45,6 +49,7 @@ export function General({ settings, onChange, onTour }: Props) {
     if (capturing) captureRef.current?.focus();
   }, [capturing]);
   const [rootInput, setRootInput] = useState("");
+  const [skipInput, setSkipInput] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [cleared, setCleared] = useState(false);
   const [reindexing, setReindexing] = useState(false);
@@ -86,6 +91,19 @@ export function General({ settings, onChange, onTour }: Props) {
   const toggleDrives = async (on: boolean) => {
     onChange({ ...settings, includeDrives: on });
     if (!(await run("drives", api.setIncludeDrives(on)))) onChange(settings);
+  };
+
+  const editSkip = async (k: string, next: string[]): Promise<boolean> => {
+    onChange({ ...settings, programSkip: next });
+    const ok = await run(k, api.setProgramSkip(next));
+    if (!ok) onChange(settings);
+    return ok;
+  };
+
+  const addSkip = async () => {
+    const entry = skipInput.trim();
+    if (!entry || settings.programSkip.includes(entry)) return;
+    if (await editSkip("skip", [...settings.programSkip, entry])) setSkipInput("");
   };
 
   const clear = async () => {
@@ -160,7 +178,7 @@ export function General({ settings, onChange, onTour }: Props) {
 
       <Row
         label="Find programs on all drives"
-        help="Lists exe, msi, apk and other installers from every drive under !"
+        help={`Scans every fixed and removable drive for exe, msi, apk and other installers. Network and optical drives are never touched. ${settings.programsCount} found.${settings.programsCapped ? " A drive hit its limit, so some programs are missing." : ""}`}
         error={errors.programs}
       >
         <Toggle
@@ -168,6 +186,80 @@ export function General({ settings, onChange, onTour }: Props) {
           checked={settings.scanPrograms}
           onChange={(on) => void patch("programs", { scanPrograms: on })}
         />
+      </Row>
+
+      <Row label="Drives" error={errors.skipDrives}>
+        <ul className="s-list">
+          {settings.drives.map((d) => (
+            <li key={d.root} className="s-list-item">
+              <label className="s-path">
+                <input
+                  type="checkbox"
+                  disabled={!settings.scanPrograms}
+                  checked={!settings.programSkip.some((s) => sameDrive(s, d.root))}
+                  onChange={(e) =>
+                    void editSkip(
+                      "skipDrives",
+                      e.target.checked
+                        ? settings.programSkip.filter((s) => !sameDrive(s, d.root))
+                        : [...settings.programSkip, d.root],
+                    )
+                  }
+                />{" "}
+                {d.root} · {d.kind}
+                {d.present ? "" : " (not connected)"}
+              </label>
+            </li>
+          ))}
+        </ul>
+      </Row>
+
+      <Row
+        label="Excluded folders"
+        help="A folder (D:\Games), a drive (E:\) or a folder name (node_modules, .*)"
+        error={errors.skip}
+      >
+        <div className="s-roots">
+          <ul className="s-list">
+            {settings.programSkip
+              .filter((s) => !DRIVE_RE.test(s))
+              .map((s) => (
+                <li key={s} className="s-list-item">
+                  <span className="s-path">{s}</span>
+                  <button
+                    type="button"
+                    className="s-btn"
+                    aria-label={`Remove ${s}`}
+                    disabled={!settings.scanPrograms}
+                    onClick={() =>
+                      void editSkip("skip", settings.programSkip.filter((x) => x !== s))
+                    }
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+          </ul>
+          <div className="s-add">
+            <input
+              className="s-input"
+              aria-label="Exclude"
+              placeholder="D:\Games"
+              disabled={!settings.scanPrograms}
+              value={skipInput}
+              onChange={(e) => setSkipInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void addSkip()}
+            />
+            <button
+              type="button"
+              className="s-btn"
+              disabled={!settings.scanPrograms}
+              onClick={() => void addSkip()}
+            >
+              Add
+            </button>
+          </div>
+        </div>
       </Row>
 
       <Row label="Indexed folders" help="Extra folders Find mode searches." error={errors.roots}>

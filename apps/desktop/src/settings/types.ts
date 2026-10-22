@@ -22,6 +22,17 @@ export interface SettingsView {
   extraRoots: string[];
   includeDrives: boolean;
   scanPrograms: boolean;
+  programSkip: string[];
+  drives: DriveView[];
+  programsCount: number;
+  programsCapped: boolean;
+}
+
+/** One drive row; mirrors DriveView in Rust. */
+export interface DriveView {
+  root: string;
+  kind: "fixed" | "removable";
+  present: boolean;
 }
 
 export interface GeneralPatch {
