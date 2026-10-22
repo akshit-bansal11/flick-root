@@ -5,7 +5,7 @@ import { Lens, useLens } from "../Lens";
 export const PAGES = [
   { id: "general", label: "General" },
   { id: "appearance", label: "Appearance" },
-  { id: "features", label: "Features" },
+  { id: "prefixes", label: "Prefixes" },
   { id: "providers", label: "AI providers" },
   { id: "engine", label: "Decision engine" },
   { id: "integrations", label: "Integrations" },
@@ -16,7 +16,7 @@ export type PageId = (typeof PAGES)[number]["id"];
 interface Props {
   active: PageId;
   onSelect: (id: PageId) => void;
-  /** "n/m on" text for the Features item, once known. */
+  /** "n/m on" text for the Prefixes item, once known. */
   featuresCount: string | null;
 }
 
@@ -59,7 +59,7 @@ export function Nav({ active, onSelect, featuresCount }: Props) {
             onKeyDown={(e) => onKeyDown(e, i)}
           >
             <span>{p.label}</span>
-            {p.id === "features" && featuresCount && (
+            {p.id === "prefixes" && featuresCount && (
               <span className="s-nav-count">{featuresCount}</span>
             )}
           </button>

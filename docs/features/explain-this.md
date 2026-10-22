@@ -9,7 +9,7 @@ A second hotkey captures the text you have selected in another app and opens Fli
 3. Flick opens in Ask with a preview of the captured text and the app it came from. Type a question, or send it as is; with no question typed, the question is "Explain this".
 4. Press Enter to send it to your Ask provider. Nothing is sent before you press Enter.
 
-The hotkey does nothing if the launcher is already showing (there is no foreground selection to read) or if Ask is off. Explain this is a feature module: turn it off in Settings, Features and the hotkey is released.
+The hotkey does nothing if the launcher is already showing (there is no foreground selection to read) or if Ask is off. Explain this is a feature module: turn it off in Settings, Prefixes and the hotkey is released.
 
 ## How the text is captured
 

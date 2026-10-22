@@ -22,7 +22,7 @@ If Windows refuses, Flick says the process may need admin rights.
 
 ## Options
 
-Settings, Features, Ports and processes: **Show command line** (default on).
+Settings, Prefixes, Ports and processes: **Show command line** (default on).
 
 ## Privacy
 

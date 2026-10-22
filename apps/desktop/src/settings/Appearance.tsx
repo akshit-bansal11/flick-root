@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { Lens } from "../Lens";
 import {
   applyAppearance,
   clampGlass,
@@ -11,6 +12,7 @@ import {
   type ThemeId,
 } from "../theme";
 import * as api from "./api";
+import { AppearancePreview } from "./AppearancePreview";
 import { type AppearanceView, errorText } from "./types";
 
 const LABELS: Record<ThemeId, string> = {
@@ -53,6 +55,8 @@ export function Appearance() {
   const [drag, setDrag] = useState<number | null>(null);
   /** Saves run one after another so a slow reply never lands after a newer one. */
   const chain = useRef<Promise<void>>(Promise.resolve());
+  /** The segmented control's lens is placed by CSS (`--i`); the ref only satisfies `Lens`. */
+  const lens = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api
@@ -107,6 +111,8 @@ export function Appearance() {
         </div>
       )}
 
+      <AppearancePreview />
+
       <div role="radiogroup" aria-label="Theme" className="s-themes">
         {THEMES.map((t) => (
           <label key={t} className="s-theme-card">
@@ -133,6 +139,12 @@ export function Appearance() {
         <div className="s-row-control">
           <input
             id="s-glass"
+            className="s-range"
+            ref={(el) => {
+              // --val is the fill stop of the track, as a percentage of the range.
+              const pct = ((glass - GLASS_MIN) / (GLASS_MAX - GLASS_MIN)) * 100;
+              el?.style.setProperty("--val", `${pct}%`);
+            }}
             type="range"
             min={GLASS_MIN}
             max={GLASS_MAX}
@@ -147,7 +159,9 @@ export function Appearance() {
             onKeyUp={commitGlass}
             onBlur={commitGlass}
           />
-          <output htmlFor="s-glass">{glass}%</output>
+          <output className="s-val" htmlFor="s-glass">
+            {glass}%
+          </output>
         </div>
       </div>
 
@@ -162,7 +176,18 @@ export function Appearance() {
             </div>
           )}
         </div>
-        <div role="radiogroup" aria-labelledby="s-scheme-label" className="s-seg">
+        <div
+          role="radiogroup"
+          aria-labelledby="s-scheme-label"
+          className="s-seg"
+          data-lens="1"
+          ref={(el) => {
+            // --n and --i place the lens: it is one item wide and moves by whole item widths.
+            el?.style.setProperty("--n", String(SCHEMES.length));
+            el?.style.setProperty("--i", String(SCHEMES.findIndex((s) => s.id === a.scheme)));
+          }}
+        >
+          <Lens ref={lens} />
           {SCHEMES.map((s) => (
             <label key={s.id} className="s-seg-item">
               <input

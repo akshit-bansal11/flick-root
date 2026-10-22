@@ -69,8 +69,10 @@ afterEach(() => {
 });
 
 describe("SettingsApp", () => {
-  it("shows the Features count", async () => {
+  it("shows the Prefixes item with its on count", async () => {
     await mount();
+    expect(screen.getByRole("button", { name: /^Prefixes/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Features/ })).toBeNull();
     expect(screen.getByText("2/3 on")).toBeTruthy();
   });
 
@@ -191,6 +193,8 @@ describe("resolveView", () => {
     expect(resolveView("#first-run", null)).toBe("first-run");
     expect(resolveView("providers", "general")).toBe("providers");
     expect(resolveView("ai-providers", "general")).toBe("providers");
+    expect(resolveView("#features", "general")).toBe("prefixes");
+    expect(resolveView("prefixes", "general")).toBe("prefixes");
     expect(resolveView("nope", "about")).toBe("about");
     expect(resolveView(null, null)).toBeNull();
   });

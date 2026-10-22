@@ -279,6 +279,8 @@
   --l-shadow-raised: 0 1px 1px var(--l-raw-black-30), 0 6px 16px -6px var(--l-raw-black-50);
   --l-shadow-overlay: 0 18px 48px -14px var(--l-raw-black-65), 0 2px 6px var(--l-raw-black-35);
   --l-shadow-window: 0 40px 90px -20px var(--l-raw-black-70), 0 6px 18px var(--l-raw-black-40);
+  /* Decorative wallpaper behind the Settings mini-launcher preview. */
+  --l-preview-wall: linear-gradient(135deg, var(--l-raw-navy-850), var(--l-raw-indigo-800));
 }
 
 /* Roles, light: the OS-preference fallback (no data-scheme yet), then the resolved light scheme and frost. */
@@ -318,6 +320,7 @@
       0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
     --l-lens: color-mix(in oklab, var(--l-accent) 11%, var(--l-raise));
     --l-lens-ring: color-mix(in oklab, var(--l-accent) 38%, transparent);
+    --l-preview-wall: linear-gradient(135deg, var(--l-raw-frost-150), var(--l-raw-cyan-300));
   }
 }
 
@@ -355,6 +358,7 @@
     0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
   --l-shadow-window:
     0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
+  --l-preview-wall: linear-gradient(135deg, var(--l-raw-frost-150), var(--l-raw-cyan-300));
 }
 
 /* Derived glass tokens. Declared on the element so a themed child (the Settings swatch) recomputes them.

@@ -37,4 +37,4 @@ Flick only reads the text while you type. It does not check the network or the d
 
 ## Turn it off
 
-Settings > Features, "Links and paths".
+Settings > Prefixes, "Links and paths".

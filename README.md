@@ -12,7 +12,7 @@ Flick is at v0.0.1. Features:
 - Ask (`?`): streams an answer from the provider and model you pick, with Fast/Think, thinking modes and provider fallback.
 - Projects (`@`): code folders under your dev roots, most used first.
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
-- Settings window (General, Appearance, Features, AI providers, About), first run with a welcome screen, and an interactive tour.
+- Settings window (General, Appearance, Prefixes, AI providers, Decision engine, Integrations, About), first run with a welcome screen, and an interactive tour.
 - Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
 - Programs on all drives, thinking modes, and a liquid glass launcher with six themes.
 - A glass tray menu (Open, Settings, updates, Quit) that opens from a right-click on the tray icon, in the same window as the launcher.

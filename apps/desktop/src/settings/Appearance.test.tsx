@@ -39,6 +39,42 @@ describe("Appearance", () => {
     await waitFor(() => expect((slider as HTMLInputElement).disabled).toBe(true));
   });
 
+  it("saves a scheme pick and moves the segmented lens to it", async () => {
+    render(<Appearance />);
+    const group = await screen.findByRole("radiogroup", { name: "Colour scheme" });
+    expect(group.style.getPropertyValue("--n")).toBe("3");
+    expect(group.style.getPropertyValue("--i")).toBe("0");
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    await waitFor(() => expect(api.setAppearance).toHaveBeenCalledWith({ scheme: "dark" }));
+    await waitFor(() => expect(group.style.getPropertyValue("--i")).toBe("1"));
+  });
+
+  it("shows the slider value in an output and drives the track fill", async () => {
+    render(<Appearance />);
+    const slider = await screen.findByRole("slider");
+    expect(screen.getByRole("status").textContent).toBe("90%");
+    expect(Number.parseFloat(slider.style.getPropertyValue("--val"))).toBeCloseTo(66.67, 1);
+    fireEvent.change(slider, { target: { value: "95" } });
+    expect(screen.getByRole("status").textContent).toBe("95%");
+    expect(slider.style.getPropertyValue("--val")).toBe("100%");
+  });
+
+  it("renders a decorative live preview", async () => {
+    render(<Appearance />);
+    await screen.findByRole("slider");
+    const pv = document.querySelector(".s-pv");
+    expect(pv?.getAttribute("aria-hidden")).toBe("true");
+    expect(pv?.textContent).toContain("2.5 kg to lb");
+  });
+
+  it("disables the scheme radios for a theme that forces its scheme", async () => {
+    render(<Appearance />);
+    fireEvent.click(await screen.findByRole("radio", { name: "Midnight" }));
+    await waitFor(() =>
+      expect((screen.getByRole("radio", { name: "Dark" }) as HTMLInputElement).disabled).toBe(true),
+    );
+  });
+
   it("shows the error and reverts when saving fails", async () => {
     vi.mocked(api.setAppearance).mockRejectedValue({ code: "invalid_appearance", message: "nope" });
     render(<Appearance />);

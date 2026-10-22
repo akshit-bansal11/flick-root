@@ -9,10 +9,10 @@ import { About } from "./About";
 import { Appearance } from "./Appearance";
 import * as api from "./api";
 import { Decision } from "./Decision";
-import { Features } from "./Features";
 import { General } from "./General";
 import { Integrations } from "./Integrations";
 import { Nav, PAGES, type PageId } from "./Nav";
+import { Prefixes } from "./Prefixes";
 import { Providers } from "./Providers";
 import { errorText, type SettingsView } from "./types";
 import "./settings.css";
@@ -24,6 +24,7 @@ export function resolveView(section: string | null | undefined, current: View | 
   const s = section?.replace(/^#/, "");
   if (s === "first-run") return "first-run";
   if (s === "ai-providers") return "providers";
+  if (s === "features") return "prefixes";
   return PAGES.find((p) => p.id === s)?.id ?? current;
 }
 
@@ -122,7 +123,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
       </p>
     ),
     appearance: <Appearance />,
-    features: <Features />,
+    prefixes: <Prefixes />,
     providers: <Providers />,
     engine: <Decision />,
     integrations: <Integrations />,

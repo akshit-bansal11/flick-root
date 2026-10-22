@@ -8,9 +8,11 @@ The panel is acrylic glass. The input bar, the keycaps, the prefix chip and the 
 
 ## Settings, Appearance
 
-- **Theme:** Glass, Frost, Midnight, Aurora, Ember or Solid. Default Glass.
-- **Glass strength:** tint opacity, 80 to 95 percent. Default 90. It saves when you release the slider. The floor exists so text stays readable over a white or black desktop.
-- **Scheme:** System, Dark or Light. Default System.
+A small live preview of the launcher sits at the top of the page: a glass panel with a `= Calc` chip over a decorative wallpaper. It uses the theme and glass strength you are picking, so it changes while you drag the slider.
+
+- **Theme:** Glass, Frost, Midnight, Aurora, Ember or Solid, shown as swatch cards. Default Glass.
+- **Glass strength:** tint opacity, 80 to 95 percent. Default 90. The value shows next to the slider, and it saves when you release the slider. The floor exists so text stays readable over a white or black desktop.
+- **Scheme:** System, Dark or Light, a segmented control with a glass lens that slides to the choice. Default System. Frost is always light and Midnight, Aurora and Ember are always dark, so the control is disabled for them.
 
 ## Contrast
 
