@@ -21,12 +21,14 @@ pub enum SearchScope {
 }
 
 /// Program rows rank below real apps by this factor.
-const PROGRAM_FACTOR: f32 = 0.75;
+const PROGRAM_FACTOR: f32 = 0.95;
 /// Program extensions that can run elevated.
 const ADMIN_EXTS: &[&str] = &["exe", "msi"];
 /// Nucleo scores are unbounded; feature items score 0..1. Squash apps into 0..=APP_CEIL so an
 /// exact feature keyword match (1.0) outranks a fuzzy app hit, while apps still order among themselves.
-/// ponytail: relative-to-top squash, a fixed calibration if apps ever need absolute confidence.
+/// Scores are divided by max(perfect score of the query, best hit), one absolute scale for apps and
+/// programs: a scattered app hit cannot outrank a contiguous program hit just by being the best app.
+/// ponytail: nucleo's self-score is the ceiling; if a hit exceeds it the best hit becomes the ceiling.
 const APP_CEIL: f32 = 0.9;
 
 /// Whether `a` may run elevated. `program` says it came from the programs scan: only exe and msi
@@ -128,7 +130,8 @@ pub fn command_search_scoped(
             );
         } else {
             let hits = matcher.top_k(&input.text, app_index, k);
-            let max = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
+            let best = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
+            let max = best.max(matcher.perfect_score(&input.text) as f32);
             items.extend(hits.into_iter().filter_map(|h| {
                 let a = apps.get(h.idx)?;
                 let score = if max > 0.0 {
@@ -174,15 +177,16 @@ pub fn program_items(
         return Vec::new();
     }
     let hits = matcher.top_k(text, index, k);
-    let max = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
-    if max <= 0.0 {
+    let best = hits.iter().map(|h| h.score as f32).fold(0.0_f32, f32::max);
+    if best <= 0.0 {
         return Vec::new();
     }
+    let max = best.max(matcher.perfect_score(text) as f32);
     hits.into_iter()
         .filter_map(|h| {
             let a = programs.get(h.idx)?;
             // Weak hits (< half the best score, or scattered letters) are noise.
-            if (h.score as f32) < max * 0.5 || !solid_match(&a.name, text) {
+            if (h.score as f32) < best * 0.5 || !solid_match(&a.name, text) {
                 return None;
             }
             Some(app_item(
@@ -303,6 +307,26 @@ mod tests {
         assert_eq!(run(SearchScope::All, "").len(), 1);
         assert!(run(SearchScope::Commands, "code").is_empty());
         assert_eq!(run(SearchScope::Apps, "code").len(), 2);
+    }
+
+    #[test]
+    fn contiguous_program_beats_scattered_app() {
+        let apps = vec![app("Windows Media Player Legacy")];
+        let progs = vec![app("Inlay-2.0.0")];
+        let (ai, pi) = (idx_of(&apps), idx_of(&progs));
+        let mut m = FuzzyMatcher::new();
+        let a = command_search_scoped(
+            &apps,
+            SearchScope::All,
+            &ai,
+            &mut m,
+            &Registry::new(),
+            &input("inlay"),
+            5,
+        );
+        let p = program_items(&progs, &pi, &mut m, "inlay", 5);
+        let got = merge_items(a, p, 5);
+        assert_eq!(got[0].title, "Inlay-2.0.0");
     }
 
     #[test]

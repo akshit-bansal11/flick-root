@@ -79,6 +79,17 @@ impl FuzzyMatcher {
         }
     }
 
+    /// Score of `query` matched against itself: the ceiling a haystack hit can reach, so callers
+    /// can scale scores on one absolute scale. Returns 0 for an empty query.
+    pub fn perfect_score(&mut self, query: &str) -> u32 {
+        if query.is_empty() {
+            return 0;
+        }
+        let pattern = Pattern::parse(query, CaseMatching::Smart, Normalization::Smart);
+        let hay = Utf32String::from(query);
+        pattern.score(hay.slice(..), &mut self.matcher).unwrap_or(0)
+    }
+
     /// Best `k` hits for `query`, sorted by score descending (ties: lower idx
     /// first). An empty query returns nothing; callers show most-used.
     pub fn top_k(&mut self, query: &str, index: &MatchIndex, k: usize) -> Vec<Scored> {
@@ -139,6 +150,26 @@ mod tests {
         assert!(hits[0].score >= hits[1].score);
         assert!(hits.iter().all(|h| h.idx != 0 && h.idx != 3));
         assert_eq!(hits[0].idx, 1, "exact full-name match wins");
+    }
+
+    #[test]
+    fn perfect_score_bounds_every_hit() {
+        let idx = MatchIndex::new(&[
+            "inlay-2.0.0",
+            "windows media player legacy",
+            "visual studio code",
+            "code",
+            "spotify",
+        ]);
+        let mut m = FuzzyMatcher::new();
+        assert_eq!(m.perfect_score(""), 0);
+        for q in ["inlay", "code", "spot", "media"] {
+            let perfect = m.perfect_score(q);
+            assert!(perfect > 0, "{q}");
+            for h in m.top_k(q, &idx, 5) {
+                assert!(h.score <= perfect, "{q}: {} > {perfect}", h.score);
+            }
+        }
     }
 
     #[test]
