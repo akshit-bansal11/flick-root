@@ -38,5 +38,9 @@ export function Root() {
     ipc.hideLauncher().catch(warn);
   }, []);
 
-  return menu ? <TrayMenu event={menu} onRun={onRun} onClose={onClose} /> : <Launcher initialShown={shown} />;
+  return menu ? (
+    <TrayMenu event={menu} onRun={onRun} onClose={onClose} />
+  ) : (
+    <Launcher initialShown={shown} />
+  );
 }
