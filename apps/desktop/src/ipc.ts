@@ -67,7 +67,9 @@ export const cancelAsk = (askId: string) => invoke<void>("cancel_ask", { askId }
 
 export const openLink = (url: string) => invoke<void>("open_link", { url });
 
-export const hideLauncher = () => invoke<void>("hide_launcher");
+export const webSearch = (text: string) => invoke<Outcome>("web_search", { text });
+
+export const hideLauncher =() => invoke<void>("hide_launcher");
 
 export const resizeLauncher = (height: number) => invoke<void>("resize_launcher", { height });
 
@@ -80,6 +82,8 @@ export type ShownEvent = ShownPayload & {
   appearance?: Appearance;
   /** Live source ids (apps, files, ask, running feature ids); absent from older shells. */
   sources?: string[];
+  /** Title of the first web shortcut when the web feature runs. */
+  webTitle?: string | null;
 };
 
 export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>

@@ -34,7 +34,8 @@ export const isProgram = (item: Item): boolean =>
   item.payload.program === true;
 
 /** Group label shown above a run of same-group results. */
-export const groupLabel = (item: Item): string => (isProgram(item) ? "Programs" : GROUP[item.kind]);
+export const groupLabel = (item: Item): string =>
+  item.source === "ui" ? "Search instead" : isProgram(item) ? "Programs" : GROUP[item.kind];
 
 /** Human name of a kind, used as the subtitle when an item has none. */
 export const kindName = (kind: ItemKind): string => NAME[kind];

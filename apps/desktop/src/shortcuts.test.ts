@@ -64,8 +64,14 @@ describe("shortcut table", () => {
     expect(RESERVED).toContain("Ctrl+Alt+Delete");
   });
 
-  it("Show location applies to Open only", () => {
-    expect(SHORTCUTS.find((s) => s.id === "location")?.scope).toBe("find");
+  it("Show location applies to Open and plain-text results", () => {
+    expect(SHORTCUTS.find((s) => s.id === "location")?.scope).toEqual(["none", "find"]);
+  });
+
+  it("plain-text scope shares no chord with the launcher scope", () => {
+    const own = inScope("none").map((s) => s.keys);
+    const shared = inScope("launcher").map((s) => s.keys);
+    expect(own.filter((c) => shared.includes(c))).toEqual([]);
   });
 
   it("has unique ids", () => {

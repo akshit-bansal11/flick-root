@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item, LaunchMode } from "../types";
+import { groupLabel } from "./kinds";
 import {
   type Attachment,
   availableModes,
@@ -8,6 +9,7 @@ import {
   initialState,
   type KeyInput,
   MODES,
+  PLAIN_SEARCH,
   reduce,
   type State,
 } from "./reducer";
@@ -71,10 +73,116 @@ describe("reducer", () => {
     ]);
   });
 
-  it("plain text in none mode searches nothing and keeps the hints", () => {
-    const r = reduce(initialState(), { type: "text", text: "abc" });
-    expect(r.effects).toEqual([]);
-    expect(r.state).toMatchObject({ mode: "none", input: "abc", items: [] });
+  it("plain text in none mode searches apps and features and bumps seq", () => {
+    const a = reduce(initialState(), { type: "text", text: "abc" });
+    const { wire: mode, sources } = PLAIN_SEARCH;
+    expect(a.effects).toEqual([{ type: "search", seq: 1, mode, text: "abc", sources }]);
+    expect(sources).toEqual(["apps", "features"]);
+    expect(a.state).toMatchObject({ mode: "none", input: "abc", seq: 1 });
+    expect(reduce(a.state, { type: "text", text: "abcd" }).state.seq).toBe(2);
+  });
+
+  it("blank text in none mode does not search and stale results are dropped", () => {
+    const typed = reduce(initialState(), { type: "text", text: "ab" }).state;
+    const cleared = reduce(typed, { type: "text", text: "" });
+    expect(cleared.effects).toEqual([]);
+    expect(cleared.state).toMatchObject({ mode: "none", input: "", items: [] });
+    expect(reduce(cleared.state, { type: "text", text: "  " }).effects).toEqual([]);
+    const late = reduce(cleared.state, { type: "results", seq: 1, items: [item("x")] });
+    expect(late.state.items).toEqual([]);
+  });
+
+  describe("fallback rows", () => {
+    const live = ["apps", "files", "ask", "syscmd"];
+    const plain = (sources: string[] | null, webTitle: string | null, x: Partial<State> = {}) =>
+      typedResults({ ...initialState(sources, webTitle), ...x });
+    const typedResults = (s: State): State => {
+      const typed = reduce(s, { type: "text", text: "cats" }).state;
+      return reduce(typed, { type: "results", seq: typed.seq, items: [item("app:cats")] }).state;
+    };
+
+    it("come after the results, in order, in the Search instead group", () => {
+      const s = plain(live, "Google");
+      expect(s.items.map((i) => i.id)).toEqual(["app:cats", "ui:find", "ui:web", "ui:ask"]);
+      expect(s.items.slice(1).map((i) => i.title)).toEqual([
+        "Find files named “cats”",
+        "Search Google for “cats”",
+        "Ask your AI: “cats”",
+      ]);
+      expect(s.items.slice(1).every((i) => i.source === "ui")).toBe(true);
+      expect(groupLabel(s.items[1] ?? item("none"))).toBe("Search instead");
+    });
+
+    it("drop the Web row without a web title and the Ask row without a live ask", () => {
+      expect(plain(live, null).items.map((i) => i.id)).toEqual(["app:cats", "ui:find", "ui:ask"]);
+      expect(plain(["apps", "syscmd"], "Google").items.map((i) => i.id)).toEqual([
+        "app:cats",
+        "ui:find",
+        "ui:web",
+      ]);
+      expect(plain(null, null).items.map((i) => i.id)).toEqual(["app:cats", "ui:find", "ui:ask"]);
+    });
+
+    it("name the selected thinking mode in the Ask row", () => {
+      const s = plain(live, null, { thinkingModes: { modes: tm, selected: "b/2" } });
+      expect(s.items.at(-1)?.title).toBe("Ask b/2 · 2: “cats”");
+    });
+
+    it("arrows count the items in plain mode", () => {
+      const s = plain(live, "Google");
+      expect(reduce(s, k("ArrowUp")).state.selected).toBe(3);
+      expect(reduce(s, k("ArrowDown")).state.selected).toBe(1);
+    });
+
+    it("Enter on Find enters find carrying the text", () => {
+      const r = reduce({ ...plain(live, "Google"), selected: 1 }, k("Enter"));
+      expect(r.state).toMatchObject({ mode: "find", input: "cats" });
+      expect(r.effects).toEqual([
+        { type: "search", seq: 2, mode: "find", text: "cats", sources: MODES.find.sources },
+      ]);
+    });
+
+    it("Enter on Web emits webSearch with the trimmed text", () => {
+      const s = plain(live, "Google");
+      const r = reduce({ ...s, input: " cats ", selected: 2 }, k("Enter"));
+      expect(r.effects).toEqual([{ type: "webSearch", text: "cats" }]);
+    });
+
+    it("Enter on Ask switches to Ask and sends the text", () => {
+      const r = reduce({ ...plain(live, "Google"), selected: 3 }, k("Enter"));
+      expect(r.state).toMatchObject({ mode: "query", input: "cats" });
+      expect(r.state.query.status).toBe("streaming");
+      expect(r.effects).toEqual([
+        { type: "loadThinkingModes" },
+        { type: "ask", token: 1, text: "cats", effort: "fast" },
+      ]);
+    });
+
+    it("Ctrl+Enter and Ctrl+Shift+Enter do nothing on a fallback row", () => {
+      const s = { ...plain(live, "Google"), selected: 2 };
+      expect(reduce(s, k("Enter", { ctrl: true })).effects).toEqual([]);
+      expect(reduce(s, k("Enter", { ctrl: true, shift: true })).effects).toEqual([]);
+    });
+
+    it("Esc clears the text and returns to the prefix list", () => {
+      const r = reduce(plain(live, "Google"), k("Escape"));
+      expect(r.state).toMatchObject({ mode: "none", input: "", items: [] });
+      expect(r.effects).toEqual([]);
+    });
+
+    it("a prefix as first character still enters its mode", () => {
+      expect(reduce(initialState(live), { type: "text", text: "/c" }).state.mode).toBe("find");
+    });
+
+    it("the enabledSources event stores webTitle and loads thinking modes once", () => {
+      const ev: Event = { type: "enabledSources", sources: live, webTitle: "Bing" };
+      const r = reduce(initialState(), ev);
+      expect(r.state.webTitle).toBe("Bing");
+      expect(r.effects).toEqual([{ type: "loadThinkingModes" }]);
+      const loaded = { ...initialState(), thinkingModes: { modes: tm, selected: null } };
+      expect(reduce(loaded, ev).effects).toEqual([]);
+      expect(reduce(r.state, { type: "shown" }).state.webTitle).toBe("Bing");
+    });
   });
 
   it("text change in query mode does not search", () => {
@@ -224,7 +332,8 @@ describe("reducer", () => {
   });
 
   it("the enabledSources event updates the hint list and survives shown and hidden", () => {
-    const s = reduce(initialState(), { type: "enabledSources", sources: ["apps", "math"] }).state;
+    const ev: Event = { type: "enabledSources", sources: ["apps", "math"], webTitle: null };
+    const s = reduce(initialState(), ev).state;
     expect(s.enabledSources).toEqual(["apps", "math"]);
     expect(availableModes(s.enabledSources)).toEqual(["find", "calc"]);
     expect(reduce(s, { type: "shown" }).state.enabledSources).toEqual(["apps", "math"]);
@@ -313,7 +422,7 @@ describe("reducer", () => {
     const s = initialState(["syscmd"]);
     const r = reduce(s, { type: "text", text: ch });
     expect(r.state).toMatchObject({ mode: "none", input: ch });
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([expect.objectContaining({ type: "search", text: ch })]);
   });
 
   it("Backspace on empty input inside a mode returns to none", () => {
@@ -683,12 +792,9 @@ describe("thinking modes", () => {
 });
 
 describe("entering modes with text", () => {
-  it("Enter on a hint carries typed plain text and searches it", () => {
+  it("Ctrl+1 carries typed plain text into Open and searches it", () => {
     const s = { ...initialState(), input: "notepad", selected: 0 };
-    const r = reduce(s, {
-      type: "key",
-      key: { key: "Enter", ctrl: false, shift: false, alt: false },
-    });
+    const r = reduce(s, k("1", { ctrl: true }));
     expect(r.state.mode).toBe("find");
     expect(r.state.input).toBe("notepad");
     expect(r.effects[0]).toMatchObject({ type: "search", text: "notepad" });
@@ -702,7 +808,7 @@ describe("entering modes with text", () => {
   it("the old ! prefix is plain text now", () => {
     const r = reduce(initialState(), { type: "text", text: "!spot" });
     expect(r.state).toMatchObject({ mode: "none", input: "!spot" });
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([expect.objectContaining({ type: "search", text: "!spot" })]);
   });
 
   describe("actionFailed", () => {

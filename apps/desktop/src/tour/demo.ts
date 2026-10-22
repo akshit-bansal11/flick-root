@@ -98,10 +98,17 @@ const canned = (list: Canned, text: string): Item[] => {
   return list.find(([re]) => re.test(t))?.[1]() ?? [];
 };
 
+const DEMO_FEATURES: readonly string[] = ["math", "syscmd", "projects"];
+
+/** Title the demo gives the first web shortcut, for the plain-text Web row. */
+export const DEMO_WEB_TITLE = "Google";
+
 /** Items the demo shows for a search, composed from `sources` in result order. */
 export function demoSearch(mode: Mode, sources: readonly string[], text: string): Item[] {
   if (mode === "query") return [];
-  const has = (id: string) => sources.includes(id);
+  // "features" stands for the demo's math, command and project sources.
+  const has = (id: string) =>
+    sources.includes(id) || (DEMO_FEATURES.includes(id) && sources.includes("features"));
   const match = (list: readonly Item[], pick: (i: Item) => boolean = () => true) =>
     list.filter((i) => pick(i) && matchText(i, text));
   return [
@@ -244,6 +251,9 @@ export function createDemoRunner(host: DemoHost) {
           break;
         case "openSettings":
           host.toast("The real launcher opens Settings here");
+          break;
+        case "webSearch":
+          host.toast("Would search the web");
           break;
         case "ask":
           stream(e.token);

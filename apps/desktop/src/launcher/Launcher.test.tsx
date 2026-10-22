@@ -23,6 +23,7 @@ vi.mock("../ipc", () => ({
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(),
   openLink: vi.fn(() => Promise.resolve()),
+  webSearch: vi.fn(() => Promise.resolve({ type: "done" })),
   copyText: vi.fn(() => Promise.resolve()),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),

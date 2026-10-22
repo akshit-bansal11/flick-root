@@ -107,6 +107,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
             .then((r) => dispatch({ type: "thinkingModes", modes: r.modes, selected: r.selected }))
             .catch(warn);
           break;
+        case "webSearch":
+          outcome("ui:web", ipc.webSearch(e.text));
+          break;
         case "setThinkingMode":
           ipc.setThinkingMode(e.id).catch(warn);
           break;
@@ -122,7 +125,9 @@ export function useLauncher(inputRef: React.RefObject<HTMLInputElement | null>) 
           glassAvailable: p.glass !== false,
         });
         dispatch({ type: "shown" });
-        if (p.sources) dispatch({ type: "enabledSources", sources: p.sources });
+        if (p.sources) {
+          dispatch({ type: "enabledSources", sources: p.sources, webTitle: p.webTitle ?? null });
+        }
         inputRef.current?.focus();
         requestAnimationFrame(() => {
           syncHeight.current(true);

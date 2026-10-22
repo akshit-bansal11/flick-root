@@ -38,6 +38,13 @@ describe("demoSearch", () => {
     expect(demoSearch("command", ["syscmd"], "lock")[0]?.id).toBe("cmd:lock");
     expect(demoSearch("query", [], "x")).toEqual([]);
   });
+  it("plain text searches apps and features but never files", () => {
+    const plain = ["apps", "features"];
+    expect(demoSearch("command", plain, "spot").map((i) => i.title)).toEqual(["Spotify"]);
+    expect(demoSearch("command", plain, "2 + 2")[0]?.id).toBe("result:4");
+    expect(demoSearch("command", plain, "lock")[0]?.id).toBe("cmd:lock");
+    expect(demoSearch("command", plain, "report")).toEqual([]);
+  });
   it("lists apps, programs, files, folders and projects in order", () => {
     const ids = demoSearch("find", ["apps", "files"], "").map((i) => i.id);
     expect(ids.indexOf("prog:notepadpp")).toBeGreaterThan(ids.indexOf("app:notepad"));
@@ -77,6 +84,11 @@ describe("demo runner", () => {
       "Would show it in Explorer",
       "In the real launcher Esc hides it",
     ]);
+  });
+  it("shows a toast for a web search", () => {
+    const { toasts, runner } = setup();
+    runner.run({ type: "webSearch", text: "cats" });
+    expect(toasts).toEqual(["Would search the web"]);
   });
   it("streams the canned answer and stops on cancel", () => {
     const { dispatched, runner } = setup();

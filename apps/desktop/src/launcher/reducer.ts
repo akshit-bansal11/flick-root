@@ -35,6 +35,8 @@ export interface State {
   mode: LaunchMode;
   /** Live source ids from launcher://shown; null until reported, then every prefix is offered. */
   enabledSources: string[] | null;
+  /** Title of the first web shortcut (launcher://shown); null when the web feature is off. */
+  webTitle: string | null;
   input: string;
   seq: number;
   /** Id of the current ask; events carrying another token are stale and ignored. */
@@ -69,7 +71,7 @@ export type Event =
   | { type: "actionFailed"; message: string }
   | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
   | { type: "enterMode"; mode: LaunchMode }
-  | { type: "enabledSources"; sources: string[] }
+  | { type: "enabledSources"; sources: string[]; webTitle: string | null }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
   | { type: "copyDone"; ok: boolean }
@@ -96,6 +98,7 @@ export type Effect =
     }
   | { type: "cancelAsk"; token: number }
   | { type: "loadThinkingModes" }
+  | { type: "webSearch"; text: string }
   | { type: "setThinkingMode"; id: string }
   | { type: "hide" }
   | { type: "openSettings"; section: string };
@@ -137,7 +140,7 @@ export const MODES: Record<Exclude<LaunchMode, "none">, ModeDef> = {
     placeholder: "Run a command or web shortcut",
     desc: "system, web shortcuts, media, ports and capture",
     wire: "command",
-    sources: ["syscmd", "web", "media", "ports", "capture"],
+    sources: ["syscmd", "web", "media", "ports", "capture", "links"],
     needs: ["syscmd", "web", "media", "ports", "capture"],
   },
   calc: {
@@ -178,9 +181,19 @@ const modeOf = (prefix: string): Entered | undefined =>
 export const availableModes = (enabled: string[] | null): Entered[] =>
   ENTERED.filter((m) => enabled === null || MODES[m].needs.some((n) => enabled.includes(n)));
 
-export const initialState = (enabledSources: string[] | null = null): State => ({
+/** Plain text typed with no prefix: apps plus every feature that answers the command wire. */
+export const PLAIN_SEARCH = {
+  wire: "command" as const,
+  sources: ["apps", "features"] as const,
+};
+
+export const initialState = (
+  enabledSources: string[] | null = null,
+  webTitle: string | null = null,
+): State => ({
   mode: "none",
   enabledSources,
+  webTitle,
   input: "",
   seq: 0,
   askToken: 0,
@@ -210,11 +223,13 @@ export const initialState = (enabledSources: string[] | null = null): State => (
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
 
-/** Set mode and input; every mode but none and query bumps seq and searches its sources. */
+/** Set mode and input; every mode but query searches (none only for non-blank text). */
 function search(s: State, mode: LaunchMode, input: string): Result {
   const next: State = { ...s, mode, input, selected: 0, pendingConfirm: null, armed: false };
-  if (mode === "none" || mode === "query") return out({ ...next, items: [] });
-  const { wire, sources } = MODES[mode];
+  if (mode === "query" || (mode === "none" && input.trim() === "")) {
+    return out({ ...next, items: [] });
+  }
+  const { wire, sources } = mode === "none" ? PLAIN_SEARCH : MODES[mode];
   const seq = s.seq + 1;
   return out({ ...next, seq }, { type: "search", seq, mode: wire, text: input, sources });
 }
@@ -255,14 +270,14 @@ function textChange(s: State, text: string): Result {
   if (target && availableModes(s.enabledSources).includes(target)) {
     return switchMode(s, target, text.slice(1));
   }
-  if (s.mode === "none" || s.mode === "query") {
-    return out({ ...s, input: text, armed: false, notice: null });
-  }
+  if (s.mode === "query") return out({ ...s, input: text, armed: false, notice: null });
   return search({ ...s, notice: null }, s.mode, text);
 }
 
+const isPrefixList = (s: State): boolean => s.mode === "none" && s.input.trim() === "";
+
 function move(s: State, delta: number): Result {
-  const n = s.mode === "none" ? availableModes(s.enabledSources).length : s.items.length;
+  const n = isPrefixList(s) ? availableModes(s.enabledSources).length : s.items.length;
   if (n === 0) return out(s);
   return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
@@ -303,11 +318,58 @@ function enter(s: State): Result {
       },
     );
   }
-  if (s.mode === "none") {
+  if (isPrefixList(s)) {
     const mode = availableModes(s.enabledSources)[s.selected];
     return mode ? enterMode(s, mode) : out(s);
   }
   return openSelected(s, "open");
+}
+
+const FALLBACK_GLYPH: Record<string, string> = { "ui:find": "/", "ui:web": "↗", "ui:ask": "?" };
+
+const uiRow = (id: string, title: string): Item => ({
+  id,
+  kind: "command",
+  title,
+  subtitle: "",
+  icon: { type: "glyph", value: FALLBACK_GLYPH[id] ?? "" },
+  score: 0,
+  source: "ui",
+  actions: [{ type: "primary" }],
+  payload: null,
+});
+
+/** C6 rows appended after plain-text results: Find, Web (when a web shortcut exists) and Ask. */
+function fallbackRows(s: State): Item[] {
+  const text = s.input.trim();
+  const sel = s.thinkingModes.modes.find((m) => m.id === s.thinkingModes.selected);
+  const ai = sel ? `${sel.providerLabel} · ${sel.model}` : "your AI";
+  const rows: Item[] = [];
+  if (availableModes(s.enabledSources).includes("find")) {
+    rows.push(uiRow("ui:find", `Find files named “${text}”`));
+  }
+  if (s.webTitle !== null) rows.push(uiRow("ui:web", `Search ${s.webTitle} for “${text}”`));
+  if (s.enabledSources === null || s.enabledSources.includes("ask")) {
+    rows.push(uiRow("ui:ask", `Ask ${ai}: “${text}”`));
+  }
+  return rows;
+}
+
+/** Enter on a fallback row; Ctrl+Enter and Ctrl+Shift+Enter do nothing there. */
+function openFallback(s: State, id: string): Result {
+  switch (id) {
+    case "ui:find":
+      return switchMode(s, "find", s.input);
+    case "ui:web":
+      return out(s, { type: "webSearch", text: s.input.trim() });
+    case "ui:ask": {
+      const entered = switchMode(s, "query", s.input);
+      const sent = enter(entered.state);
+      return { state: sent.state, effects: [...entered.effects, ...sent.effects] };
+    }
+    default:
+      return out(s);
+  }
 }
 
 type Intent = "open" | "location" | "admin";
@@ -316,6 +378,7 @@ type Intent = "open" | "location" | "admin";
 function openSelected(s: State, intent: Intent): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
+  if (item.source === "ui") return intent === "open" ? openFallback(s, item.id) : out(s);
   if (intent === "admin") {
     // Rust lists Admin only for apps and exe/msi programs off removable drives.
     if (!item.actions.some((a) => a.type === "admin")) return out(s);
@@ -506,8 +569,13 @@ export function reduce(s: State, ev: Event): Result {
     case "text":
       return textChange(s, ev.text);
     case "results":
-      if (ev.seq !== s.seq) return out(s);
-      return out({ ...s, items: ev.items, selected: 0, armed: false });
+      if (ev.seq !== s.seq || isPrefixList(s)) return out(s);
+      return out({
+        ...s,
+        items: s.mode === "none" ? [...ev.items, ...fallbackRows(s)] : ev.items,
+        selected: 0,
+        armed: false,
+      });
     case "ask":
       return ask(s, ev.token, ev.event);
     case "outcome":
@@ -549,11 +617,16 @@ export function reduce(s: State, ev: Event): Result {
       return out({ ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } });
     case "enterMode":
       return enterMode(s, ev.mode);
-    case "enabledSources":
-      return out({ ...s, enabledSources: ev.sources });
+    case "enabledSources": {
+      const load: Effect[] =
+        ev.sources.includes("ask") && s.thinkingModes.modes.length === 0
+          ? [{ type: "loadThinkingModes" }]
+          : [];
+      return out({ ...s, enabledSources: ev.sources, webTitle: ev.webTitle }, ...load);
+    }
     case "shown":
       return out({
-        ...initialState(s.enabledSources),
+        ...initialState(s.enabledSources, s.webTitle),
         thinkingModes: s.thinkingModes,
         seq: s.seq,
         askToken: s.askToken,
@@ -562,7 +635,7 @@ export function reduce(s: State, ev: Event): Result {
     case "hidden":
       return out(
         {
-          ...initialState(s.enabledSources),
+          ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           seq: s.seq,
           askToken: s.askToken,
