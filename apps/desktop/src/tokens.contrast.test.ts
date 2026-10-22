@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import css from "./tokens.css?raw";
 import { FORCED_SCHEME, GLASS_DEFAULT, GLASS_MAX, GLASS_MIN, THEMES, type ThemeId } from "./theme";
+import css from "./tokens.css?raw";
 
 type Scheme = "dark" | "light";
 type Rgb = readonly [number, number, number];

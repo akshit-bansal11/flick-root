@@ -309,8 +309,10 @@
     --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
     --l-droplet: linear-gradient(180deg, var(--l-raw-white), var(--l-raw-steel-50));
     --l-shadow-raised: 0 1px 1px var(--l-raw-mist-900-10), 0 6px 14px -6px var(--l-raw-mist-900-22);
-    --l-shadow-overlay: 0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
-    --l-shadow-window: 0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
+    --l-shadow-overlay:
+      0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
+    --l-shadow-window:
+      0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
     --l-lens: color-mix(in oklab, var(--l-accent) 11%, var(--l-raise));
     --l-lens-ring: color-mix(in oklab, var(--l-accent) 38%, transparent);
   }
@@ -346,8 +348,10 @@
   --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
   --l-droplet: linear-gradient(180deg, var(--l-raw-white), var(--l-raw-steel-50));
   --l-shadow-raised: 0 1px 1px var(--l-raw-mist-900-10), 0 6px 14px -6px var(--l-raw-mist-900-22);
-  --l-shadow-overlay: 0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
-  --l-shadow-window: 0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
+  --l-shadow-overlay:
+    0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
+  --l-shadow-window:
+    0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
 }
 
 /* Derived glass tokens. Declared on the element so a themed child (the Settings swatch) recomputes them.
