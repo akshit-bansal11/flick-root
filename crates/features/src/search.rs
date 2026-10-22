@@ -1,23 +1,62 @@
 //! Search composition for Command and Find modes.
 
-use crate::registry::Registry;
+use crate::registry::{FeatureSel, Registry};
 use index_apps::AppEntry;
 use index_files::{FileHit, FileIndex, FindQuery, Overlay};
 use launcher_core::matcher::{FuzzyMatcher, MatchIndex, keyword_score, one_edit};
 use launcher_core::{ActionKind, Input, Item, ItemId, ItemKind};
 use std::cmp::Ordering;
 
-/// Which sources a Command-mode search draws from.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SearchScope {
-    /// Apps, programs and feature items.
-    #[default]
-    All,
-    /// Apps and programs only.
-    Apps,
-    /// Feature items only.
-    Commands,
+/// Which sources a search draws from (wire ids: see [`Sources::parse`]).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Sources {
+    /// Installed apps and scanned programs.
+    pub apps: bool,
+    /// The file index.
+    pub files: bool,
+    /// Which running features.
+    pub features: FeatureSel,
+}
+
+impl Sources {
+    /// Apps and every feature, no files: what Command mode searched before sources existed.
+    pub fn everything() -> Self {
+        Self {
+            apps: true,
+            files: false,
+            features: FeatureSel::All,
+        }
+    }
+
+    /// Parses wire ids. `"apps"`, `"files"` and `"features"` (all features) are reserved; any other id
+    /// must satisfy `known` (a feature id). Duplicates collapse; an empty list selects nothing.
+    /// The error is the first unknown id.
+    pub fn parse(ids: &[String], known: impl Fn(&str) -> bool) -> Result<Sources, String> {
+        let mut s = Sources::default();
+        let mut some: Vec<String> = Vec::new();
+        let mut all = false;
+        for id in ids {
+            match id.as_str() {
+                "apps" => s.apps = true,
+                "files" => s.files = true,
+                "features" => all = true,
+                f if known(f) => {
+                    if !some.iter().any(|x| x == f) {
+                        some.push(f.to_owned());
+                    }
+                }
+                _ => return Err(id.clone()),
+            }
+        }
+        s.features = if all {
+            FeatureSel::All
+        } else if some.is_empty() {
+            FeatureSel::None
+        } else {
+            FeatureSel::Ids(some)
+        };
+        Ok(s)
+    }
 }
 
 /// Program rows rank below real apps by this factor.
@@ -141,7 +180,7 @@ pub(crate) fn fuzzy_pick<'a>(
     best.filter(|_| !tie).map(|(_, k)| k)
 }
 
-/// Command-mode results over all sources; see [`command_search_scoped`].
+/// Command-mode results over apps and all features; see [`command_search_scoped`].
 pub fn command_search(
     apps: &[AppEntry],
     app_index: &MatchIndex,
@@ -152,7 +191,7 @@ pub fn command_search(
 ) -> Vec<Item> {
     command_search_scoped(
         apps,
-        SearchScope::All,
+        &Sources::everything(),
         app_index,
         matcher,
         registry,
@@ -166,7 +205,7 @@ pub fn command_search(
 /// (their index is much larger) and joined with [`merge_items`].
 pub fn command_search_scoped(
     apps: &[AppEntry],
-    scope: SearchScope,
+    sources: &Sources,
     app_index: &MatchIndex,
     matcher: &mut FuzzyMatcher,
     registry: &Registry,
@@ -174,7 +213,7 @@ pub fn command_search_scoped(
     k: usize,
 ) -> Vec<Item> {
     let mut items: Vec<Item> = Vec::new();
-    if scope != SearchScope::Commands {
+    if sources.apps {
         if input.text.is_empty() {
             items.extend(
                 apps.iter()
@@ -199,9 +238,7 @@ pub fn command_search_scoped(
             }));
         }
     }
-    if scope != SearchScope::Apps {
-        items.extend(registry.query_all(input));
-    }
+    items.extend(registry.query_sel(input, &sources.features));
     // Boost always runs: usage history orders apps too (and empty "!" lists most-used first).
     for it in &mut items {
         it.score += registry.rank_boost_all(input, it);
@@ -309,6 +346,27 @@ pub fn merge_items(
     top_k_sorted(items, k)
 }
 
+/// The `/` list (C5): feature rows (the natural-language finder), apps, programs, files, folders, at
+/// most `k`. Up to 3 rows are reserved for files when any exist; unused room goes to the other side.
+pub fn compose_open(cmd_items: Vec<Item>, files: Vec<Item>, k: usize) -> Vec<Item> {
+    let (apps, mut rows): (Vec<Item>, Vec<Item>) =
+        cmd_items.into_iter().partition(|i| i.source == "apps");
+    let (programs, apps): (Vec<Item>, Vec<Item>) = apps
+        .into_iter()
+        .partition(|i| i.payload.get("program").is_some());
+    let (files, folders): (Vec<Item>, Vec<Item>) =
+        files.into_iter().partition(|i| i.kind == ItemKind::File);
+    rows.truncate(k);
+    let room = k - rows.len();
+    let nfiles = files.len() + folders.len();
+    let nrun = apps.len() + programs.len();
+    let run_take = nrun.min(room - nfiles.min(3).min(room));
+    let file_take = nfiles.min(room - run_take);
+    rows.extend(apps.into_iter().chain(programs).take(run_take));
+    rows.extend(files.into_iter().chain(folders).take(file_take));
+    rows
+}
+
 pub(crate) fn file_item(h: FileHit) -> Item {
     let path = h.path.to_string_lossy().into_owned();
     Item {
@@ -357,6 +415,17 @@ mod tests {
         }
     }
 
+    const APPS: Sources = Sources {
+        apps: true,
+        files: false,
+        features: FeatureSel::None,
+    };
+    const FEATURES: Sources = Sources {
+        apps: false,
+        files: false,
+        features: FeatureSel::All,
+    };
+
     fn input(text: &str) -> Input {
         Input {
             raw: text.into(),
@@ -387,14 +456,91 @@ mod tests {
         let mut m = FuzzyMatcher::new();
         let r = Registry::new();
         for q in ["spotfy", "spotifu"] {
-            let got =
-                command_search_scoped(&apps, SearchScope::Apps, &ai, &mut m, &r, &input(q), 5);
+            let got = command_search_scoped(&apps, &APPS, &ai, &mut m, &r, &input(q), 5);
             assert_eq!(
                 got.first().map(|i| i.title.as_str()),
                 Some("Spotify"),
                 "{q}"
             );
         }
+    }
+
+    #[test]
+    fn sources_parse() {
+        let known = |id: &str| id == "math" || id == "web";
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let s = Sources::parse(&ids(&["apps", "files", "math", "web", "math"]), known).unwrap();
+        assert!(s.apps && s.files);
+        assert_eq!(
+            s.features,
+            FeatureSel::Ids(vec!["math".into(), "web".into()])
+        );
+        let s = Sources::parse(&ids(&["apps", "features", "math"]), known).unwrap();
+        assert_eq!(s.features, FeatureSel::All);
+        assert_eq!(
+            Sources::parse(&ids(&["apps", "nope", "bad"]), known),
+            Err("nope".into())
+        );
+        assert_eq!(Sources::parse(&[], known), Ok(Sources::default()));
+        assert_eq!(Sources::parse(&ids(&["ask"]), known), Err("ask".into()));
+    }
+
+    fn row(id: &str, kind: ItemKind, source: &str, program: bool) -> Item {
+        Item {
+            id: ItemId(id.into()),
+            kind,
+            title: id.into(),
+            subtitle: String::new(),
+            icon: None,
+            score: 0.0,
+            source: source.into(),
+            actions: vec![],
+            payload: if program {
+                serde_json::json!({ "program": true })
+            } else {
+                serde_json::Value::Null
+            },
+        }
+    }
+
+    fn ids_of(v: &[Item]) -> Vec<&str> {
+        v.iter().map(|i| i.id.0.as_str()).collect()
+    }
+
+    #[test]
+    fn compose_open_order() {
+        let a = |n: &str| row(n, ItemKind::App, "apps", false);
+        let p = |n: &str| row(n, ItemKind::App, "apps", true);
+        let f = |n: &str| row(n, ItemKind::File, "files", false);
+        let d = |n: &str| row(n, ItemKind::Folder, "files", false);
+        let nl = row("nl", ItemKind::Result, "nlfind", false);
+        // Order: feature row, apps, programs, files, folders (inputs deliberately shuffled).
+        let got = compose_open(
+            vec![p("p1"), a("a1"), nl.clone()],
+            vec![d("d1"), f("f1")],
+            8,
+        );
+        assert_eq!(ids_of(&got), ["nl", "a1", "p1", "f1", "d1"]);
+        // Plentiful apps: 3 rows stay reserved for files, 1 row for the feature.
+        let apps: Vec<Item> = (0..8).map(|i| a(&format!("a{i}"))).collect();
+        let files: Vec<Item> = (0..5).map(|i| f(&format!("f{i}"))).collect();
+        let mut cmd = apps.clone();
+        cmd.push(nl);
+        let got = compose_open(cmd, files.clone(), 8);
+        assert_eq!(
+            ids_of(&got),
+            ["nl", "a0", "a1", "a2", "a3", "f0", "f1", "f2"]
+        );
+        // No files: apps fill the room, k respected.
+        assert_eq!(compose_open(apps.clone(), Vec::new(), 8).len(), 8);
+        // One file only: it takes one row, apps the rest.
+        let got = compose_open(apps, files[..1].to_vec(), 8);
+        assert_eq!(got.len(), 8);
+        assert_eq!(got[7].id.0, "f0");
+        // Few apps: files take the leftover room.
+        let got = compose_open(vec![a("a0")], files, 4);
+        assert_eq!(ids_of(&got), ["a0", "f0", "f1", "f2"]);
+        assert!(compose_open(Vec::new(), Vec::new(), 8).is_empty());
     }
 
     #[test]
@@ -431,15 +577,16 @@ mod tests {
     }
 
     #[test]
-    fn programs_rank_below_apps_and_scope_filters() {
+    fn programs_rank_below_apps_and_sources_filter() {
         let apps = vec![app("Code")];
         let progs = paths(&["Code Helper"]);
         let (ai, pi) = (idx_of(&apps), program_index(&progs));
         let mut m = FuzzyMatcher::new();
         let r = Registry::new();
-        let mut run = |scope, text: &str| {
-            let a = command_search_scoped(&apps, scope, &ai, &mut m, &r, &input(text), 5);
-            let p = if scope == SearchScope::Commands {
+        let every = Sources::everything();
+        let mut run = |src: &Sources, text: &str| {
+            let a = command_search_scoped(&apps, src, &ai, &mut m, &r, &input(text), 5);
+            let p = if !src.apps {
                 Vec::new()
             } else {
                 program_items(&progs, &[], &pi, &mut FuzzyMatcher::new(), text, 5)
@@ -447,15 +594,15 @@ mod tests {
             merge_items(a, p, text, 5)
         };
         // Both match "code"; the program must not outrank the real app.
-        let got = run(SearchScope::All, "code");
+        let got = run(&every, "code");
         assert_eq!(got[0].title, "Code");
         assert_eq!(got[1].payload["program"], true);
         assert_eq!(got[1].payload["entry"], 0);
         assert!(got[1].score < got[0].score);
         // Empty input lists real apps only.
-        assert_eq!(run(SearchScope::All, "").len(), 1);
-        assert!(run(SearchScope::Commands, "code").is_empty());
-        assert_eq!(run(SearchScope::Apps, "code").len(), 2);
+        assert_eq!(run(&every, "").len(), 1);
+        assert!(run(&FEATURES, "code").is_empty());
+        assert_eq!(run(&APPS, "code").len(), 2);
     }
 
     #[test]
@@ -466,7 +613,7 @@ mod tests {
         let mut m = FuzzyMatcher::new();
         let a = command_search_scoped(
             &apps,
-            SearchScope::All,
+            &Sources::everything(),
             &ai,
             &mut m,
             &Registry::new(),
@@ -486,7 +633,7 @@ mod tests {
         let mut m = FuzzyMatcher::new();
         let a = command_search_scoped(
             &apps,
-            SearchScope::All,
+            &Sources::everything(),
             &ai,
             &mut m,
             &Registry::new(),
@@ -596,8 +743,7 @@ mod tests {
         let mut m = FuzzyMatcher::new();
         for text in ["", "a"] {
             r.on_chosen_all(&input(text), &app_item(&apps[1], 1, 0.0, false, false));
-            let got =
-                command_search_scoped(&apps, SearchScope::Apps, &ai, &mut m, &r, &input(text), 5);
+            let got = command_search_scoped(&apps, &APPS, &ai, &mut m, &r, &input(text), 5);
             assert_eq!(got[0].title, "Bravo", "text {text:?}");
         }
     }

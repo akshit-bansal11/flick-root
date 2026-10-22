@@ -1,8 +1,10 @@
 //! The `search` command.
 use crate::error::CommandError;
 use crate::state::AppState;
+use features::registry::FeatureSel;
 use features::search::{
-    SearchScope, command_search_scoped, merge_items, program_entry, program_items,
+    Sources, command_search_scoped, compose_open, find_search, merge_items, program_entry,
+    program_items,
 };
 use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
@@ -34,46 +36,63 @@ fn reply(seq: u64, items: Vec<Item>) -> SearchResponse {
     }
 }
 
-/// Searches in the given mode. Superseded calls return no items.
+/// Searches the given sources (wire ids, see `Sources::parse`). `mode` filters which features answer.
+/// Superseded calls return no items.
 #[tauri::command]
 pub async fn search(
     state: State<'_, Arc<AppState>>,
     seq: u64,
     mode: Mode,
     text: String,
-    scope: Option<SearchScope>,
+    sources: Vec<String>,
 ) -> Result<SearchResponse, CommandError> {
     let started = Instant::now();
     state.latest_seq.fetch_max(seq, Ordering::SeqCst);
+    let src = Sources::parse(&sources, |id| state.registry.knows(id))
+        .map_err(|id| CommandError::new("invalid_source", format!("unknown source {id}")))?;
     let input = Input {
         raw: text.clone(),
         text,
         mode,
         seq,
     };
-    let items = match mode {
-        Mode::Query => Vec::new(),
-        Mode::Command => command(&state, &input, scope.unwrap_or_default()).await?,
-        Mode::Find => {
-            if !state.config.load().modes.find.enabled {
-                return Err(CommandError::new("mode_disabled", "Find mode is off"));
-            }
+    let items = if mode == Mode::Query {
+        Vec::new()
+    } else {
+        // A disabled file index or empty text contributes no files and is not an error.
+        let files_task = (src.files
+            && state.config.load().modes.find.enabled
+            && !input.text.is_empty())
+        .then(|| {
             let files = state.files.clone();
             let overlay = state.overlay.load_full();
             let inp = input.clone();
-            let found = tauri::async_runtime::spawn_blocking(move || {
-                features::find_search(&files, &overlay, &inp, K)
-            })
-            .await
-            .map_err(|e| CommandError::new("internal", e.to_string()))?;
-            // Feature items (the natural-language finder row) sit above the file hits.
-            let mut items = state.registry.query_all(&input);
-            items.extend(found);
+            tauri::async_runtime::spawn_blocking(move || find_search(&files, &overlay, &inp, K))
+        });
+        let cmd = Sources {
+            apps: src.apps,
+            files: false,
+            features: src.features.clone(),
+        };
+        let items = if cmd.apps || cmd.features != FeatureSel::None {
+            command(&state, &input, &cmd).await?
+        } else {
+            Vec::new()
+        };
+        if src.files {
+            let files = match files_task {
+                Some(t) => t
+                    .await
+                    .map_err(|e| CommandError::new("internal", e.to_string()))?,
+                None => Vec::new(),
+            };
+            compose_open(items, files, K)
+        } else {
             items
         }
     };
     let micros = started.elapsed().as_micros() as u64;
-    let budget_us = if mode == Mode::Find { 25_000 } else { 2_000 };
+    let budget_us = if src.files { 25_000 } else { 2_000 };
     if micros > budget_us {
         tracing::info!(?mode, items = items.len(), micros, "slow search");
     } else {
@@ -91,19 +110,19 @@ pub async fn search(
 async fn command(
     state: &Arc<AppState>,
     input: &Input,
-    scope: SearchScope,
+    sources: &Sources,
 ) -> Result<Vec<Item>, CommandError> {
     let am = state.app_match.load();
     let items = command_search_scoped(
         &am.entries,
-        scope,
+        sources,
         &am.index,
         &mut state.matcher.lock(),
         &state.registry,
         input,
         K,
     );
-    let programs = if scope == SearchScope::Commands || input.text.is_empty() {
+    let programs = if !sources.apps || input.text.is_empty() {
         Vec::new()
     } else {
         let st = state.clone();

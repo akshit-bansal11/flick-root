@@ -217,8 +217,10 @@ impl Feature for Projects {
         }
     }
     fn query(&self, input: &Input) -> Vec<Item> {
-        let (action, q) = keyword(input.text.trim()).unwrap_or(("open", input.text.trim()));
-        if q.is_empty() {
+        let text = input.text.trim();
+        let (action, q) = keyword(text).unwrap_or(("open", text));
+        // Empty input lists projects (the frecency boost orders them); `term ` with no name lists nothing.
+        if q.is_empty() && !text.is_empty() {
             return Vec::new();
         }
         let Some(slot) = self.live.lock().as_ref().map(|l| l.index.clone()) else {
@@ -228,12 +230,22 @@ impl Feature for Projects {
         let Some(idx) = guard.as_ref().as_ref() else {
             return Vec::new();
         };
-        self.matcher
-            .lock()
-            .top_k(q, &idx.names, MAX_RESULTS)
-            .into_iter()
-            .map(|s| {
-                let p = &idx.projects[s.idx];
+        // ponytail: empty input returns every project (score 0) so the frecency boost can order them all;
+        // O(projects) only on empty input, the shared top-k truncates to the most used.
+        let hits: Vec<(usize, f32)> = if q.is_empty() {
+            (0..idx.projects.len()).map(|i| (i, 0.0)).collect()
+        } else {
+            self.matcher
+                .lock()
+                .top_k(q, &idx.names, MAX_RESULTS)
+                .into_iter()
+                // ponytail: squash nucleo's unbounded score into 0..1, tune if ranking needs it.
+                .map(|s| (s.idx, s.score as f32 / (s.score as f32 + 200.0)))
+                .collect()
+        };
+        hits.into_iter()
+            .map(|(i, score)| {
+                let p = &idx.projects[i];
                 let path = p.path.to_string_lossy().into_owned();
                 Item {
                     id: ItemId(format!("projects:{path}")),
@@ -245,8 +257,7 @@ impl Feature for Projects {
                         _ => path.clone(),
                     },
                     icon: None,
-                    // ponytail: squash nucleo's unbounded score into 0..1, tune if ranking needs it.
-                    score: s.score as f32 / (s.score as f32 + 200.0),
+                    score,
                     source: "projects".into(),
                     actions: vec![ActionKind::Primary],
                     payload: serde_json::json!({ "path": path, "action": action }),
@@ -408,6 +419,9 @@ mod tests {
     #[tokio::test]
     async fn start_scans_queries_and_stop_clears() {
         let d = fixture();
+        for i in 0..4 {
+            touch(d.path(), &format!("extra{i}/package.json"));
+        }
         let c = ctx(d.path());
         let f = Projects::default();
         assert!(f.query(&input("rust")).is_empty());
@@ -427,7 +441,12 @@ mod tests {
                 .unwrap()
                 .ends_with("rust-proj")
         );
-        assert!(f.query(&input("")).is_empty());
+        let all = f.query(&input(""));
+        assert_eq!(all.len(), 10);
+        assert!(
+            all.iter()
+                .all(|i| i.score == 0.0 && i.payload["action"] == "open")
+        );
         let k = f.query(&input("code rust"));
         assert_eq!(k[0].payload["action"], "code");
         assert!(f.query(&input("term ")).is_empty());

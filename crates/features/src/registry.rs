@@ -59,11 +59,24 @@ pub struct FeatureView {
     pub options: toml::Table,
 }
 
+/// Which features a query draws from.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum FeatureSel {
+    /// No feature.
+    #[default]
+    None,
+    /// Every running feature whose modes include the request mode.
+    All,
+    /// Only the listed feature ids (still filtered by mode and running state).
+    Ids(Vec<String>),
+}
+
 /// Owns all features. Toggles are serialized by one async lock; the keystroke path reads a lock-free snapshot.
 #[derive(Default)]
 pub struct Registry {
     entries: RwLock<Vec<Entry>>,
     running: ArcSwap<Vec<Arc<dyn Feature>>>,
+    ids: ArcSwap<Vec<&'static str>>,
 }
 
 fn wanted(cfg: &Config, f: &dyn Feature) -> bool {
@@ -139,6 +152,12 @@ impl Registry {
 
     /// Adds a feature in the `Registered` state.
     pub async fn register(&self, feature: Arc<dyn Feature>) {
+        let id = feature.id();
+        self.ids.rcu(|cur| {
+            let mut v = (**cur).clone();
+            v.push(id);
+            v
+        });
         self.entries.write().await.push(Entry {
             feature,
             state: FeatureState::Registered,
@@ -223,15 +242,31 @@ impl Registry {
         Ok(cfg)
     }
 
-    /// Items from running features whose modes include `input.mode`. Sync, takes no async lock.
-    pub fn query_all(&self, input: &Input) -> Vec<Item> {
+    /// Whether a feature with this id is registered (running, stopped or failed). Lock-free.
+    pub fn knows(&self, id: &str) -> bool {
+        self.ids.load().contains(&id)
+    }
+
+    /// Items from running features whose modes include `input.mode` and that `sel` selects.
+    /// Sync, takes no async lock.
+    pub fn query_sel(&self, input: &Input, sel: &FeatureSel) -> Vec<Item> {
         let mut out = Vec::new();
         for f in self.running.load().iter() {
-            if f.modes().contains(&input.mode) {
+            let picked = match sel {
+                FeatureSel::None => false,
+                FeatureSel::All => true,
+                FeatureSel::Ids(ids) => ids.iter().any(|i| i == f.id()),
+            };
+            if picked && f.modes().contains(&input.mode) {
                 out.extend(f.query(input));
             }
         }
         out
+    }
+
+    /// Items from all running features whose modes include `input.mode`.
+    pub fn query_all(&self, input: &Input) -> Vec<Item> {
+        self.query_sel(input, &FeatureSel::All)
     }
 
     /// Sum of running features' rank boosts for `item`.
@@ -454,6 +489,46 @@ mod tests {
         let items = r.query_all(&input(Mode::Find));
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].source, "b");
+    }
+
+    #[tokio::test]
+    async fn knows_lists_stopped_features() {
+        let r = Registry::new();
+        let c = ctx();
+        r.register(stub("a", false, &[Mode::Command])).await;
+        r.register(stub("bad", true, &[Mode::Command])).await;
+        assert!(r.knows("a") && r.knows("bad") && !r.knows("zzz"));
+        r.apply_config(&c.config.load(), &c).await;
+        r.set_enabled("a", false, &c).await.unwrap();
+        assert!(r.knows("a") && r.knows("bad"));
+    }
+
+    #[tokio::test]
+    async fn query_sel_filters_by_id_and_mode() {
+        let r = Registry::new();
+        let c = ctx();
+        r.register(stub("a", false, &[Mode::Command])).await;
+        r.register(stub("b", false, &[Mode::Command])).await;
+        r.register(stub("f", false, &[Mode::Find])).await;
+        r.apply_config(&c.config.load(), &c).await;
+        let i = input(Mode::Command);
+        let only_b = r.query_sel(&i, &FeatureSel::Ids(vec!["b".into()]));
+        assert_eq!(only_b.len(), 1);
+        assert_eq!(only_b[0].source, "b");
+        assert!(r.query_sel(&i, &FeatureSel::None).is_empty());
+        // A listed id whose modes exclude the request mode contributes nothing.
+        assert!(
+            r.query_sel(&i, &FeatureSel::Ids(vec!["f".into()]))
+                .is_empty()
+        );
+        let all: Vec<_> = r
+            .query_sel(&i, &FeatureSel::All)
+            .into_iter()
+            .map(|x| x.source)
+            .collect();
+        let via: Vec<_> = r.query_all(&i).into_iter().map(|x| x.source).collect();
+        assert_eq!(all, via);
+        assert_eq!(all, ["a", "b"]);
     }
 
     #[tokio::test]
