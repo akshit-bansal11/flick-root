@@ -144,6 +144,8 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {
         tracing::warn!(%err, "show failed");
     }
+    // Spawned; nothing on the show path waits for the refresh.
+    crate::state::on_open(app);
     #[cfg(windows)]
     if let Ok(h) = win.hwnd() {
         let _ = win::dwm::strip_caption(h.0 as isize);

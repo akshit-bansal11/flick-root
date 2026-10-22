@@ -173,7 +173,9 @@ pub async fn set_general(
     match scan_programs {
         Some(true) => {
             let s = Arc::clone(&state);
-            tauri::async_runtime::spawn(async move { state::scan_programs_task(&s).await });
+            tauri::async_runtime::spawn(async move {
+                state::run_programs(&s, false, Vec::new(), true).await;
+            });
         }
         Some(false) => state::stop_programs(&state),
         None => {}
@@ -262,7 +264,11 @@ pub async fn reindex(state: State<'_, Arc<AppState>>, kind: String) -> Result<()
     let s = Arc::clone(&state);
     match kind.as_str() {
         "apps" => {
-            tauri::async_runtime::spawn(async move { state::refresh_apps(&s).await });
+            // Reindex apps also rescans every drive's programs (a no-op while programs are off).
+            tauri::async_runtime::spawn(async move {
+                state::refresh_apps(&s).await;
+                state::run_programs(&s, true, Vec::new(), true).await;
+            });
         }
         "files" => {
             if !state.config.load().modes.find.enabled {
