@@ -76,15 +76,16 @@ fn app_entry(
         .ok_or_else(not_found)
 }
 
-/// True when `parsing` is a scanned program on a removable drive. Checked here, not only in the
-/// UI: a removable program never runs elevated, even if the IPC call asks for it.
+/// True when `parsing` is a scanned program on a removable drive, or is no longer in the current
+/// program list (the set can be swapped between lookups). Fails closed: checked here, not only in
+/// the UI, so a removable or vanished program never runs elevated, even if the IPC call asks.
 fn is_removable_program(state: &AppState, parsing: &str) -> bool {
     let set = state.programs.load();
     set.paths
         .iter()
         .position(|p| &**p == parsing)
         .and_then(|i| set.removable.get(i).copied())
-        .unwrap_or(false)
+        .unwrap_or(true)
 }
 
 /// Ok when `path` still exists; else the `not_found` error shown to the user. Blocking: an
