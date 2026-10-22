@@ -33,6 +33,10 @@ const settings: SettingsView = {
   queryEnabled: false,
   roots: [],
   extraRoots: [],
+  programSkip: [],
+  drives: [],
+  programsCount: 0,
+  programsCapped: false,
 };
 
 let root: Root | undefined;
