@@ -59,9 +59,13 @@ if ($hits) { $hits | ForEach-Object { Write-Host "$($_.Path):$($_.LineNumber): $
 
 Set-Location $work
 Invoke-Git add -A
-Invoke-Git -c core.safecrlf=false commit --quiet -m "Flick $Version"
-Write-Host "Snapshot of $head committed in $work as 'Flick $Version':"
-git show --stat --format='%h %s' HEAD | Select-Object -Last 3
+if (git status --porcelain) {
+    Invoke-Git -c core.safecrlf=false commit --quiet -m "Flick $Version"
+    Write-Host "Snapshot of $head committed in $work as 'Flick $Version':"
+    git show --stat --format='%h %s' HEAD | Select-Object -Last 3
+} else {
+    Write-Host "The public repo already matches $head; no new commit."
+}
 
 if ($Push) {
     Invoke-Git push origin HEAD:main
