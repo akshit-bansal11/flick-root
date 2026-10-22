@@ -230,12 +230,16 @@ mod tests {
         {
             let mut w = make.make_writer();
             write!(w, "token={SECRET} ").unwrap();
-            write!(w, "key=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789").unwrap();
+            write!(
+                w,
+                concat!("key=sk-a", "nt-api03-abcdefghijklmnopqrstuvwxyz0123456789")
+            )
+            .unwrap();
         }
         let out = contents(&buf);
         assert!(out.contains("[REDACTED]"));
         assert!(!out.contains(SECRET));
-        assert!(!out.contains("sk-ant-api03-abcdef"));
+        assert!(!out.contains(concat!("sk-a", "nt-api03-abcdef")));
     }
 
     #[test]

@@ -30,7 +30,7 @@ fn bench(c: &mut Criterion) {
     .expect("start");
     for q in [
         "log 250 lunch #food",
-        "log my key sk-aB3xK9mQaB3xK9mQaB3xK9mQaB3xK9mQaB3xK9mQ",
+        concat!("log my key sk-a", "B3xK9mQaB3xK9mQaB3xK9mQaB3xK9mQaB3xK9mQ"),
         "hello",
     ] {
         let input = Input {

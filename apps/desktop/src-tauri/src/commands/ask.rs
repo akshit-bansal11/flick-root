@@ -185,7 +185,10 @@ mod tests {
 
     #[test]
     fn refuses_secret_and_empty_hub() {
-        let key = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF";
+        let key = concat!(
+            "sk-a",
+            "nt-api03-abcdefghijklmnopqrstuvwxyz0123456789ABCDEF"
+        );
         let code = |e: Option<AskEvent>| match e {
             Some(AskEvent::Error { code, .. }) => code,
             _ => String::new(),

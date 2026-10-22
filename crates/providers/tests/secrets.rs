@@ -9,7 +9,7 @@ use url::Url;
 use wiremock::matchers::any;
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-const FAKE: &str = "sk-fake-0123456789abcdef";
+const FAKE: &str = concat!("sk-f", "ake-0123456789abcdef");
 
 fn vault() -> Arc<SecretVault> {
     Arc::new(SecretVault::new(

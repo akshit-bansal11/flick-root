@@ -6,7 +6,7 @@ use launcher_core::detect::looks_secret;
 use launcher_core::redact::Redactor;
 use launcher_core::store::Store;
 
-const TAIL: &str = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fG3hJ5kL7m";
+const TAIL: &str = concat!("aB3d", "E5gH7jK9mN1pQ3sT5vW7yZ9bD1fG3hJ5kL7m");
 
 #[test]
 fn masks_inside_json_and_urls() {

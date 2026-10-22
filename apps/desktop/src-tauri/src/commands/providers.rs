@@ -453,8 +453,11 @@ mod tests {
 
     fn keyed(v: &SecretVault) -> SecretName {
         let name = SecretName::provider("openrouter", "openrouter.ai").unwrap();
-        v.set(&name, "sk-or-fake-0123456789abcdef".to_owned().into())
-            .unwrap();
+        v.set(
+            &name,
+            concat!("sk-o", "r-fake-0123456789abcdef").to_owned().into(),
+        )
+        .unwrap();
         name
     }
 

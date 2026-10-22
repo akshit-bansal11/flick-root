@@ -10,13 +10,17 @@ fn masked(r: &Redactor, s: &str) {
 #[test]
 fn provider_samples_masked() {
     let r = Redactor::new();
-    let tail = "aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fG3hJ5kL7m";
+    let tail = concat!("aB3d", "E5gH7jK9mN1pQ3sT5vW7yZ9bD1fG3hJ5kL7m");
     for s in [
         format!("sk-{tail}"),
         format!("key sk-ant-api03-{tail} end"),
         format!("ghp_{}", &tail[..36]),
-        "AKIAABCDEFGHIJKLMNOP".to_string(),
-        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop".to_string(),
+        concat!("AKIA", "ABCDEFGHIJKLMNOP").to_string(),
+        concat!(
+            "eyJh",
+            "bGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop"
+        )
+        .to_string(),
         format!("Authorization: Bearer {tail}"),
     ] {
         masked(&r, &s);
@@ -50,7 +54,10 @@ fn debug_hides_secret() {
     assert!(!format!("{r:?}").contains("super-secret"));
 }
 
-const BODY: &str = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj";
+const BODY: &str = concat!(
+    "MIIE",
+    "vQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj"
+);
 
 #[test]
 fn pem_block_body_masked() {

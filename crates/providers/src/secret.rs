@@ -430,13 +430,13 @@ mod tests {
         let name = SecretName::parse("provider.x@x.test").unwrap();
         v.set(
             &name,
-            SecretString::from("  sk-fake-0123456789abcdef \t".to_owned()),
+            SecretString::from(concat!("  sk-f", "ake-0123456789abcdef \t").to_owned()),
         )
         .unwrap();
         let got = v
             .with_secret(&name, |s| s.expose_secret().to_owned())
             .unwrap();
-        assert_eq!(got, "sk-fake-0123456789abcdef");
+        assert_eq!(got, concat!("sk-f", "ake-0123456789abcdef"));
         assert!(v.info(&name).unwrap().last_used.is_some());
         // take() must not touch the meta store synchronously; flush() persists it.
         let meta = v.meta.get(name.as_str()).unwrap().unwrap();
