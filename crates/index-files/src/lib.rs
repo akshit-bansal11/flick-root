@@ -13,7 +13,7 @@ pub mod store;
 pub mod watch;
 
 pub use error::FilesError;
-pub use programs::{PROGRAM_EXTS, ProgramCache, ProgramFile, ScannedRoot, scan_programs};
+pub use programs::{PROGRAM_EXTS, ProgramCache, ProgramFile, ScannedRoot, scan_root};
 pub use query::{FileHit, FindQuery, query};
 pub use scan::{Parallelism, Root, default_roots, scan};
 pub use store::{FileIndex, FileStore, StoreBuilder};

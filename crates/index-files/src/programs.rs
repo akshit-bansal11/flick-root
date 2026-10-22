@@ -1,8 +1,8 @@
 //! Programs scan: every launchable file (exe, installers, scripts, shortcuts) under a set of roots.
 //!
-//! ponytail: no live watcher; the list is rescanned at startup (cache gives an instant start).
-//! [`ProgramCache`] (v2) keeps entries per drive root; the flat v1 `save_programs` /
-//! `load_programs` stay until the desktop app switches to it.
+//! Scans run on launcher open, only for new or swapped drives or a stale (24 h) cache; the cache
+//! gives an instant start. ponytail: no live feed yet; D9 feeds programs from the Find watcher.
+//! [`ProgramCache`] (v2) keeps entries per drive root and volume serial.
 
 use crate::error::FilesError;
 use crate::scan::Parallelism;
@@ -49,7 +49,6 @@ pub const PROGRAM_EXTS: &[&str] = &[
 /// Hard cap on returned programs; the walk stops when reached.
 pub const MAX_PROGRAMS: usize = 50_000;
 
-const CACHE_HEADER: &str = "programs v1";
 const CACHE_HEADER_V2: &str = "programs v2";
 const ATTR_SYSTEM: u32 = 0x4;
 const SKIP_DIRS: &[&str] = &[
@@ -73,7 +72,7 @@ const SKIP_DIRS: &[&str] = &[
     "onedrivetemp",
 ];
 
-/// A launchable file found by [`scan_programs`].
+/// A launchable file found by [`scan_root`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgramFile {
     /// Absolute path.
@@ -184,24 +183,6 @@ fn path_key(p: &Path) -> String {
 fn sort_dedup(list: &mut Vec<ProgramFile>) {
     list.sort_by_cached_key(|p| path_key(&p.path));
     list.dedup_by(|a, b| path_key(&a.path) == path_key(&b.path));
-}
-
-/// Walk `roots` and collect program files, sorted by path, deduplicated, capped at [`MAX_PROGRAMS`].
-/// `cancel` is checked per entry.
-pub fn scan_programs(
-    roots: &[PathBuf],
-    parallelism: &Parallelism,
-    cancel: &AtomicBool,
-) -> Result<Vec<ProgramFile>, FilesError> {
-    let mut out: Vec<ProgramFile> = Vec::new();
-    let mut seen: HashSet<String> = HashSet::new();
-    for root in roots {
-        if walk_root(root, MAX_PROGRAMS, parallelism, cancel, &mut seen, &mut out)? {
-            break;
-        }
-    }
-    sort_dedup(&mut out);
-    Ok(out)
 }
 
 /// Per-root share of [`MAX_PROGRAMS`] when `n_roots` roots are scanned, so one junk drive
@@ -422,34 +403,4 @@ fn parse_root(s: &str) -> Option<ScannedRoot> {
         scanned,
         capped,
     })
-}
-
-/// Write `list` to `path` (header line, then one path per line) via temp file + rename.
-pub fn save_programs(path: &Path, list: &[ProgramFile]) -> Result<(), FilesError> {
-    let mut text = String::from(CACHE_HEADER);
-    for p in list {
-        text.push('\n');
-        text.push_str(&p.path.to_string_lossy());
-    }
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, text).map_err(|e| FilesError::io("write programs cache", e))?;
-    std::fs::rename(&tmp, path).map_err(|e| FilesError::io("replace programs cache", e))
-}
-
-/// Load a cache written by [`save_programs`]; `None` when missing or of an unknown version.
-pub fn load_programs(path: &Path) -> Result<Option<Vec<ProgramFile>>, FilesError> {
-    let text = match std::fs::read_to_string(path) {
-        Ok(t) => t,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(FilesError::io("read programs cache", e)),
-    };
-    let mut lines = text.lines();
-    if lines.next() != Some(CACHE_HEADER) {
-        return Ok(None);
-    }
-    Ok(Some(
-        lines
-            .filter_map(|l| ProgramFile::from_path(Path::new(l)))
-            .collect(),
-    ))
 }

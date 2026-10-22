@@ -1,8 +1,13 @@
-use index_files::programs::{ProgramFile, load_programs, save_programs};
-use index_files::{FilesError, Parallelism, scan_programs};
+use index_files::programs::ProgramFile;
+use index_files::{FilesError, Parallelism};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
+
+/// One root walked with the full cap (what the app does per drive).
+fn scan(r: &Path, par: &Parallelism, cancel: &AtomicBool) -> Result<Vec<ProgramFile>, FilesError> {
+    scan_root(r, MAX_PROGRAMS, par, cancel).map(|(v, _)| v)
+}
 
 fn touch(p: &Path) {
     fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -43,16 +48,9 @@ fn scan_filters_and_caches() {
         .status();
 
     let cancel = AtomicBool::new(false);
-    let got = scan_programs(&[r.to_path_buf()], &Parallelism::Serial, &cancel).unwrap();
+    let got = scan(r, &Parallelism::Serial, &cancel).unwrap();
     let names: Vec<_> = got.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(names, ["a", "app", "b", "setup", "d"]);
-
-    let cache = r.join("programs.cache");
-    save_programs(&cache, &got).unwrap();
-    assert_eq!(load_programs(&cache).unwrap(), Some(got));
-    assert_eq!(load_programs(&r.join("missing")).unwrap(), None);
-    fs::write(&cache, "flick-programs 1\nC:\\a.exe").unwrap();
-    assert_eq!(load_programs(&cache).unwrap(), None);
 }
 
 #[test]
@@ -60,7 +58,7 @@ fn cancel_returns_cancelled() {
     let d = tempfile::tempdir().unwrap();
     touch(&d.path().join("a.exe"));
     let cancel = AtomicBool::new(true);
-    let r = scan_programs(&[d.path().to_path_buf()], &Parallelism::Serial, &cancel);
+    let r = scan(d.path(), &Parallelism::Serial, &cancel);
     assert!(matches!(r, Err(FilesError::Cancelled)));
 }
 
@@ -81,15 +79,12 @@ fn extra_types_and_app_bundle() {
         touch(&r.join(f));
     }
     let cancel = AtomicBool::new(false);
-    let got = scan_programs(&[r.to_path_buf()], &Parallelism::Serial, &cancel).unwrap();
+    let got = scan(r, &Parallelism::Serial, &cancel).unwrap();
     let names: Vec<_> = got.iter().map(|p| p.name.as_str()).collect();
     assert_eq!(names, ["a", "b", "c", "d", "e", "f", "Foo"]);
     let foo = got.iter().find(|p| p.name == "Foo").unwrap();
     assert_eq!(foo.ext, "app");
     assert_eq!(got.iter().find(|p| p.name == "b").unwrap().ext, "appimage");
-    let cache = r.join("programs.cache");
-    save_programs(&cache, &got).unwrap();
-    assert_eq!(load_programs(&cache).unwrap(), Some(got));
 }
 
 #[test]
@@ -107,11 +102,7 @@ fn hidden_system_root_is_walked() {
             .success()
     };
     assert!(attrib(["+h", "+s"]));
-    let found = scan_programs(
-        &[r.to_path_buf()],
-        &Parallelism::RayonNewPool(2),
-        &AtomicBool::new(false),
-    );
+    let found = scan(r, &Parallelism::RayonNewPool(2), &AtomicBool::new(false));
     assert!(attrib(["-h", "-s"]));
     let found = found.unwrap();
     assert!(found.iter().any(|p| p.name == "a" && p.ext == "exe"));
@@ -163,10 +154,9 @@ fn v2_round_trip_and_v1_is_none() {
     c.save(&path).unwrap();
     assert_eq!(ProgramCache::load(&path).unwrap(), Some(c));
 
-    save_programs(&path, &progs(&[r"C:\a.exe"])).unwrap();
+    // A v1 cache (flat list) is not v2: ignored, never an error; the first v2 scan replaces it.
+    fs::write(&path, "programs v1\nC:\\a.exe").unwrap();
     assert_eq!(ProgramCache::load(&path).unwrap(), None);
-    // The v1 loader still reads it, so nothing is wiped before the first v2 scan.
-    assert_eq!(load_programs(&path).unwrap().map(|l| l.len()), Some(1));
     assert_eq!(ProgramCache::load(&d.path().join("missing")).unwrap(), None);
 }
 
