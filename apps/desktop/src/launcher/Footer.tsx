@@ -1,5 +1,6 @@
 import { APP_DISPLAY_NAME } from "../brand";
-import { type Condition, capsText, inScope, shortcut } from "../shortcuts";
+import { Keycaps } from "../Keycaps";
+import { type Condition, caps, inScope, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
 import { useExit } from "../useMotion";
 import { availableModes, MODES } from "./reducer";
@@ -16,19 +17,30 @@ interface Props {
   copyFailed?: boolean;
 }
 
+export interface FootHint {
+  id: string;
+  caps: string[];
+  label: string;
+}
+
 /** Footer hints per mode, straight from the shortcut table. */
 export function footHints(
   mode: LaunchMode,
   ctx: Props["ctx"] = {},
   modes: Props["modes"] = availableModes(null),
-): string[] {
+): FootHint[] {
   if (mode === "none") {
-    const prefixes = modes.map((m) => `${MODES[m].prefix} ${MODES[m].label.toLowerCase()}`);
-    return [...prefixes, `${capsText("sheet")} ${shortcut("sheet").foot}`];
+    const prefixes = modes.map((m) => ({
+      id: `go:${m}`,
+      caps: [MODES[m].prefix],
+      label: MODES[m].label.toLowerCase(),
+    }));
+    const sheet = { id: "sheet", caps: caps("sheet"), label: shortcut("sheet").foot ?? "" };
+    return [...prefixes, sheet];
   }
   return inScope(mode)
     .filter((s) => s.foot && (!s.when || ctx[s.when]))
-    .map((s) => `${capsText(s.id)} ${s.foot}`);
+    .map((s) => ({ id: s.id, caps: caps(s.id), label: s.foot ?? "" }));
 }
 
 export function Footer({ mode, modes, ctx, copied = false, copyFailed = false }: Props) {
@@ -39,7 +51,7 @@ export function Footer({ mode, modes, ctx, copied = false, copyFailed = false }:
         <span className="brand-dot" aria-hidden="true" />
         {APP_DISPLAY_NAME}
       </span>
-      <span className="keys">
+      <span className="acts">
         {toast.shown && (
           <span
             className={toast.leaving ? "copied out" : "copied"}
@@ -50,8 +62,10 @@ export function Footer({ mode, modes, ctx, copied = false, copyFailed = false }:
             {toast.shown}
           </span>
         )}
-        {footHints(mode, ctx, modes).map((k) => (
-          <span key={k}>{k}</span>
+        {footHints(mode, ctx, modes).map((h) => (
+          <span key={h.id} className="act">
+            <Keycaps caps={h.caps} /> {h.label}
+          </span>
         ))}
       </span>
     </div>

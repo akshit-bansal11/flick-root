@@ -15,9 +15,9 @@ pub const LABEL: &str = "launcher";
 /// Panel width in logical px. Keep equal to `--l-panel-w` in tokens.css.
 const PANEL_W: f64 = 640.0;
 /// Tallest panel in logical px. Keep equal to `--l-panel-max` in tokens.css.
-const PANEL_MAX_H: f64 = 586.0;
-/// Shortest window in logical px (the input row alone).
-const PANEL_MIN_H: f64 = 56.0;
+const PANEL_MAX_H: f64 = 706.0;
+/// Shortest window in logical px (the input row alone). Keep equal to `--l-input` in tokens.css.
+const PANEL_MIN_H: f64 = 60.0;
 /// Gap kept between the panel and the work-area edge, in logical px.
 const WORK_MARGIN: f64 = 24.0;
 
@@ -363,7 +363,7 @@ mod tests {
         // 1920x1040 work area with a 40px taskbar at the bottom.
         assert_eq!(
             layout((0, 0, 1920, 1040), 1.0, PANEL_MAX_H),
-            (640, 227, 640, 586)
+            (640, 167, 640, 706)
         );
     }
 
@@ -372,7 +372,7 @@ mod tests {
         // Input row alone: centred on its own height, not a full list's.
         assert_eq!(
             layout((0, 0, 1920, 1040), 1.0, PANEL_MIN_H),
-            (640, 492, 640, 56)
+            (640, 490, 640, 60)
         );
     }
 

@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
 import type { ExplainCaptured, Item } from "../types";
+import { footHints } from "./Footer";
 import { Launcher } from "./Launcher";
 
 vi.mock("../ipc", () => ({
@@ -144,7 +145,7 @@ describe("Launcher", () => {
     await type(">");
     expect(screen.getByText("Apps")).toBeTruthy();
     expect(screen.getAllByText("App")).toHaveLength(2);
-    expect(screen.queryByText("Ctrl Shift ↵ admin")).toBeNull();
+    expect(screen.queryByText("admin")).toBeNull();
     expect(screen.queryByText("Tab mode")).toBeNull();
   });
 
@@ -158,7 +159,13 @@ describe("Launcher", () => {
       }),
     );
     await type("/");
-    expect(screen.getByText("Ctrl Shift ↵ admin")).toBeTruthy();
+    const act = screen.getByText("admin");
+    expect(act.className).toBe("act");
+    expect([...act.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
+      "Ctrl",
+      "Shift",
+      "↵",
+    ]);
   });
 
   it("labels drive-scan programs", async () => {
@@ -257,11 +264,15 @@ describe("Launcher", () => {
   it("find footer advertises Ctrl Shift C on a file row only, not Ctrl C", async () => {
     await mount();
     await type("/");
-    expect(screen.queryByText("Ctrl Shift C copy path")).toBeNull();
+    expect(screen.queryByText("copy path")).toBeNull();
     mockFileResults();
     await type("/x");
-    expect(screen.getAllByText("Ctrl Shift C copy path").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Ctrl C copy path")).toBeNull();
+    const acts = screen.getAllByText("copy path");
+    expect([...acts[0].querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
+      "Ctrl",
+      "Shift",
+      "C",
+    ]);
   });
 
   it("Escape on empty input hides the launcher", async () => {
@@ -330,5 +341,24 @@ describe("Launcher explain", () => {
     expect(ipc.hideLauncher).not.toHaveBeenCalled();
     await type(">alp");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("footHints", () => {
+  it("find lists open and location, and admin only when the selection has it", () => {
+    expect(footHints("find").map((h) => h.label)).toEqual(["open", "location"]);
+    const admin = footHints("find", { adminAction: true }).find((h) => h.id === "admin");
+    expect(admin?.caps).toEqual(["Ctrl", "Shift", "↵"]);
+  });
+
+  it("commands lists a single Enter hint without copy until a value exists", () => {
+    expect(footHints("commands").map((h) => h.caps)).toEqual([["↵"]]);
+  });
+
+  it("none lists the prefixes as one cap each, then the shortcut sheet", () => {
+    const hints = footHints("none", {}, ["find", "calc"]);
+    expect(hints.map((h) => h.id)).toEqual(["go:find", "go:calc", "sheet"]);
+    expect(hints[0]).toEqual({ id: "go:find", caps: ["/"], label: "open" });
+    expect(hints[2]?.label).toBe("shortcuts");
   });
 });

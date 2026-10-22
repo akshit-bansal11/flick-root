@@ -1,3 +1,4 @@
+import { Keycaps } from "../Keycaps";
 import { capsOf, groups, WHEN_TEXT } from "../shortcuts";
 
 const TITLE_ID = "shortcut-sheet-title";
@@ -22,11 +23,7 @@ export function ShortcutSheet() {
                     {s.when && <span className="sheet-when"> ({WHEN_TEXT[s.when]})</span>}
                   </dt>
                   <dd>
-                    {capsOf(s.keys).map((c) => (
-                      <kbd key={c} className="kbd">
-                        {c}
-                      </kbd>
-                    ))}
+                    <Keycaps caps={capsOf(s.keys)} />
                   </dd>
                 </div>
               ))}

@@ -192,20 +192,21 @@
   --l-r-window: 8px;
   --l-r-pill: 999px;
 
-  --l-row: 44px;
-  --l-input: 56px;
+  --l-row: 48px;
+  --l-input: 60px;
   --l-tile: 20px;
-  --l-tile-row: 26px;
+  --l-tile-row: 28px;
   --l-tile-lg: 32px;
-  --l-group-h: 28px;
-  --l-foot-h: 36px;
-  /* Input + 8 rows + action row + 3 group labels + footer + list padding: a full list is exactly centred. */
+  --l-group-h: 32px;
+  --l-foot-h: 40px;
+  /* Input + 8 rows + action row + 5 group labels (nlfind, Apps, Programs, Files, Folders) + footer + list
+     padding = 706px: a full list is exactly centred. Rust PANEL_MAX_H in window.rs mirrors it. */
   --l-panel-max: calc(
     var(--l-input) +
     var(--l-row) *
     9 +
     var(--l-group-h) *
-    3 +
+    5 +
     var(--l-foot-h) +
     var(--l-sp-7)
   );

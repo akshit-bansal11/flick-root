@@ -1,4 +1,5 @@
-import { capsText, shortcut } from "../shortcuts";
+import { Keycaps } from "../Keycaps";
+import { caps, shortcut } from "../shortcuts";
 
 const ACTIONS = ["open", "location", "copyPath"] as const;
 
@@ -20,7 +21,7 @@ export function Actions({ onPress, pathItem }: Props) {
           onClick={() => onPress(shortcut(id).keys)}
         >
           {shortcut(id).label}
-          <kbd className="kbd">{capsText(id)}</kbd>
+          <Keycaps caps={caps(id)} />
         </button>
       ))}
     </div>

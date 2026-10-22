@@ -4,10 +4,11 @@ body,
   margin: 0;
   overflow: hidden;
   background: transparent;
-  font: var(--l-fs) / var(--l-lh) var(--l-ui);
+  font: var(--l-fs-body) / var(--l-lh-body) var(--l-ui);
   color: var(--l-text);
 }
 
+/* Base glass. DWM acrylic blurs the desktop and carries the shadow, so the panel has no backdrop-filter. */
 .launcher {
   position: relative;
   width: 100%;
@@ -15,29 +16,29 @@ body,
   display: flex;
   flex-direction: column;
   background: var(--l-glass-tint);
-  border-radius: var(--l-r-panel);
+  border-radius: var(--l-r-window);
   overflow: hidden;
-  box-shadow: var(--l-glass-inner);
+  box-shadow: none;
 }
 
 /* Specular sheen across the top of the glass. */
-.launcher::after {
+.launcher::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
-  height: 40%;
-  background: var(--l-glass-sheen);
+  height: 90px;
+  background: var(--l-sheen-bg);
   pointer-events: none;
 }
 
-/* 1px hairline whose brightness fades top to bottom (masked ring). */
-.launcher::before {
+/* 1px specular rim whose brightness fades top to bottom (masked ring). */
+.launcher::after {
   content: "";
   position: absolute;
   inset: 0;
   padding: 1px;
   border-radius: inherit;
-  background: var(--l-glass-border);
+  background: var(--l-rim);
   mask:
     linear-gradient(var(--l-mask) 0 0) content-box,
     linear-gradient(var(--l-mask) 0 0);
@@ -49,8 +50,8 @@ body,
 .launch-error {
   margin: 0;
   padding: var(--l-sp-5) var(--l-sp-8);
-  border-top: var(--l-border);
-  font-size: var(--l-fs-sub);
+  border-top: var(--l-border-hair);
+  font-size: var(--l-fs-caption);
   color: var(--l-err);
 }
 
@@ -69,7 +70,7 @@ body,
 }
 
 .launcher-body::-webkit-scrollbar-thumb {
-  border-radius: var(--l-r2);
+  border-radius: var(--l-r-key);
   background: var(--l-line);
 }
 
@@ -92,7 +93,7 @@ body,
   padding: 0 var(--l-sp-8);
   min-width: 0;
   color: var(--l-muted);
-  border-bottom: var(--l-border);
+  border-bottom: var(--l-border-hair);
 }
 
 .input-icon {
@@ -109,7 +110,7 @@ body,
   border: 0;
   outline: 0;
   padding: 0;
-  font: 400 calc(var(--l-fs) + 3px) var(--l-ui);
+  font: 400 var(--l-fs-input) / var(--l-lh-input) var(--l-ui);
   color: var(--l-text);
   caret-color: var(--l-accent);
   text-overflow: ellipsis;
@@ -120,13 +121,13 @@ body,
 }
 
 .chip {
-  animation: chip-in var(--l-dur) var(--l-ease-spring);
+  animation: chip-in var(--l-dur) var(--l-ease-liquid);
   flex: none;
   padding: 1px var(--l-sp-4);
-  border-radius: var(--l-r2);
+  border-radius: var(--l-r-key);
   background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
   color: var(--l-accent);
-  font: 500 var(--l-fs-meta) var(--l-mono);
+  font: 500 var(--l-fs-micro) var(--l-mono);
   white-space: nowrap;
 }
 
@@ -162,7 +163,7 @@ body,
   min-height: var(--l-row);
   padding: 0 var(--l-sp-5);
   border: 0;
-  border-radius: var(--l-r);
+  border-radius: var(--l-r-control);
   background: none;
   color: var(--l-text);
   font: inherit;
@@ -207,16 +208,24 @@ body,
   padding: var(--l-sp-3) var(--l-sp-5);
 }
 
+/* Glass keycap. No backdrop-filter: a footer and a shortcut list hold many per frame.
+   ponytail: .kbd stays grouped here until Results, Tour, Welcome and Attachment move to Keycaps. */
+.key,
 .kbd {
-  font: 500 10.5px var(--l-mono);
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--l-muted-strong);
-  padding: 1px var(--l-sp-3);
-  border: var(--l-border);
-  border-bottom-width: 2px;
-  border-radius: var(--l-r2);
-  background: color-mix(in srgb, var(--l-text) var(--l-kbd-mix), transparent);
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  padding: 0 var(--l-sp-2);
+  border-radius: var(--l-r-key);
+  font: 500 var(--l-fs-micro) / 1 var(--l-mono);
+  color: var(--l-text);
+  background: var(--l-raise);
+  box-shadow:
+    inset 0 1px 0 var(--l-spec),
+    inset 0 -1px 0 var(--l-key-bottom),
+    inset 0 0 0 1px var(--l-hairline);
 }
 
 .results {
@@ -237,7 +246,7 @@ body,
   gap: var(--l-sp-6);
   min-height: var(--l-row);
   padding: 0 var(--l-sp-5);
-  border-radius: var(--l-r);
+  border-radius: var(--l-r-control);
   cursor: pointer;
   min-width: 0;
 }
@@ -269,7 +278,7 @@ body,
   position: absolute;
   inset: 0 var(--l-sp-3) auto;
   height: 0;
-  border-radius: var(--l-r);
+  border-radius: var(--l-r-control);
   background: color-mix(in srgb, var(--l-accent) var(--l-sel-mix), transparent);
   pointer-events: none;
   will-change: transform;
@@ -296,6 +305,7 @@ body,
 
 .row-title,
 .row-sub {
+  font-size: var(--l-fs-body);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -307,13 +317,13 @@ body,
 }
 
 .row-sub {
-  font-size: var(--l-fs-sub);
+  font-size: var(--l-fs-caption);
   color: var(--l-muted);
 }
 
 .row-meta {
   flex: none;
-  font: 500 var(--l-fs-meta) var(--l-mono);
+  font: 500 var(--l-fs-micro) var(--l-mono);
   color: var(--l-muted);
   white-space: nowrap;
 }
@@ -326,9 +336,8 @@ body,
   height: var(--l-group-h);
   box-sizing: border-box;
   padding: var(--l-sp-4) var(--l-sp-5) var(--l-sp-2);
-  font: 500 var(--l-fs-group) var(--l-mono);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--l-fs-caption);
+  font-weight: 500;
   color: var(--l-muted);
 }
 
@@ -346,8 +355,9 @@ body,
   height: var(--l-foot-h);
   box-sizing: border-box;
   padding: 0 var(--l-sp-7);
-  border-top: var(--l-border);
-  font: 500 var(--l-fs-meta) var(--l-mono);
+  border-top: var(--l-border-hair);
+  font-size: var(--l-fs-caption);
+  line-height: var(--l-lh-caption);
   color: var(--l-muted);
 }
 
@@ -355,7 +365,7 @@ body,
   display: flex;
   align-items: center;
   gap: var(--l-sp-3);
-  font: 600 12.5px var(--l-ui);
+  font: 600 var(--l-fs-caption) var(--l-ui);
   color: var(--l-text);
   white-space: nowrap;
 }
@@ -367,7 +377,7 @@ body,
   background: var(--l-accent);
 }
 
-.keys {
+.acts {
   display: flex;
   gap: var(--l-sp-6);
   justify-content: flex-end;
@@ -376,18 +386,30 @@ body,
   white-space: nowrap;
 }
 
+.act {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--l-sp-3);
+}
+
+.keys {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--l-sp-1);
+}
+
 .tile {
   flex: none;
   width: var(--l-tile-row);
   height: var(--l-tile-row);
-  border-radius: var(--l-r);
+  border-radius: var(--l-r-control);
   object-fit: contain;
 }
 
 .tile-letter {
   display: grid;
   place-items: center;
-  font: 600 12px var(--l-ui);
+  font: 600 var(--l-fs-caption) var(--l-ui);
   color: var(--l-tile-text);
   background: var(--l-tile-bg);
 }
@@ -398,18 +420,18 @@ body,
   align-items: center;
   height: var(--l-row);
   padding: 0 var(--l-sp-8);
-  border-top: var(--l-border);
+  border-top: var(--l-border-hair);
 }
 
 .action {
   display: flex;
   gap: var(--l-sp-4);
   align-items: center;
-  font: 500 var(--l-fs-action) var(--l-ui);
+  font: 500 var(--l-fs-caption) var(--l-ui);
   color: var(--l-text);
   background: none;
   border: 0;
-  border-radius: var(--l-r2);
+  border-radius: var(--l-r-key);
   padding: var(--l-sp-2) var(--l-sp-3);
   cursor: pointer;
 }
@@ -441,7 +463,7 @@ body,
 }
 
 .copied.out {
-  animation: copied-out var(--l-dur) var(--l-ease-in-out) forwards;
+  animation: copied-out var(--l-dur) var(--l-ease-out) forwards;
 }
 
 @keyframes copied-in {
@@ -474,13 +496,13 @@ body,
 
 .sheet-title {
   margin: 0 0 var(--l-sp-3);
-  font: 600 13px var(--l-ui);
+  font: 600 var(--l-fs-body) var(--l-ui);
   color: var(--l-text);
 }
 
 .sheet-scope {
   margin: var(--l-sp-5) 0 var(--l-sp-2);
-  font: 600 var(--l-fs-meta) var(--l-ui);
+  font: 600 var(--l-fs-micro) var(--l-ui);
   color: var(--l-muted);
 }
 
@@ -502,7 +524,7 @@ body,
 
 .sheet-row dd {
   display: flex;
-  gap: var(--l-sp-2);
+  gap: var(--l-sp-1);
   margin: 0;
 }
 
