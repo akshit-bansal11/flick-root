@@ -60,29 +60,109 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
         )?;
         return Ok(());
     }
+    let mica = mica_wanted();
+    let query = if mica { "?mica=1" } else { "" };
     let url = match section {
-        Some(s) => format!("settings.html#{s}"),
-        None => "settings.html".to_string(),
+        Some(s) => format!("settings.html{query}#{s}"),
+        None => format!("settings.html{query}"),
     };
     let win = WebviewWindowBuilder::new(app, SETTINGS_LABEL, WebviewUrl::App(url.into()))
         .title(format!("{} Settings", app.package_info().name))
         .inner_size(960.0, 640.0)
         .min_inner_size(760.0, 520.0)
         .decorations(true)
+        .transparent(mica)
         .visible(true)
         .center()
         .build()?;
+    apply_frame(app, &win, mica);
     // Hotkeys always come back when Settings goes away, even if the tour did not unmount cleanly.
     let handle = app.clone();
-    win.on_window_event(move |event| {
-        if matches!(
-            event,
-            tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
-        ) {
+    win.on_window_event(move |event| match event {
+        tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed => {
             crate::hotkey::set_paused(&handle, false);
         }
+        // The OS resets the caption on a system theme change; put Flick's scheme back.
+        tauri::WindowEvent::ThemeChanged(_) => sync_settings_theme(&handle),
+        _ => {}
     });
     Ok(())
+}
+
+/// Mica needs Windows build 22621 and transparency effects on; otherwise Settings is opaque.
+#[cfg(windows)]
+fn mica_wanted() -> bool {
+    win::dwm::has_system_backdrop() && win::dwm::transparency_enabled()
+}
+
+/// No Mica outside Windows.
+#[cfg(not(windows))]
+fn mica_wanted() -> bool {
+    false
+}
+
+/// Puts Mica (when `mica`) and Flick's dark/light scheme on the native frame of Settings.
+fn apply_frame(app: &AppHandle, win: &tauri::WebviewWindow, mica: bool) {
+    #[cfg(windows)]
+    {
+        let dark = settings_dark(app);
+        let res = win.hwnd().map_err(anyhow::Error::from).and_then(|h| {
+            let h = h.0 as isize;
+            let r = if mica {
+                win::dwm::set_mica(h, true, dark)
+            } else {
+                win::dwm::set_dark_frame(h, dark)
+            };
+            r.map_err(anyhow::Error::from)
+        });
+        if let Err(err) = res {
+            tracing::warn!(%err, "settings frame");
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = (app, win, mica);
+}
+
+/// Re-applies Flick's scheme to the Settings caption and Mica, when the window exists.
+pub fn sync_settings_theme(app: &AppHandle) {
+    #[cfg(windows)]
+    if let Some(win) = app.get_webview_window(SETTINGS_LABEL) {
+        let dark = settings_dark(app);
+        let res = win
+            .hwnd()
+            .map_err(anyhow::Error::from)
+            .and_then(|h| win::dwm::set_dark_frame(h.0 as isize, dark).map_err(Into::into));
+        if let Err(err) = res {
+            tracing::warn!(%err, "settings theme");
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
+}
+
+/// Whether Settings renders dark under the saved appearance; "system" follows Windows.
+#[cfg(windows)]
+fn settings_dark(app: &AppHandle) -> bool {
+    let (theme, scheme) = app
+        .try_state::<std::sync::Arc<crate::state::AppState>>()
+        .map(|st| {
+            let cfg = st.config.load();
+            (cfg.appearance.theme.clone(), cfg.appearance.scheme.clone())
+        })
+        .unwrap_or_default();
+    scheme_dark(&theme, &scheme).unwrap_or_else(win::dwm::system_prefers_dark)
+}
+
+/// Dark (`Some(true)`) or light for a theme and scheme, mirroring `FORCED_SCHEME` in theme.ts;
+/// `None` means follow the system.
+fn scheme_dark(theme: &str, scheme: &str) -> Option<bool> {
+    match (theme, scheme) {
+        ("frost", _) => Some(false),
+        ("midnight" | "aurora" | "ember", _) => Some(true),
+        (_, "dark") => Some(true),
+        (_, "light") => Some(false),
+        _ => None,
+    }
 }
 
 /// An item of the tray menu, as the launcher UI sends it.
@@ -156,5 +236,16 @@ mod tests {
         for bad in ["", "Quit", " open", "exit", "settings\0"] {
             assert_eq!(TrayAction::parse(bad), None, "{bad:?}");
         }
+    }
+
+    #[test]
+    fn scheme_dark_table() {
+        assert_eq!(scheme_dark("frost", "dark"), Some(false));
+        assert_eq!(scheme_dark("midnight", "light"), Some(true));
+        assert_eq!(scheme_dark("aurora", "system"), Some(true));
+        assert_eq!(scheme_dark("ember", "light"), Some(true));
+        assert_eq!(scheme_dark("glass", "dark"), Some(true));
+        assert_eq!(scheme_dark("solid", "light"), Some(false));
+        assert_eq!(scheme_dark("glass", "system"), None);
     }
 }

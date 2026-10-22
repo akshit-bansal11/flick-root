@@ -158,3 +158,4 @@ Design decisions are recorded in [docs/adr/](docs/adr/):
 - [ADR-011](docs/adr/ADR-011-secret-security.md) Secret security
 - [ADR-012](docs/adr/ADR-012-prefixes-and-plain-text.md) Prefixes and plain text
 - [ADR-013](docs/adr/ADR-013-tray-menu.md) Tray menu
+- [ADR-014](docs/adr/ADR-014-settings-backdrop.md) Settings backdrop

@@ -1,12 +1,13 @@
-//! Desktop Window Manager helpers: rounded corners, acrylic backdrop and the system theme settings.
+//! Desktop Window Manager helpers: rounded corners, acrylic and Mica backdrops and the system theme settings.
 
 use crate::error::WinError;
 use std::ffi::c_void;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
-    DWM_SYSTEMBACKDROP_TYPE, DWM_WINDOW_CORNER_PREFERENCE, DWMSBT_NONE, DWMSBT_TRANSIENTWINDOW,
-    DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
-    DWMWCP_ROUND, DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
+    DWM_SYSTEMBACKDROP_TYPE, DWM_WINDOW_CORNER_PREFERENCE, DWMSBT_MAINWINDOW, DWMSBT_NONE,
+    DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
+    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmExtendFrameIntoClientArea,
+    DwmSetWindowAttribute,
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
 use windows::Win32::System::Registry::{
@@ -170,13 +171,24 @@ fn has_backdrop(build: u32) -> bool {
     build >= BACKDROP_MIN_BUILD
 }
 
-/// `(frame margin, backdrop type)` for glass on or off. -1 extends the frame over the whole client area.
+/// Whether DWM system backdrops (Mica, acrylic) exist on this Windows build (22621 or later).
+pub fn has_system_backdrop() -> bool {
+    has_backdrop(build_number())
+}
+
+/// `(frame margin, backdrop type)` for a backdrop on or off. -1 extends the frame over the whole client area.
+fn backdrop_values(on: bool, kind: DWM_SYSTEMBACKDROP_TYPE) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
+    if on { (-1, kind) } else { (0, DWMSBT_NONE) }
+}
+
+/// `(frame margin, backdrop type)` for glass on or off.
 fn glass_values(on: bool) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
-    if on {
-        (-1, DWMSBT_TRANSIENTWINDOW)
-    } else {
-        (0, DWMSBT_NONE)
-    }
+    backdrop_values(on, DWMSBT_TRANSIENTWINDOW)
+}
+
+/// `(frame margin, backdrop type)` for Mica on or off.
+fn mica_values(on: bool) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
+    backdrop_values(on, DWMSBT_MAINWINDOW)
 }
 
 /// Turns the acrylic backdrop of `hwnd` on or off; `dark` picks the dark tint.
@@ -186,16 +198,24 @@ pub fn set_acrylic(hwnd: isize, on: bool, dark: bool) -> Result<(), WinError> {
     if !has_backdrop(build_number()) {
         return accent_blur(h, on);
     }
-    let (m, kind) = glass_values(on);
-    let margins = MARGINS {
-        cxLeftWidth: m,
-        cxRightWidth: m,
-        cyTopHeight: m,
-        cyBottomHeight: m,
-    };
-    // SAFETY: `margins` is a live MARGINS; DWM rejects a stale hwnd with an error.
-    unsafe { DwmExtendFrameIntoClientArea(h, &raw const margins) }
-        .map_err(|e| WinError::os(e, "DwmExtendFrameIntoClientArea"))?;
+    apply_backdrop(h, glass_values(on), dark)
+}
+
+/// Turns the Mica backdrop of `hwnd` on or off; `dark` picks the dark Mica and caption.
+/// Builds before 22621 have no Mica: the call fails with `Unavailable` and changes nothing.
+pub fn set_mica(hwnd: isize, on: bool, dark: bool) -> Result<(), WinError> {
+    if !has_system_backdrop() {
+        return Err(WinError::Unavailable("Mica needs build 22621".into()));
+    }
+    apply_backdrop(HWND(hwnd as *mut c_void), mica_values(on), dark)
+}
+
+/// Switches the native frame of `hwnd` (caption, Mica) between dark and light.
+pub fn set_dark_frame(hwnd: isize, dark: bool) -> Result<(), WinError> {
+    dark_mode(HWND(hwnd as *mut c_void), dark)
+}
+
+fn dark_mode(h: HWND, dark: bool) -> Result<(), WinError> {
     let dark = i32::from(dark);
     // SAFETY: `dark` is a live 4-byte BOOL-sized value and the size passed matches it.
     unsafe {
@@ -206,7 +226,25 @@ pub fn set_acrylic(hwnd: isize, on: bool, dark: bool) -> Result<(), WinError> {
             size_of::<i32>() as u32,
         )
     }
-    .map_err(|e| WinError::os(e, "DwmSetWindowAttribute(dark)"))?;
+    .map_err(|e| WinError::os(e, "DwmSetWindowAttribute(dark)"))
+}
+
+/// Extends the frame by `m`, sets the dark mode, then the backdrop `kind`.
+fn apply_backdrop(
+    h: HWND,
+    (m, kind): (i32, DWM_SYSTEMBACKDROP_TYPE),
+    dark: bool,
+) -> Result<(), WinError> {
+    let margins = MARGINS {
+        cxLeftWidth: m,
+        cxRightWidth: m,
+        cyTopHeight: m,
+        cyBottomHeight: m,
+    };
+    // SAFETY: `margins` is a live MARGINS; DWM rejects a stale hwnd with an error.
+    unsafe { DwmExtendFrameIntoClientArea(h, &raw const margins) }
+        .map_err(|e| WinError::os(e, "DwmExtendFrameIntoClientArea"))?;
+    dark_mode(h, dark)?;
     // SAFETY: `kind` is a live 4-byte enum value and the size passed matches it.
     unsafe {
         DwmSetWindowAttribute(
@@ -304,5 +342,11 @@ mod tests {
     fn glass_values_select() {
         assert_eq!(glass_values(true), (-1, DWMSBT_TRANSIENTWINDOW));
         assert_eq!(glass_values(false), (0, DWMSBT_NONE));
+    }
+
+    #[test]
+    fn mica_values_select() {
+        assert_eq!(mica_values(true), (-1, DWMSBT_MAINWINDOW));
+        assert_eq!(mica_values(false), (0, DWMSBT_NONE));
     }
 }

@@ -216,6 +216,7 @@ pub async fn set_appearance(
     })
     .await?;
     changed(&app, "appearance");
+    crate::tray::sync_settings_theme(&app);
     Ok(AppearanceView::from(&next))
 }
 
