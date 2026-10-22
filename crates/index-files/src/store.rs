@@ -6,9 +6,10 @@
 //! lazily per candidate (nucleo borrows ASCII directly), avoiding 4x memory.
 //! Root entries store the full root path as their name; children store the file name.
 
+use crate::error::FilesError;
 use crate::scan::Root;
 use arc_swap::ArcSwap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Parent index marking a root entry.
@@ -144,6 +145,117 @@ impl FileStore {
             p.push(self.name(i));
         }
         p
+    }
+
+    /// A new store holding this one plus the entries of `scanned` filed under `root.id`,
+    /// with no I/O. `scanned` is typically `scan(&[root])`. A root with the same path is
+    /// replaced. Root ids are reassigned in table order (existing roots first, `root` last).
+    pub fn with_root(&self, root: &Root, scanned: &FileStore) -> Result<FileStore, FilesError> {
+        let kept = self
+            .roots
+            .iter()
+            .filter(|r| r.path != root.path)
+            .cloned()
+            .collect();
+        let (mut roots, ids) = renumber(&self.roots, kept);
+        let new_id =
+            u8::try_from(roots.len()).map_err(|_| FilesError::TooManyRoots(root.path.clone()))?;
+        let mut b = StoreBuilder::new();
+        copy_into(&mut b, self, &ids, |_| true);
+        let mut scanned_ids = [None; 256];
+        scanned_ids[usize::from(root.id)] = Some(new_id);
+        copy_into(&mut b, scanned, &scanned_ids, |_| true);
+        roots.push(Root {
+            id: new_id,
+            ..root.clone()
+        });
+        Ok(b.finish(roots))
+    }
+
+    /// A new store without the root whose path is `path` (and its entries); other root ids
+    /// are reassigned. No I/O.
+    pub fn without_root(&self, path: &Path) -> FileStore {
+        let kept = self
+            .roots
+            .iter()
+            .filter(|r| r.path != path)
+            .cloned()
+            .collect();
+        let (roots, ids) = renumber(&self.roots, kept);
+        let mut b = StoreBuilder::new();
+        copy_into(&mut b, self, &ids, |_| true);
+        b.finish(roots)
+    }
+
+    /// A new store without `prefix` and everything beneath it: a subtree inside a root, or
+    /// whole roots that sit under it. No I/O.
+    pub fn without_prefix(&self, prefix: &Path) -> FileStore {
+        let kept = self
+            .roots
+            .iter()
+            .filter(|r| !r.path.starts_with(prefix))
+            .cloned()
+            .collect();
+        let (roots, ids) = renumber(&self.roots, kept);
+        let leaf = prefix.file_name().and_then(|n| n.to_str());
+        let mut b = StoreBuilder::new();
+        // Children of a dropped entry are dropped by copy_into, so only the top match is tested.
+        copy_into(&mut b, self, &ids, |i| {
+            if self.parent(i).is_none() {
+                return !Path::new(self.name(i)).starts_with(prefix);
+            }
+            !(leaf == Some(self.name(i)) && self.path_of(i) == prefix)
+        });
+        b.finish(roots)
+    }
+}
+
+/// Assign ids 0.. to `kept` in order; returns the renumbered roots and a map from each old
+/// id in `old` to its new id (`None` when that root was dropped).
+fn renumber(old: &[Root], mut kept: Vec<Root>) -> (Vec<Root>, [Option<u8>; 256]) {
+    let mut ids = [None; 256];
+    for (n, r) in kept.iter_mut().enumerate() {
+        let Ok(new) = u8::try_from(n) else { break };
+        if old.iter().any(|o| o.id == r.id && o.path == r.path) {
+            ids[usize::from(r.id)] = Some(new);
+        }
+        r.id = new;
+    }
+    kept.truncate(256);
+    (kept, ids)
+}
+
+/// Append the entries of `src` that `keep` accepts and whose root id maps through `ids`,
+/// remapping parents. An entry whose parent was not copied is dropped with it. Relies on
+/// parents preceding children, which scan and fold guarantee.
+fn copy_into(
+    b: &mut StoreBuilder,
+    src: &FileStore,
+    ids: &[Option<u8>; 256],
+    keep: impl Fn(usize) -> bool,
+) {
+    let mut map = vec![NO_PARENT; src.len()];
+    for (i, e) in src.entries.iter().enumerate() {
+        let Some(root) = ids[usize::from(e.root)] else {
+            continue;
+        };
+        let parent = if e.parent == NO_PARENT {
+            NO_PARENT
+        } else {
+            match map.get(e.parent as usize) {
+                Some(&p) if p != NO_PARENT => p,
+                _ => continue,
+            }
+        };
+        if !keep(i) {
+            continue;
+        }
+        if let (Some(n), Some(slot)) = (
+            b.push(src.name(i), parent, e.is_dir, e.modified_min, root),
+            map.get_mut(i),
+        ) {
+            *slot = n;
+        }
     }
 }
 

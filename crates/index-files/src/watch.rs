@@ -225,68 +225,133 @@ fn make_added(roots: &[Root], path: &Path, md: &std::fs::Metadata) -> Option<Add
     Some(added_of(root.id, path.to_path_buf(), name, md))
 }
 
+/// State the notify callback works on. One place for every event, so later hooks (program
+/// extensions, D9) can be added in [`Sink::on_event`].
+struct Sink {
+    overlay: Arc<Overlay>,
+    roots: Vec<Root>,
+    index: Option<Arc<FileIndex>>,
+    busy: Arc<AtomicBool>,
+    stale: Arc<AtomicBool>,
+}
+
+impl Sink {
+    /// Handle one notify result. Never panics: an error or a rescan notice (events were
+    /// lost) only marks the index stale so the next open reconciles.
+    fn on_event(&self, res: notify::Result<notify::Event>) {
+        let ev = match res {
+            Ok(ev) => ev,
+            Err(_) => {
+                self.stale.store(true, Ordering::Release);
+                return;
+            }
+        };
+        if ev.need_rescan() {
+            self.stale.store(true, Ordering::Release);
+        }
+        // Modify(data) is ignored: mtime refreshes on the next scan.
+        if !matches!(
+            ev.kind,
+            EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_))
+        ) {
+            return;
+        }
+        for p in &ev.paths {
+            self.overlay.apply_path(&self.roots, p);
+        }
+        if let Some(ix) = &self.index
+            && self.overlay.len() > COMPACT_AT
+            && !self.busy.swap(true, Ordering::AcqRel)
+        {
+            let (ix, ov, flag) = (
+                Arc::clone(ix),
+                Arc::clone(&self.overlay),
+                Arc::clone(&self.busy),
+            );
+            let spawned = std::thread::Builder::new()
+                .name("files-compact".into())
+                .spawn(move || {
+                    ix.compact(&ov);
+                    flag.store(false, Ordering::Release);
+                });
+            if spawned.is_err() {
+                self.busy.store(false, Ordering::Release);
+            }
+        }
+    }
+}
+
 /// Owns the OS watchers. Dropping it stops watching.
 pub struct WatchHandle {
     _watcher: RecommendedWatcher,
     overlay: Arc<Overlay>,
+    stale: Arc<AtomicBool>,
+    watched: Vec<Root>,
+    failed: Vec<(Root, String)>,
 }
 
 impl WatchHandle {
     /// Start watching every root recursively. With `index`, the overlay is compacted into it
-    /// on a background thread once it passes [`COMPACT_AT`] entries.
+    /// on a background thread once it passes [`COMPACT_AT`] entries. A root that cannot be
+    /// watched (drive gone) is skipped and listed in [`WatchHandle::failed`]; this errors
+    /// only when roots were given and none could be watched.
     pub fn start(roots: &[Root], index: Option<Arc<FileIndex>>) -> Result<Self, FilesError> {
         let overlay = Arc::new(Overlay::new());
-        let (ov, rs) = (Arc::clone(&overlay), roots.to_vec());
-        let busy = Arc::new(AtomicBool::new(false));
+        let stale = Arc::new(AtomicBool::new(false));
+        let sink = Sink {
+            overlay: Arc::clone(&overlay),
+            roots: roots.to_vec(),
+            index,
+            busy: Arc::new(AtomicBool::new(false)),
+            stale: Arc::clone(&stale),
+        };
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-            let Ok(ev) = res else { return };
-            // Modify(data) is ignored: mtime refreshes on the next scan.
-            if matches!(
-                ev.kind,
-                EventKind::Create(_)
-                    | EventKind::Remove(_)
-                    | EventKind::Modify(ModifyKind::Name(_))
-            ) {
-                for p in &ev.paths {
-                    ov.apply_path(&rs, p);
-                }
-                if let Some(ix) = &index
-                    && ov.len() > COMPACT_AT
-                    && !busy.swap(true, Ordering::AcqRel)
-                {
-                    let (ix, ov, flag) = (Arc::clone(ix), Arc::clone(&ov), Arc::clone(&busy));
-                    let spawned = std::thread::Builder::new()
-                        .name("files-compact".into())
-                        .spawn(move || {
-                            ix.compact(&ov);
-                            flag.store(false, Ordering::Release);
-                        });
-                    if spawned.is_err() {
-                        busy.store(false, Ordering::Release);
-                    }
-                }
-            }
+            sink.on_event(res);
         })
         .map_err(|e| FilesError::io("create watcher", std::io::Error::other(e)))?;
+        let (mut watched, mut failed) = (Vec::new(), Vec::new());
         for r in roots {
-            watcher
-                .watch(&r.path, RecursiveMode::Recursive)
-                .map_err(|e| {
-                    FilesError::io(
-                        format!("watch {}", r.path.display()),
-                        std::io::Error::other(e),
-                    )
-                })?;
+            match watcher.watch(&r.path, RecursiveMode::Recursive) {
+                Ok(()) => watched.push(r.clone()),
+                Err(e) => failed.push((r.clone(), e.to_string())),
+            }
+        }
+        if watched.is_empty()
+            && let Some((r, e)) = failed.first()
+        {
+            return Err(FilesError::io(
+                format!("watch {}", r.path.display()),
+                std::io::Error::other(e.clone()),
+            ));
         }
         Ok(Self {
             _watcher: watcher,
             overlay,
+            stale,
+            watched,
+            failed,
         })
     }
 
     /// The overlay this watcher feeds.
     pub fn overlay(&self) -> Arc<Overlay> {
         Arc::clone(&self.overlay)
+    }
+
+    /// True once a watcher error or a rescan notice means events may have been lost; the
+    /// index should be reconciled with a rescan.
+    pub fn is_stale(&self) -> bool {
+        self.stale.load(Ordering::Acquire)
+    }
+
+    /// Roots actually being watched.
+    pub fn watched(&self) -> &[Root] {
+        &self.watched
+    }
+
+    /// Roots that could not be watched, with the reason; callers log these as warnings.
+    pub fn failed(&self) -> &[(Root, String)] {
+        &self.failed
     }
 }
 
@@ -332,4 +397,38 @@ pub(crate) fn fold(store: &FileStore, g: &Inner) -> FileStore {
         }
     }
     b.finish(store.roots().to_vec())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::{CreateKind, Flag};
+
+    fn sink() -> Sink {
+        Sink {
+            overlay: Arc::new(Overlay::new()),
+            roots: Vec::new(),
+            index: None,
+            busy: Arc::new(AtomicBool::new(false)),
+            stale: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    #[test]
+    fn error_event_sets_stale() {
+        let s = sink();
+        s.on_event(Ok(notify::Event::new(EventKind::Create(CreateKind::File))));
+        assert!(!s.stale.load(Ordering::Acquire));
+        s.on_event(Err(notify::Error::generic("injected")));
+        assert!(s.stale.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn rescan_notice_sets_stale() {
+        let s = sink();
+        s.on_event(Ok(
+            notify::Event::new(EventKind::Other).set_flag(Flag::Rescan)
+        ));
+        assert!(s.stale.load(Ordering::Acquire));
+    }
 }
