@@ -45,6 +45,18 @@ Programs found by the drive scan are matched in their own index, off the keystro
 | Programs match, 50,000 programs (synthetic names) | <= 25 ms (Find budget) | 0.84–1.61 ms ("c" fastest, "inst 4" slowest) | within |
 | Command search, 2,000 apps, all features on | <= 2 ms | worst 0.22 ms; "co" 0.08 ms | within |
 
+### Plain-text search benches (GitHub `windows-latest` runner, `bench.yml`, 2026-10-23)
+
+Plain text with no prefix queries apps, programs and every enabled feature on each keystroke. Means from criterion; a
+shared runner is slower and noisier than the dev machine.
+
+| Budget | Limit | Measured | Bench | Status |
+| --- | --- | --- | --- | --- |
+| All features plus 2,000 apps, per keystroke | <= 2 ms | 53 us ("g cats") to 1.48 ms ("spotfy", typo fallback) | features (command_all) | within |
+| Slowest single feature query (math) | <= 0.5 ms | 224 us ("2.5 kg to lb") | features (math) | within |
+| Programs, 50,000 paths | none set | 1.04 to 1.45 ms | features (programs_50k) | recorded |
+| Find match | p95 <= 25 ms | 12.6 to 21.0 ms (means) | index-files (find) | within, closest to its limit |
+
 ## How to reproduce
 
 - Benches run on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (bench.txt plus criterion estimates). Bench crates: launcher-core, index-files, features (frecency, math, syscmd, web, projects, command_all, nlfind, ports, media, explain, capture).
