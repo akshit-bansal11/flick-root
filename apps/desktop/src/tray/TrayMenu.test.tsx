@@ -30,6 +30,16 @@ describe("TrayMenu", () => {
     expect([...open.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Alt", "Space"]);
   });
 
+  it("names each menuitem by its label only and exposes the chord as aria-keyshortcuts", () => {
+    setup();
+    const open = screen.getByRole("menuitem", { name: `Open ${APP_DISPLAY_NAME}` });
+    const settings = screen.getByRole("menuitem", { name: "Settings" });
+    const quit = screen.getByRole("menuitem", { name: "Quit" });
+    expect(open.getAttribute("aria-keyshortcuts")).toBe("Alt+Space");
+    expect(settings.getAttribute("aria-keyshortcuts")).toBe("Control+Comma");
+    expect(quit.hasAttribute("aria-keyshortcuts")).toBe(false);
+  });
+
   it("uses roving tabindex starting on Open", () => {
     setup();
     const tabs = screen.getAllByRole("menuitem").map((i) => i.getAttribute("tabindex"));

@@ -395,7 +395,10 @@ pub async fn reindex(state: State<'_, Arc<AppState>>, kind: String) -> Result<()
         }
         "files" => {
             if !state.config.load().modes.find.enabled {
-                return Err(CommandError::new("mode_disabled", "Find mode is off"));
+                return Err(CommandError::new(
+                    "mode_disabled",
+                    "File search is off. Turn it on in Settings, Prefixes.",
+                ));
             }
             tauri::async_runtime::spawn(async move { state::start_find(&s).await });
         }

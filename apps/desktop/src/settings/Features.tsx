@@ -93,7 +93,7 @@ export function Features() {
         <div className="s-row-text">
           <div className="s-row-label">Command</div>
           <div className="s-help" id="f-command-help">
-            Command mode is always on.
+            Commands are always on.
           </div>
         </div>
         <div className="s-row-control">

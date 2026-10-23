@@ -69,11 +69,13 @@ describe("token hygiene", () => {
   it("keeps colour literals in tokens.css", () => {
     expect(hits(css, /:[^;{}]*#[0-9a-f]{3,8}\b/i)).toEqual([]);
     expect(hits(css, /\b(?:rgba?|hsla?)\(/i)).toEqual([]);
+    expect(hits(css, /\b(?:oklch|oklab)\(/i)).toEqual([]);
+    expect(hits(css, /(?<![\w-])color\(/i)).toEqual([]);
   });
 
   it("sets font sizes through tokens", () => {
-    expect(hits(css, /font-size:[^;]*\d\s*px/i)).toEqual([]);
-    expect(hits(css, /font:[^;]*\d+(?:\.\d+)?px/i)).toEqual([]);
+    expect(hits(css, /font-size:[^;]*\d\s*(?:px|r?em|pt)\b/i)).toEqual([]);
+    expect(hits(css, /font:[^;]*\d+(?:\.\d+)?(?:px|r?em|pt)\b/i)).toEqual([]);
     expect(hits(tsx, /fontSize/)).toEqual([]);
   });
 

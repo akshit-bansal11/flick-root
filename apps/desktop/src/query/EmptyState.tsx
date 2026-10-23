@@ -8,7 +8,7 @@ export function EmptyState({ onOpenSettings }: Props) {
     <div className="query-empty">
       <div className="query-empty-title">Connect a model to ask questions</div>
       <div className="query-empty-body">
-        Local models are free. Command and Find work without AI.
+        Local models are free. Commands, apps, files and projects work without AI.
       </div>
       <button type="button" className="query-btn" onClick={onOpenSettings}>
         AI providers

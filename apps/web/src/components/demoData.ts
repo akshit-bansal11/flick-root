@@ -54,10 +54,10 @@ const PREFIX_LIST: Item[] = [
   { title: "@ Projects", sub: "Folders you code in", keys: "" },
 ];
 
-const FALLBACKS: Item[] = [
-  { title: "Find files", sub: "Search instead", keys: "" },
-  { title: "Search the web", sub: "Search instead", keys: "" },
-  { title: "Ask", sub: "Search instead", keys: "" },
+const fallbacks = (q: string): Item[] => [
+  { title: `Find files named “${q}”`, sub: "Search instead", keys: "" },
+  { title: `Search Google for “${q}”`, sub: "Search instead", keys: "" },
+  { title: `Ask your AI: “${q}”`, sub: "Search instead", keys: "" },
 ];
 
 export const SCRIPT = ["spo", "/ report", "= 2.5 kg to lb", "> lock", "@ flick"];
@@ -74,7 +74,7 @@ export function filter(mode: Mode, q: string): Item[] {
   if (mode === "Ask") return ITEMS.Ask;
   if (mode === "none") {
     if (!s) return PREFIX_LIST;
-    return [...[...APPS, ...COMMANDS].filter((i) => i.keys.includes(s)), ...FALLBACKS];
+    return [...[...APPS, ...COMMANDS].filter((i) => i.keys.includes(s)), ...fallbacks(q.trim())];
   }
   return ITEMS[mode].filter((i) => !s || i.keys.includes(s));
 }

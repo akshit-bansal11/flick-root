@@ -131,7 +131,7 @@ export function Features() {
       </p>
       <ul className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {MODES.map((m) => (
-          <li key={m.name} className="rounded-[var(--l-r)] border border-line bg-surface p-4">
+          <li key={m.name} className="rounded-[var(--l-r-card)] border border-line bg-surface p-4">
             <h3 className="font-semibold">
               {m.name} <code className="font-mono text-accent">{m.key}</code>
             </h3>
@@ -149,13 +149,13 @@ export function Features() {
       <ul className="grid gap-4 sm:grid-cols-2">
         {FEATURES.map((f) => (
           <li key={f.title}>
-            <article className="flex h-full flex-col gap-2 rounded-[var(--l-r)] border border-line bg-surface p-4">
+            <article className="flex h-full flex-col gap-2 rounded-[var(--l-r-card)] border border-line bg-surface p-4">
               <header className="flex items-baseline justify-between gap-2">
                 <h3 className="font-semibold">{f.title}</h3>
                 <span className="font-mono text-xs text-muted">{f.since}</span>
               </header>
               <p className="text-muted">{f.line}</p>
-              <code className="mt-auto w-fit max-w-full break-words rounded-[var(--l-r2)] border border-line bg-bg px-2 py-1 font-mono text-fg">
+              <code className="mt-auto w-fit max-w-full break-words rounded-[var(--l-r-key)] border border-line bg-bg px-2 py-1 font-mono text-fg">
                 {f.example}
               </code>
               {f.doc && (

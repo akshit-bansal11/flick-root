@@ -19,7 +19,7 @@ pub fn on_hotkey(app: &AppHandle) {
         .query
         .enabled;
     if !query_on {
-        tracing::info!("explain skipped: Query mode is off");
+        tracing::info!("explain skipped: Ask is off");
         return;
     }
     let app = app.clone();

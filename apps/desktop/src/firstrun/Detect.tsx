@@ -4,7 +4,7 @@ import { Toggle } from "../settings/Toggle";
 import { errorText, type ProbeResult } from "../settings/types";
 
 export const NONE_FOUND =
-  "No local server found. Command and Find work without one. You can connect a model later in Settings.";
+  "No local server found. Commands, apps, files and projects work without one. You can connect a model later in Settings.";
 
 const TITLES: Record<string, string> = {
   ollama: "Ollama",

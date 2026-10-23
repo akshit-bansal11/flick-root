@@ -2,7 +2,7 @@
 
 **Session start:** if .agent/HANDOFF.md exists, read it first and resume from its Next section (KICKOFF.md section 10). Keep it current after every commit. Decide for yourself; do not ask questions or wait for approval (KICKOFF.md section 9).
 
-Free, open-source, keyboard-first Windows launcher: Command, Find and Query modes in one bar. Tauri 2 shell, Rust crates for all logic, React 19 + TypeScript UI, Next.js site in apps/web. KICKOFF.md is the spec; docs/adr/ holds the locked decisions.
+Free, open-source, keyboard-first Windows launcher: five prefixes in one bar (Open, Commands, Calc, Ask, Projects). Tauri 2 shell, Rust crates for all logic, React 19 + TypeScript UI, Next.js site in apps/web. KICKOFF.md is the spec; docs/adr/ holds the locked decisions.
 
 ## FOSS-first
 

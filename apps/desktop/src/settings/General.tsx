@@ -274,7 +274,7 @@ export function General({ settings, onChange, onTour }: Props) {
         </div>
       </Row>
 
-      <Row label="Indexed folders" help="Extra folders Find mode searches." error={errors.roots}>
+      <Row label="Indexed folders" help="Extra folders Open searches." error={errors.roots}>
         <div className="s-roots">
           <ul className="s-list">
             {settings.extraRoots.map((r) => (

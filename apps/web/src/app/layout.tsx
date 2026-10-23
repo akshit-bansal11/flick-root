@@ -5,7 +5,7 @@ import { SiteNav } from "@/components/SiteNav";
 import "./globals.css";
 
 const description =
-  "A free, open-source, keyboard-first launcher for Windows. Command, Find and Query modes in one bar. No bundled models, keys, account or telemetry.";
+  "A free, open-source, keyboard-first launcher for Windows. Five prefixes in one bar: Open, Commands, Calc, Ask and Projects. No bundled models, keys, account or telemetry.";
 
 export const metadata: Metadata = {
   title: `${APP_DISPLAY_NAME}: a keyboard-first launcher for Windows`,

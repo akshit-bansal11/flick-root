@@ -93,7 +93,10 @@ fn check_enabled(enabled: bool) -> Result<(), CommandError> {
     if enabled {
         Ok(())
     } else {
-        Err(CommandError::new("mode_disabled", "Query mode is off"))
+        Err(CommandError::new(
+            "mode_disabled",
+            "Ask is off. Turn it on in Settings, Prefixes.",
+        ))
     }
 }
 

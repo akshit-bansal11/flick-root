@@ -38,7 +38,8 @@ pub fn is_project(dir: &Path) -> bool {
     let Ok(rd) = std::fs::read_dir(dir) else {
         return false;
     };
-    rd.flatten().any(|e| {
+    // ponytail: only the first 1024 entries are read; a marker beyond them is missed.
+    rd.flatten().take(1024).any(|e| {
         e.path()
             .extension()
             .and_then(|x| x.to_str())

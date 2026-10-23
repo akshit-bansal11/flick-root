@@ -5,7 +5,7 @@ export function Download() {
     <div className="flex flex-col items-center gap-2">
       <a
         href={`${REPO_URL}/releases/latest`}
-        className="rounded-[var(--l-r)] bg-accent px-6 py-3 font-semibold text-ink"
+        className="rounded-[var(--l-r-control)] bg-accent px-6 py-3 font-semibold text-ink"
       >
         Download for Windows
       </a>
