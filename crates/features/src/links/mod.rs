@@ -506,10 +506,10 @@ mod tests {
         assert!(is_safe_doc(r"C:\x\A~1.PDF"));
         assert_eq!(open_target(r"C:\x\a.pdfx", false), Some(r"C:\x"));
         assert_eq!(open_target(r"C:\y\evil.exe", false), Some(r"C:\y"));
-        assert_eq!(plain_drive_path(r"\?\C:\x\a.pdfx"), Some(r"C:\x\a.pdfx"));
+        assert_eq!(plain_drive_path(r"\\?\C:\x\a.pdfx"), Some(r"C:\x\a.pdfx"));
         assert_eq!(plain_drive_path(r"C:\x"), Some(r"C:\x"));
-        assert_eq!(plain_drive_path(r"\?\UNC\server\share\a.pdf"), None);
-        assert_eq!(plain_drive_path(r"\.\CON"), None);
+        assert_eq!(plain_drive_path(r"\\?\UNC\server\share\a.pdf"), None);
+        assert_eq!(plain_drive_path(r"\\.\CON"), None);
     }
 
     #[test]
