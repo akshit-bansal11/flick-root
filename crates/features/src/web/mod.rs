@@ -105,12 +105,16 @@ impl State {
                 "" => key.clone(),
                 t => t.to_owned(),
             };
+            // Store the scheme lowercased so `execute`, which accepts only lowercase http(s),
+            // opens an `HTTPS://` template too. The scheme is ASCII, so the split is on a char edge.
+            let scheme_end = lower.find("://").unwrap_or(0);
+            let url = format!("{}{}", &lower[..scheme_end], &url[scheme_end..]);
             st.by_keyword.insert(key.clone(), st.list.len());
             st.list.push(Shortcut {
                 keyword: key,
                 title,
-                url: url.to_owned(),
-                host: host_of(url),
+                host: host_of(&url),
+                url,
             });
         }
         Ok(st)
@@ -306,10 +310,14 @@ impl Feature for Web {
             .filter(|u| u.starts_with("http://") || u.starts_with("https://"))
             .ok_or_else(|| FeatureError::Other("item has no URL".into()))?
             .to_owned();
-        tokio::task::spawn_blocking(move || index_apps::launch::open_path(Path::new(&url)))
-            .await
-            .map_err(|e| FeatureError::Other(format!("open task failed: {e}")))?
-            .map_err(|e| FeatureError::Other(format!("could not open URL: {e}")))?;
+        // The error never carries the URL: it holds the user's search text.
+        tokio::task::spawn_blocking(move || {
+            let _com = index_apps::com::ComGuard::new().map_err(|_| "COM init")?;
+            index_apps::launch::open_path(Path::new(&url)).map_err(|_| "shell open")
+        })
+        .await
+        .map_err(|e| FeatureError::Other(format!("open task failed: {e}")))?
+        .map_err(|kind| FeatureError::Other(format!("Could not open that link ({kind})")))?;
         Ok(Outcome::HideLauncher)
     }
 }
@@ -416,6 +424,16 @@ mod tests {
         let items = st.query(&input("dd rust"));
         assert_eq!(url(&items), "https://duckduckgo.com/?q=rust");
         assert!(st.query(&input("g rust")).is_empty());
+    }
+
+    #[test]
+    fn uppercase_scheme_is_stored_lowercase() {
+        let t: toml::Table = r#"shortcuts = [{ keyword = "d", url = "HTTPS://Duck.com/?Q={q}" }]"#
+            .parse()
+            .unwrap();
+        let st = State::from_options(&t).unwrap();
+        // Lowercase scheme, so `execute` accepts it; the rest of the template is untouched.
+        assert_eq!(url(&st.query(&input("d x"))), "https://Duck.com/?Q=x");
     }
 
     #[test]

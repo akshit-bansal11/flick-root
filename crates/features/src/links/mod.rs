@@ -2,8 +2,10 @@
 //!
 //! `query` only parses text; it never touches the filesystem, the environment or the network.
 //! The `%NAME%` and `~` expansions read a small allow-list of variables captured in `start`.
-//! Opening happens only in `execute`, which re-validates the target and, for a path, checks that
-//! it exists first. Targets go to the shell-open helper as a file name, never as a command line.
+//! Opening happens only in `execute`, which re-validates the target and, for a path, resolves it
+//! to its canonical form first. Folders and allow-listed document types open themselves; any
+//! other file opens its parent folder, so a typed path never starts a program. Targets go to the
+//! shell-open helper as a file name, never as a command line.
 
 use crate::ctx::FeatureCtx;
 use crate::error::FeatureError;
@@ -15,7 +17,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Longest text that is classified at all.
+/// Longest text that is classified at all, and longest normalised target that is offered.
 const MAX_LEN: usize = 2048;
 
 /// Variables `%NAME%` may name; anything else is not expanded and the text is not a path.
@@ -39,41 +41,17 @@ const TLDS: [&str; 23] = [
 /// quoting downstream.
 const BAD_PATH_CHARS: [char; 6] = ['<', '>', '"', '|', '?', '*'];
 
-/// Extensions Enter never opens from a typed path: programs, scripts, shortcuts and installers.
-const BLOCKED_EXTS: [&str; 28] = [
-    "exe",
-    "com",
-    "bat",
-    "cmd",
-    "ps1",
-    "psm1",
-    "psd1",
-    "vbs",
-    "vbe",
-    "js",
-    "jse",
-    "wsf",
-    "wsh",
-    "hta",
-    "msi",
-    "msp",
-    "msc",
-    "reg",
-    "lnk",
-    "scr",
-    "pif",
-    "cpl",
-    "jar",
-    "appref-ms",
-    "application",
-    "url",
-    "inf",
-    "scf",
+/// Document, media and archive types a typed path may open directly. Every other file opens its
+/// parent folder instead, so programs, scripts, shortcuts and unknown types never run.
+const SAFE_EXTS: &[&str] = &[
+    "pdf", "txt", "md", "rtf", "csv", "log", "json", "xml", "yaml", "yml", "toml", "ini", "doc",
+    "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "epub", "png", "jpg", "jpeg", "gif",
+    "webp", "bmp", "svg", "ico", "tif", "tiff", "heic", "mp3", "wav", "flac", "ogg", "m4a", "aac",
+    "mp4", "mkv", "mov", "avi", "webm", "wmv", "zip", "7z", "rar", "tar", "gz",
 ];
 
-/// Shown when a typed path is a program or script.
-const BLOCKED_MSG: &str =
-    "Flick does not run programs from a typed path. Type / to find the app instead.";
+/// Shown when a typed path cannot be resolved (missing, unreadable, or not on a drive).
+const MISSING_MSG: &str = "That path does not exist";
 
 /// Allow-listed variables, uppercase name to value, captured in `start`.
 type Vars = HashMap<&'static str, String>;
@@ -131,6 +109,9 @@ pub fn classify(text: &str, vars: &HashMap<&'static str, String>) -> Option<Targ
     classify_path(t, vars)
         .map(Target::Path)
         .or_else(|| classify_url(t).map(Target::Url))
+        // Normalising can grow the text (percent-encoding); a target `execute` would refuse to
+        // re-classify is never offered.
+        .filter(|target| target.as_str().len() <= MAX_LEN)
 }
 
 fn classify_url(t: &str) -> Option<String> {
@@ -206,23 +187,66 @@ fn classify_path(t: &str, vars: &Vars) -> Option<String> {
         || expanded.contains(BAD_PATH_CHARS)
         // A second `:` is an alternate data stream.
         || expanded[2..].contains(':')
-        || expanded.split(['\\', '/']).any(|c| c == "..")
+        || expanded
+            .split(['\\', '/'])
+            .any(|c| c == ".." || is_device_name(c))
     {
         return None;
     }
     Some(expanded)
 }
 
-/// True when a path ends in a program or script type. Pure string check, no I/O. Windows drops
-/// trailing dots and spaces from names, so `a.exe.` counts as `a.exe`.
-fn is_blocked(path: &str) -> bool {
+/// True for a DOS device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`), with
+/// or without an extension. Windows ignores the extension and trailing spaces on these names.
+fn is_device_name(component: &str) -> bool {
+    let stem = component.split('.').next().unwrap_or_default();
+    let stem = stem.trim_end_matches(' ').to_ascii_uppercase();
+    match stem.as_bytes() {
+        b"CON" | b"PRN" | b"AUX" | b"NUL" => true,
+        [b'C', b'O', b'M', d] | [b'L', b'P', b'T', d] => (b'1'..=b'9').contains(d),
+        _ => false,
+    }
+}
+
+/// True when the last name in `path` has an extension in [`SAFE_EXTS`]. Pure string check, no
+/// I/O. Windows drops trailing dots and spaces from names, so `a.pdf.` counts as `a.pdf`.
+fn is_safe_doc(path: &str) -> bool {
     let name = path
         .trim_end_matches(['.', ' ', '\\', '/'])
         .rsplit(['\\', '/'])
         .next()
         .unwrap_or_default();
     name.rsplit_once('.')
-        .is_some_and(|(_, ext)| BLOCKED_EXTS.iter().any(|b| ext.eq_ignore_ascii_case(b)))
+        .is_some_and(|(_, ext)| SAFE_EXTS.iter().any(|e| ext.eq_ignore_ascii_case(e)))
+}
+
+/// Turns a path from `std::fs::canonicalize` into a plain drive path. `None` when it does not
+/// resolve to a drive path (a network share or a device), which `execute` refuses.
+fn plain_drive_path(canonical: &str) -> Option<&str> {
+    let p = canonical.strip_prefix(r"\\?\").unwrap_or(canonical);
+    is_drive_abs(p).then_some(p)
+}
+
+/// What Enter opens for an existing canonical path: a folder or a safe document opens itself,
+/// any other file opens its parent folder. Pure, so the decision is testable without the shell.
+fn open_target(canonical: &str, is_dir: bool) -> Option<&str> {
+    if is_dir || is_safe_doc(canonical) {
+        return Some(canonical);
+    }
+    Path::new(canonical).parent()?.to_str()
+}
+
+/// Resolves `p` (8.3 short names, symlinks and junctions included) and opens what
+/// [`open_target`] decides. Blocking: call on the blocking pool with COM initialised.
+fn open_typed_path(p: &str) -> Result<(), String> {
+    let missing = || MISSING_MSG.to_owned();
+    let canonical = std::fs::canonicalize(p).map_err(|_| missing())?;
+    let canonical = canonical.to_str().ok_or_else(missing)?;
+    let plain = plain_drive_path(canonical).ok_or_else(missing)?;
+    let is_dir = std::fs::metadata(plain).map_err(|_| missing())?.is_dir();
+    let target = open_target(plain, is_dir).ok_or_else(missing)?;
+    index_apps::launch::open_path(Path::new(target))
+        .map_err(|_| "Could not open that path".to_owned())
 }
 
 impl Links {
@@ -266,13 +290,16 @@ impl Feature for Links {
             return Vec::new();
         };
         let s = target.as_str();
-        if matches!(target, Target::Path(_)) && is_blocked(s) {
-            return Vec::new();
-        }
+        // No I/O here: a name that does not look like a safe document is a folder, or a file whose
+        // parent folder opens; either way a folder opens.
+        let verb = match target {
+            Target::Path(_) if !is_safe_doc(s) => "Open folder",
+            _ => "Open",
+        };
         vec![Item {
             id: ItemId(format!("links:{s}")),
             kind: ItemKind::Command,
-            title: format!("Open {s}"),
+            title: format!("{verb} {s}"),
             subtitle: match target {
                 Target::Url(_) => "Link".into(),
                 Target::Path(_) => "Path".into(),
@@ -295,18 +322,14 @@ impl Feature for Links {
             .and_then(|r| self.classify(r))
             .filter(|t| Some(t.kind()) == kind)
             .ok_or_else(|| FeatureError::Other("not a link or path".into()))?;
-        let opened = tokio::task::spawn_blocking(move || match target {
-            Target::Url(u) => index_apps::launch::open_path(Path::new(&u))
-                .map_err(|_| format!("could not open {u}")),
-            Target::Path(p) => {
-                if is_blocked(&p) {
-                    return Err(BLOCKED_MSG.to_owned());
-                }
-                let path = Path::new(&p);
-                if !path.exists() {
-                    return Err("That path does not exist".to_owned());
-                }
-                index_apps::launch::open_path(path).map_err(|_| format!("could not open {p}"))
+        // User text (the URL or path) never goes into an error: errors reach the UI and the logs.
+        let opened = tokio::task::spawn_blocking(move || {
+            let _com = index_apps::com::ComGuard::new()
+                .map_err(|_| "Could not start the shell".to_owned())?;
+            match target {
+                Target::Url(u) => index_apps::launch::open_path(Path::new(&u))
+                    .map_err(|_| "Could not open that link".to_owned()),
+                Target::Path(p) => open_typed_path(&p),
             }
         })
         .await
@@ -436,46 +459,90 @@ mod tests {
     }
 
     #[test]
-    fn blocks_programs_and_scripts() {
+    fn safe_documents_open_and_other_files_open_their_folder() {
         for p in [
-            r"C:\x\a.exe",
-            r"C:\x\A.EXE",
-            r"C:\x\run.Bat",
-            r"C:\x\s.ps1",
-            r"C:\x\a.exe.",
-            r"C:\x\a.exe ",
-            "C:/x/a.lnk",
-            r"C:\x\setup.msi",
-            r"C:\x\a.appref-ms",
-        ] {
-            assert!(is_blocked(p), "{p}");
-            assert!(links().query(&input(p)).is_empty(), "{p}");
-        }
-        for p in [
-            r"C:\Users\me\Docs",
             r"C:\x\notes.txt",
+            r"C:\x\Report.PDF",
             r"C:\x\a.exe.txt",
-            r"C:\x\exe",
-            r"C:\x.exe\readme.md",
+            r"C:\x\a.tar.gz",
+            r"C:\x\a.pdf.",
         ] {
-            assert!(!is_blocked(p), "{p}");
-            assert_eq!(links().query(&input(p)).len(), 1, "{p}");
+            assert_eq!(open_target(p, false), Some(p), "{p}");
+            assert!(
+                links().query(&input(p))[0].title.starts_with("Open C:"),
+                "{p}"
+            );
         }
-        // Links are never blocked by this check.
-        assert_eq!(links().query(&input("github.com/a.exe")).len(), 1);
+        for p in [
+            r"C:\x\a.py",
+            r"C:\x\a.exe",
+            r"C:\x\A.EXE ",
+            r"C:\x\a.appref-ms",
+            r"C:\x\setup.msi",
+            r"C:\x\noext",
+            r"C:\x\a.pdf.exe",
+        ] {
+            assert_eq!(open_target(p, false), Some(r"C:\x"), "{p}");
+            assert!(
+                links().query(&input(p))[0]
+                    .title
+                    .starts_with("Open folder "),
+                "{p}"
+            );
+        }
+        // A folder opens itself whatever its name looks like.
+        assert_eq!(open_target(r"C:\x\tool.exe", true), Some(r"C:\x\tool.exe"));
+        // Links are never affected by the extension check.
+        assert_eq!(
+            links().query(&input("github.com/a.exe"))[0].title,
+            "Open https://github.com/a.exe"
+        );
     }
 
-    #[tokio::test]
-    async fn execute_refuses_programs_with_a_hint() {
-        let dir = tempfile::tempdir().expect("temp dir");
-        let exe = dir.path().join("a.exe");
-        std::fs::write(&exe, b"").expect("write file");
-        let target = exe.to_string_lossy().into_owned();
-        let r = links().execute(&item(&target, "path"), primary()).await;
-        assert!(
-            matches!(r, Err(FeatureError::Other(ref m)) if m == BLOCKED_MSG && m.contains('/')),
-            "{r:?}"
-        );
+    #[test]
+    fn decision_uses_the_canonical_name() {
+        // `A~1.PDF` is the 8.3 short name of `a.pdfx`, and a link named `doc.pdf` can point at a
+        // program. The row reads from the typed text; Enter decides on the resolved name.
+        assert!(is_safe_doc(r"C:\x\A~1.PDF"));
+        assert_eq!(open_target(r"C:\x\a.pdfx", false), Some(r"C:\x"));
+        assert_eq!(open_target(r"C:\y\evil.exe", false), Some(r"C:\y"));
+        assert_eq!(plain_drive_path(r"\?\C:\x\a.pdfx"), Some(r"C:\x\a.pdfx"));
+        assert_eq!(plain_drive_path(r"C:\x"), Some(r"C:\x"));
+        assert_eq!(plain_drive_path(r"\?\UNC\server\share\a.pdf"), None);
+        assert_eq!(plain_drive_path(r"\.\CON"), None);
+    }
+
+    #[test]
+    fn rejects_device_names() {
+        for p in [
+            r"C:\CON",
+            r"C:\x\con.txt",
+            r"C:\x\NUL",
+            r"C:\x\aux.tar.gz",
+            r"C:\x\Prn \y",
+            r"C:\x\COM1",
+            r"C:\x\lpt9.log",
+            "C:/x/com3/y",
+        ] {
+            assert_eq!(c(p), None, "{p}");
+        }
+        for p in [
+            r"C:\x\COM0",
+            r"C:\x\console",
+            r"C:\x\LPT10",
+            r"C:\x\nullable.txt",
+        ] {
+            assert!(c(p).is_some(), "{p}");
+        }
+    }
+
+    #[test]
+    fn drops_a_url_that_grows_past_the_limit() {
+        // 600 two-byte characters fit the input limit but grow to 3,600 bytes once encoded.
+        let text = format!("https://example.com/{}", "é".repeat(600));
+        assert!(text.len() <= MAX_LEN);
+        assert_eq!(c(&text), None);
+        assert!(links().query(&input(&text)).is_empty());
     }
 
     #[test]

@@ -191,17 +191,17 @@ impl TrayAction {
 pub async fn tray_action(app: AppHandle, action: String) -> Result<(), CommandError> {
     let action = TrayAction::parse(&action)
         .ok_or_else(|| CommandError::new("invalid_action", "unknown tray action"))?;
-    if !window::menu_active(&app) {
+    // Check and clear in one step: a second concurrent call finds the menu already taken.
+    if !window::take_menu(&app) {
         return Err(CommandError::new(
             "not_available",
             "the tray menu is not open",
         ));
     }
     match action {
-        TrayAction::Open => {
-            window::hide_now(&app);
-            show_launcher(&app, "tray");
-        }
+        // Show in place, without a hide first: only `launcher://shown` is sent, and Root hands
+        // its payload to the launcher it mounts in place of the menu.
+        TrayAction::Open => window::show(&app, "tray"),
         TrayAction::Settings => {
             window::hide_now(&app);
             open_settings_window(&app, None)?;

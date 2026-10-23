@@ -159,9 +159,13 @@ fn set_menu(app: &AppHandle, on: bool) {
     }
 }
 
-/// True while the launcher window shows the tray menu.
-pub fn menu_active(app: &AppHandle) -> bool {
-    app.state::<ShowState>().inner.lock().is_ok_and(|s| s.menu)
+/// True if the launcher window was showing the tray menu, and clears the flag in the same lock,
+/// so of two concurrent tray actions only one sees `true`.
+pub fn take_menu(app: &AppHandle) -> bool {
+    app.state::<ShowState>()
+        .inner
+        .lock()
+        .is_ok_and(|mut s| std::mem::take(&mut s.menu))
 }
 
 fn emit(app: &AppHandle, event: &str, payload: serde_json::Value) {
@@ -245,7 +249,12 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
 
 /// Resumes the WebView, then shows and focuses the window.
 fn reveal(win: &WebviewWindow) {
-    // Resume before show so the first frame paints from a live page.
+    resume(win);
+    show_focused(win);
+}
+
+/// Resumes a suspended WebView. Call before showing so the first frame paints from a live page.
+fn resume(win: &WebviewWindow) {
     #[cfg(windows)]
     if let Err(err) = win.with_webview(|w| {
         if let Err(err) = win::webview::on_shown(&w.controller()) {
@@ -254,6 +263,11 @@ fn reveal(win: &WebviewWindow) {
     }) {
         tracing::debug!(%err, "webview resume dispatch failed");
     }
+    #[cfg(not(windows))]
+    let _ = win;
+}
+
+fn show_focused(win: &WebviewWindow) {
     if let Err(err) = win.show().and_then(|()| win.set_focus()) {
         tracing::warn!(%err, "show failed");
     }
@@ -276,7 +290,8 @@ fn config(app: &AppHandle) -> std::sync::Arc<launcher_core::Config> {
 }
 
 /// Turns the launcher window into the tray menu: placed at the click `anchor` (physical px)
-/// on the monitor that contains it, shown and focused, then `tray://menu` is emitted.
+/// on the monitor that contains it, `tray://menu` emitted, then shown and focused (in that order,
+/// so the launcher's last screen never flashes before the menu renders).
 /// Focus loss hides it like the launcher; the next normal show restores the launcher layout.
 pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
     let Some(win) = app.get_webview_window(LABEL) else {
@@ -294,8 +309,8 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
         Ok(None) => {}
         Err(err) => tracing::warn!(%err, "monitor lookup failed"),
     }
-    reveal(&win);
-    strip_caption(&win);
+    // Resume first so the page receives the event before the window appears.
+    resume(&win);
     let glass = sync_glass(app, &win);
     let config = config(app);
     let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
@@ -311,6 +326,8 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
             "appearance": appearance,
         }),
     );
+    show_focused(&win);
+    strip_caption(&win);
 }
 
 /// Sizes and moves the window to the menu layout for `anchor` in `m`'s work area.

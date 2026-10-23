@@ -118,7 +118,19 @@ async fn install(app: &AppHandle) -> anyhow::Result<()> {
     let handle = app.clone();
     let updater = app
         .updater_builder()
-        .on_before_exit(move || crate::state::shutdown(&handle))
+        .on_before_exit(move || {
+            // This hook runs inside the tokio task that called `download_and_install`, and
+            // `shutdown` uses `block_on`, which panics when called from a runtime thread. A plain
+            // OS thread has no runtime, so run it there and wait. The other callers (the
+            // `RunEvent::Exit` handler for a normal or tray quit) run on the main thread already.
+            let handle = handle.clone();
+            if std::thread::spawn(move || crate::state::shutdown(&handle))
+                .join()
+                .is_err()
+            {
+                tracing::warn!("shutdown before update panicked");
+            }
+        })
         .build()?;
     let Some(update) = updater.check().await? else {
         anyhow::bail!("no signed update published yet");
