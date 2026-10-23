@@ -37,7 +37,7 @@ const LEGACY = [
   "glass-sheen",
   "glass-inner",
 ];
-const legacyRe = new RegExp(`--l-(${LEGACY.join("|")})(?![\w-])`);
+const legacyRe = new RegExp(`--l-(${LEGACY.join("|")})(?![\\w-])`);
 
 /** Paths of files whose text matches. */
 const hits = (list: { path: string; text: string }[], re: RegExp) =>

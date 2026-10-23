@@ -3,8 +3,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "./api";
-import { PREFIX_GROUPS } from "./prefixGroups";
 import { Prefixes } from "./Prefixes";
+import { PREFIX_GROUPS } from "./prefixGroups";
 import type { FeatureView, Field } from "./types";
 
 vi.mock("./api", () => ({

@@ -11,8 +11,8 @@ import {
   THEMES,
   type ThemeId,
 } from "../theme";
-import * as api from "./api";
 import { AppearancePreview } from "./AppearancePreview";
+import * as api from "./api";
 import { type AppearanceView, errorText } from "./types";
 
 const LABELS: Record<ThemeId, string> = {
