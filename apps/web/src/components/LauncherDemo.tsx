@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { filter, type Mode, parse, PREFIX, SCRIPT } from "./demoData";
+import { filter, type Mode, PREFIX, parse, SCRIPT } from "./demoData";
 
 export function LauncherDemo() {
   const [mode, setMode] = useState<Mode>("none");
