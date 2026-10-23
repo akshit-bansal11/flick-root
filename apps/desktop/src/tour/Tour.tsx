@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { Keycaps } from "../Keycaps";
 import "../launcher/launcher.css";
 import { MODES } from "../launcher/reducer";
 import { DemoLauncher } from "./DemoLauncher";
@@ -36,9 +37,9 @@ export function Tour({ onDone }: Props) {
         {t.keys.length > 0 && (
           <p className="tour-keys">
             {capList(t.keys).map((c, i) => (
-              <kbd key={c.id} className="kbd tour-cap" style={{ "--i": i } as CSSProperties}>
-                {c.k}
-              </kbd>
+              <span key={c.id} className="tour-cap" style={{ "--i": i } as CSSProperties}>
+                <Keycaps caps={[c.k]} />
+              </span>
             ))}
           </p>
         )}
@@ -73,7 +74,7 @@ export function Tour({ onDone }: Props) {
             <p className="tour-prefixes">
               {(Object.keys(MODES) as (keyof typeof MODES)[]).map((m) => (
                 <span key={m}>
-                  <kbd className="kbd">{MODES[m].prefix}</kbd> {MODES[m].label}
+                  <Keycaps caps={[MODES[m].prefix]} /> {MODES[m].label}
                 </span>
               ))}
             </p>

@@ -11,19 +11,22 @@
   flex-direction: column;
   gap: var(--l-sp-6);
   padding: var(--l-sp-9);
-  background: var(--l-panel);
+  background: color-mix(in oklab, var(--l-panel) 92%, transparent);
   color: var(--l-text);
-  border: var(--l-border);
-  border-radius: var(--l-r-panel);
-  box-shadow: var(--l-shadow);
+  border-radius: var(--l-r-card);
+  box-shadow:
+    inset 0 1px 0 var(--l-spec),
+    inset 0 0 0 1px var(--l-hairline),
+    var(--l-shadow-overlay);
   font-family: var(--l-ui);
-  font-size: var(--l-fs);
-  line-height: var(--l-lh);
+  font-size: var(--l-fs-body);
+  line-height: var(--l-lh-body);
   animation: key-dialog-in var(--l-dur) var(--l-ease-out);
 }
 .key-dialog h2 {
   margin: 0;
   font-size: var(--l-fs-title);
+  line-height: var(--l-lh-title);
 }
 .key-dialog p {
   margin: 0;
@@ -33,8 +36,8 @@
   padding: var(--l-sp-4) var(--l-sp-6);
   background: var(--l-bg);
   color: var(--l-text);
-  border: var(--l-border);
-  border-radius: var(--l-r2);
+  border: var(--l-border-hair);
+  border-radius: var(--l-r-control);
   font-family: var(--l-mono);
 }
 .key-dialog-ack {
@@ -52,16 +55,17 @@
 }
 .key-dialog button {
   padding: var(--l-sp-3) var(--l-sp-8);
-  background: transparent;
+  background: var(--l-raise);
   color: var(--l-text);
-  border: var(--l-border);
-  border-radius: var(--l-r);
+  border: var(--l-border-hair);
+  border-radius: var(--l-r-control);
   cursor: pointer;
   font: inherit;
 }
 .key-dialog button:last-child {
+  border-color: var(--l-accent);
   background: var(--l-accent);
-  color: var(--l-ink);
+  color: var(--l-on-accent);
 }
 .key-dialog button:disabled {
   opacity: 0.5;

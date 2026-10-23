@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MODES } from "../launcher/reducer";
 import { Welcome } from "./Welcome";
 
 afterEach(cleanup);
@@ -10,7 +11,11 @@ describe("Welcome", () => {
     const f = fns();
     render(<Welcome note={false} {...f} />);
     expect(screen.getByText("Take a 2-minute interactive tour?")).toBeTruthy();
-    expect(document.querySelectorAll(".fr-chip")).toHaveLength(5);
+    const chips = [...document.querySelectorAll(".fr-chip")];
+    expect(chips).toHaveLength(5);
+    for (const [i, m] of Object.values(MODES).entries()) {
+      expect(chips[i]?.querySelector("kbd")?.textContent).toBe(m.prefix);
+    }
     expect(document.activeElement).toBe(screen.getByText("Take the tour"));
     fireEvent.click(screen.getByText("Take the tour"));
     fireEvent.click(screen.getByText("Not now"));

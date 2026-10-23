@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef } from "react";
 import { APP_DISPLAY_NAME } from "../brand";
+import { Keycaps } from "../Keycaps";
 import { MODES } from "../launcher/reducer";
 import { Logo } from "../tour/Logo";
 import "./firstrun.css";
@@ -45,7 +46,7 @@ export function Welcome({ note, onTour, onSkip, onContinue }: Props) {
       <div className="fr-chips">
         {CHIPS.map((m, i) => (
           <span key={m.prefix} className="fr-chip" style={{ "--i": i + 1 } as CSSProperties}>
-            <kbd className="kbd">{m.prefix}</kbd> {m.label}
+            <Keycaps caps={[m.prefix]} /> {m.label}
           </span>
         ))}
       </div>

@@ -1,28 +1,32 @@
 .fr-shell {
   min-height: 100vh;
   box-sizing: border-box;
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 32px var(--l-sp-10);
+  padding: var(--l-sp-10) max(var(--l-sp-10), calc((100% - 520px) / 2));
   display: flex;
   flex-direction: column;
   gap: var(--l-sp-8);
+  background: var(--l-bg);
   color: var(--l-text);
   font-family: var(--l-ui);
-  font-size: var(--l-fs);
+  font-size: var(--l-fs-body);
+  line-height: var(--l-lh-body);
+}
+/* First run shares the Settings window: under Mica the tint replaces the opaque page colour. */
+[data-backdrop="mica"] .fr-shell {
+  background: var(--l-mica-tint);
 }
 .fr-step {
   margin: 0;
   color: var(--l-muted);
-  font-size: var(--l-fs-meta);
+  font-size: var(--l-fs-micro);
 }
 .fr-field,
 .fr-btn {
   min-height: var(--l-row);
   padding: 0 var(--l-sp-8);
-  border: var(--l-border);
-  border-radius: var(--l-r);
-  background: var(--l-surface);
+  border: var(--l-border-hair);
+  border-radius: var(--l-r-control);
+  background: var(--l-raise);
   color: var(--l-text);
   font: inherit;
   cursor: pointer;
@@ -38,7 +42,7 @@
 }
 .fr-primary {
   background: var(--l-accent);
-  color: var(--l-ink);
+  color: var(--l-on-accent);
   border-color: var(--l-accent);
 }
 .fr-btn:disabled {
@@ -53,7 +57,7 @@
 .fr-status {
   margin: var(--l-sp-4) 0 0;
   min-height: 1.35em;
-  font-size: var(--l-fs-sub);
+  font-size: var(--l-fs-caption);
 }
 .fr-status[data-kind="ok"] {
   color: var(--l-ok-text);
@@ -75,9 +79,9 @@
   justify-content: space-between;
   gap: var(--l-sp-6);
   padding: var(--l-sp-4) var(--l-sp-6);
-  border: var(--l-border);
-  border-radius: var(--l-r);
-  background: var(--l-surface);
+  border: var(--l-border-hair);
+  border-radius: var(--l-r-card);
+  background: color-mix(in oklab, var(--l-panel) 58%, transparent);
 }
 .fr-actions {
   display: flex;
@@ -104,10 +108,16 @@
   justify-content: center;
 }
 .fr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--l-sp-3);
   padding: var(--l-sp-2) var(--l-sp-6);
-  border: var(--l-border);
-  border-radius: var(--l-r);
-  background: var(--l-surface);
+  border-radius: var(--l-r-pill);
+  background: var(--l-raise);
+  box-shadow:
+    inset 0 1px 0 var(--l-spec),
+    inset 0 0 0 1px var(--l-hairline),
+    var(--l-shadow-raised);
   animation: fr-rise var(--l-dur-slow) var(--l-ease-out) backwards;
   animation-delay: calc(var(--i) * var(--l-dur-slow));
 }
