@@ -63,7 +63,9 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
         <span className="tray-mark" aria-hidden="true">
           {APP_DISPLAY_NAME.charAt(0)}
         </span>
-        <span className="tray-name" id={NAME_ID}>{APP_DISPLAY_NAME}</span>
+        <span className="tray-name" id={NAME_ID}>
+          {APP_DISPLAY_NAME}
+        </span>
         <span className="tray-ver">v{appVersion}</span>
       </div>
       <div className="tray-list" ref={list} role="menu" aria-labelledby={NAME_ID} tabIndex={-1}>
