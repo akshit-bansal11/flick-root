@@ -26,8 +26,8 @@ export default function Home() {
         </h2>
         <p className="text-muted">
           {APP_DISPLAY_NAME} is a wrapper. It ships no models, no API keys, no account and no
-          default provider. You choose every provider, and Command and Find work fully with no AI at
-          all. There is no telemetry and no sign-in.
+          default provider. You choose every provider, and Open, Commands, Calc and Projects work
+          fully with no AI at all. There is no telemetry and no sign-in.
         </p>
       </section>
 

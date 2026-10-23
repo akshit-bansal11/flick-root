@@ -12,7 +12,7 @@ const FEATURES: Feature[] = [
   {
     title: "Math and units",
     line: "Arithmetic, units, currency and time zones; Enter copies the result.",
-    example: "2.5 kg to lb",
+    example: "= 2.5 kg to lb",
     since: "v0.0.1",
   },
   {
@@ -30,8 +30,15 @@ const FEATURES: Feature[] = [
   {
     title: "Project launcher",
     line: "Open a project in your editor or terminal by name.",
-    example: "code flick",
+    example: "@ flick",
     since: "v0.0.1",
+  },
+  {
+    title: "Links and paths",
+    line: "Type a web address or a folder path and press Enter to open it.",
+    example: "github.com/flick",
+    since: "v0.0.1",
+    doc: "links-and-paths",
   },
   {
     title: "Natural-language finder",
@@ -70,8 +77,8 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Programs on all drives",
-    line: "! also lists programs found on every fixed drive, below installed apps.",
-    example: "!setup",
+    line: "/ also lists programs found on every fixed drive, below installed apps.",
+    example: "/ setup",
     since: "v0.0.1",
     doc: "programs",
   },
@@ -84,7 +91,7 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Themes",
-    line: "Glass, Frost, Midnight, Aurora, Ember or Solid, with adjustable glass strength.",
+    line: "A glass look with a gliding selection lens. Glass, Frost, Midnight, Aurora, Ember or Solid, with adjustable glass strength.",
     example: "Settings, Appearance",
     since: "v0.0.1",
     doc: "appearance",
@@ -99,24 +106,30 @@ const FEATURES: Feature[] = [
 ];
 
 const MODES = [
+  { name: "Open", key: "/", line: "Apps, programs, files and folders." },
   {
     name: "Commands",
     key: ">",
-    line: "System commands, math, units, web shortcuts, ports, media, capture.",
+    line: "System commands, web shortcuts, media, ports and processes, quick capture, links.",
   },
-  { name: "Apps", key: "!", line: "Installed apps, plus programs found on every fixed drive." },
-  { name: "Find", key: "/", line: "Fuzzy search of files and folders on every fixed drive." },
-  { name: "Ask", key: "?", line: "Streams an answer from the provider and model you choose." },
+  { name: "Calc", key: "=", line: "Math, units, currency, time zones and number bases." },
+  {
+    name: "Ask",
+    key: "?",
+    line: "Answers from your AI providers, labelled with provider and model.",
+  },
+  { name: "Projects", key: "@", line: "Code folders under your dev roots." },
 ];
 
 export function Features() {
   return (
     <section aria-labelledby="features">
-      <h2 className="mb-2 text-2xl font-semibold">Four prefixes, one bar</h2>
+      <h2 className="mb-2 text-2xl font-semibold">Five prefixes, one bar</h2>
       <p className="mb-4 text-muted">
-        Type the prefix first in an empty bar. Plain text with no prefix searches nothing.
+        Type a prefix first to narrow the search. Plain text with no prefix searches apps and
+        commands and always offers Find, Web and Ask.
       </p>
-      <ul className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="mb-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {MODES.map((m) => (
           <li key={m.name} className="rounded-[var(--l-r)] border border-line bg-surface p-4">
             <h3 className="font-semibold">

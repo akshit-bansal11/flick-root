@@ -27,6 +27,7 @@ export const DOCS: Doc[] = [
   feature("explain-this", "Explain this"),
   feature("quick-capture", "Quick capture"),
   feature("programs", "Programs"),
+  feature("links-and-paths", "Links and paths"),
   feature("search", "Search"),
   feature("system-commands", "System commands"),
   feature("thinking-modes", "Thinking modes"),
@@ -48,6 +49,9 @@ export const DOCS: Doc[] = [
   adr("009", "feature-modules", "Feature modules"),
   adr("010", "integrations", "Integrations"),
   adr("011", "secret-security", "Secret security"),
+  adr("012", "prefixes-and-plain-text", "Prefixes and plain text"),
+  adr("013", "tray-menu", "Tray menu"),
+  adr("014", "settings-backdrop", "Settings backdrop"),
 ];
 
 const root = path.resolve(process.cwd(), "../..");
