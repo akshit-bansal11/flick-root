@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { Item } from "../types";
 import { groupLabel } from "./kinds";
 import { ResultRow } from "./ResultRow";
@@ -14,9 +14,11 @@ interface Props {
   /** True while a search is in flight; the empty state waits for its results. */
   pending?: boolean;
   onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
+  /** Right pane content for the selected row. */
+  detail?: ReactNode;
 }
 
-export function Results({ items, selected, query, pending = false, onActivate }: Props) {
+export function Results({ items, selected, query, pending = false, onActivate, detail }: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
   const visible = items.slice(start, start + MAX_ROWS);
@@ -47,6 +49,7 @@ export function Results({ items, selected, query, pending = false, onActivate }:
         })}
       </div>
       <div className="right">
+        {detail}
         {items.length === 0 && !pending && query.trim() !== "" && (
           <div className="empty">No matches</div>
         )}

@@ -4,13 +4,14 @@ import type { LaunchMode } from "../types";
 import "../query/attachment.css";
 import { LiquidFilter } from "../query/LiquidFilter";
 import { QueryView } from "../query/QueryView";
-import { Actions } from "./Actions";
-import { Footer } from "./Footer";
+import { DetailPane } from "./DetailPane";
 import { InputBar } from "./InputBar";
 import { ModeTabs } from "./ModeTabs";
 import { LISTBOX_ID, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
+import { countsOf, statusHints } from "./status";
+import { StatusLine } from "./StatusLine";
 
 /** What the launcher panel needs: a reducer state and the callbacks that feed events back. */
 export interface LauncherViewProps {
@@ -43,11 +44,19 @@ export function LauncherView({
 }: LauncherViewProps) {
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
-  // Plain text is none mode with something typed; blank none is the all tab (recent list).
-  const plain = state.mode === "none" && state.input.trim() !== "";
   const selected = state.items[state.selected];
   const pathItem = selected?.id.startsWith("file:") ?? false;
   const revealable = selected?.actions.some((a) => a.type === "location") ?? false;
+  const ctx = {
+    pathItem,
+    revealable,
+    armedProcess: state.armed && selected?.kind === "process",
+    adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,
+    copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,
+    attachment: state.attachment !== null,
+    answer: q.text !== "",
+  };
+  const counts = state.mode === "query" ? [] : countsOf(state.items);
   const hints = availableModes(state.enabledSources);
   const activeId = state.items.length > 0 ? optionId(state.selected) : undefined;
 
@@ -100,27 +109,14 @@ export function LauncherView({
             query={state.input}
             pending={state.pending}
             onActivate={activate}
+            detail={selected && <DetailPane item={selected} ctx={ctx} onPress={press} />}
           />
         )}
       </div>
-      {!state.sheet && state.mode === "find" && state.items.length > 0 && (
-        <Actions onPress={press} pathItem={pathItem} revealable={revealable} />
-      )}
-      <Footer
-        mode={state.mode}
-        modes={hints}
-        typed={plain}
+      <StatusLine
+        status={statusHints(state.mode, ctx, counts)}
         copied={state.copied}
         copyFailed={state.copyFailed}
-        ctx={{
-          pathItem,
-          revealable,
-          armedProcess: state.armed && selected?.kind === "process",
-          adminAction: selected?.actions.some((a) => a.type === "admin") ?? false,
-          copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,
-          attachment: state.attachment !== null,
-          answer: q.text !== "",
-        }}
       />
     </div>
   );

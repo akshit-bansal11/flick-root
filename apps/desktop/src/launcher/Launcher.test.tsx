@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
 import type { Appearance, ThemeRoles } from "../theme";
 import type { ExplainCaptured, Item } from "../types";
-import { footHints } from "./Footer";
 import { Launcher } from "./Launcher";
 
 vi.mock("../ipc", () => ({
@@ -313,7 +312,7 @@ describe("Launcher", () => {
     expect(screen.queryByText("Tab mode")).toBeNull();
   });
 
-  it("Open footer shows the admin hint when the selected item has an admin action", async () => {
+  it("detail pane shows the admin action with its chord", async () => {
     await mount();
     vi.mocked(ipc.search).mockImplementation((req) =>
       Promise.resolve({
@@ -323,13 +322,8 @@ describe("Launcher", () => {
       }),
     );
     await type("/");
-    const act = screen.getByText("admin");
-    expect(act.className).toBe("act");
-    expect([...act.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
-      "Ctrl",
-      "Shift",
-      "↵",
-    ]);
+    const btn = screen.getByRole("button", { name: /run as administrator/i });
+    expect(btn.querySelector(".detail-keys")?.textContent).toBe("ctrl+shift+enter");
   });
 
   it("labels drive-scan programs", async () => {
@@ -529,33 +523,5 @@ describe("Launcher explain", () => {
     expect(ipc.hideLauncher).not.toHaveBeenCalled();
     await type(">alp");
     expect(screen.queryByRole("alert")).toBeNull();
-  });
-});
-
-describe("footHints", () => {
-  it("find lists open and location, and admin only when the selection has it", () => {
-    expect(footHints("find").map((h) => h.label)).toEqual(["open"]);
-    expect(footHints("find", { revealable: true }).map((h) => h.label)).toEqual([
-      "open",
-      "location",
-    ]);
-    const admin = footHints("find", { adminAction: true }).find((h) => h.id === "admin");
-    expect(admin?.caps).toEqual(["Ctrl", "Shift", "↵"]);
-  });
-
-  it("commands lists a single Enter hint without copy until a value exists", () => {
-    expect(footHints("commands").map((h) => h.caps)).toEqual([["↵"]]);
-  });
-
-  it("none lists the prefixes as one cap each, then the shortcut sheet", () => {
-    const hints = footHints("none", {}, ["find", "calc"]);
-    expect(hints.map((h) => h.id)).toEqual(["go:find", "go:calc", "sheet"]);
-    expect(hints[0]).toEqual({ id: "go:find", caps: ["/"], label: "open" });
-    expect(hints[2]?.label).toBe("shortcuts");
-  });
-
-  it("typed none lists the open hint exactly once", () => {
-    const hints = footHints("none", {}, ["find", "calc"], true);
-    expect(hints.filter((h) => h.id === "open")).toHaveLength(1);
   });
 });
