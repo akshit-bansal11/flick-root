@@ -81,6 +81,12 @@ export interface ThinkingMode {
   local: boolean;
 }
 
+/** Reply to `home_items`: recent picks and pinned item ids. */
+export interface HomeView {
+  items: Item[];
+  pins: string[];
+}
+
 export interface ThinkingModes {
   modes: ThinkingMode[];
   selected: string | null;

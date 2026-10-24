@@ -19,6 +19,7 @@ vi.mock("../ipc", () => ({
   askStream: vi.fn(),
   cancelAsk: vi.fn(),
   listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null })),
+  homeItems: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   setThinkingMode: vi.fn(() => Promise.resolve()),
   hideLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
@@ -111,57 +112,67 @@ const type = (text: string) =>
   });
 
 describe("Launcher", () => {
-  it("starts in none mode with four prefix hint rows and no search", async () => {
+  it("starts on the all tab with the mode tab strip and no search", async () => {
     await mount();
     expect(screen.getByPlaceholderText("Search apps and commands, or type / > = ? @")).toBeTruthy();
     expect(screen.getByText("Type without a prefix to search apps and commands")).toBeTruthy();
-    expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(5);
-    expect(screen.getByRole("listbox", { name: "Modes" })).toBeTruthy();
-    expect(screen.getByText("commands")).toBeTruthy();
+    expect(screen.getByRole("tablist", { name: "Modes" })).toBeTruthy();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "all",
+      "/open",
+      ">commands",
+      "=calc",
+      "?ask",
+      "@projects",
+    ]);
+    expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
     expect(ipc.search).not.toHaveBeenCalled();
     expect(screen.queryByTestId("mode-chip")).toBeNull();
   });
 
-  it("hint rows carry Ctrl+N caps and the list has one aria-hidden lens", async () => {
-    await mount();
-    const rows = screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ });
-    const caps = rows.map((r) =>
-      [...r.querySelectorAll("kbd")].map((k) => k.textContent).join(" "),
-    );
-    expect(caps).toEqual(["Ctrl 1", "Ctrl 2", "Ctrl 3", "Ctrl 4", "Ctrl 5"]);
-    expect(screen.getByText("Narrow with a prefix")).toBeTruthy();
-    const lenses = document.querySelectorAll(".lens");
-    expect(lenses).toHaveLength(1);
-    expect(lenses[0]?.getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("ArrowDown moves aria-selected and aria-activedescendant, with one lens", async () => {
-    await mount();
-    await type(">");
-    const input = screen.getByRole("combobox");
-    const before = input.getAttribute("aria-activedescendant");
-    act(() => {
-      fireEvent.keyDown(window, { key: "ArrowDown" });
+  it("shown loads the recent picks and lists them under # recent", async () => {
+    vi.mocked(ipc.homeItems).mockResolvedValueOnce({
+      items: [{ ...item("r1", "Recent One"), payload: { home: "recent" } }],
+      pins: [],
     });
-    expect(input.getAttribute("aria-activedescendant")).not.toBe(before);
-    const selected = screen
-      .getAllByRole("option")
-      .filter((o) => o.getAttribute("aria-selected") === "true");
-    expect(selected).toHaveLength(1);
-    expect(selected[0]?.id).toBe(input.getAttribute("aria-activedescendant"));
-    expect(document.querySelectorAll(".lens")).toHaveLength(1);
+    vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+      cb({ shownId: 1, reason: "hotkey", sources: ["apps"], appearance: APPEARANCE });
+      return Promise.resolve(() => {});
+    });
+    await mount();
+    expect(ipc.homeItems).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("# recent")).toBeTruthy();
+    expect(screen.getByRole("option", { name: /Recent One/ })).toBeTruthy();
+    expect(ipc.search).not.toHaveBeenCalled();
   });
 
-  it("file rows render a kind icon tile and app rows without an icon a letter tile", async () => {
+  it("the selected tab follows the mode and a tab click switches it", async () => {
     await mount();
-    await type(">");
-    expect(document.querySelectorAll(".tile-letter").length).toBeGreaterThan(0);
+    const tab = (name: string) => screen.getByRole("tab", { name });
+    act(() => {
+      fireEvent.click(tab("/open"));
+    });
+    expect(tab("/open").getAttribute("aria-selected")).toBe("true");
+    expect(tab("all").getAttribute("aria-selected")).toBe("false");
+    await type(">x");
+    expect(tab(">commands").getAttribute("aria-selected")).toBe("true");
+    expect(tab("/open").getAttribute("aria-selected")).toBe("false");
+    act(() => {
+      fireEvent.click(tab("all"));
+    });
+    expect(tab("all").getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByTestId("mode-chip")).toBeNull();
+  });
+
+  it("file rows render a tile icon", async () => {
+    await mount();
     mockFileResults();
     await type("/x");
     expect(document.querySelector(".row .tile-ico svg")).not.toBeNull();
   });
 
-  it("shown with sources [apps] hides the other four prefix hint rows", async () => {
+  it("shown with sources [apps] leaves only the all and open tabs", async () => {
     vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
       cb({
         shownId: 1,
@@ -172,8 +183,8 @@ describe("Launcher", () => {
       return Promise.resolve(() => {});
     });
     await mount();
-    expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(1);
-    expect(screen.queryByText("commands")).toBeNull();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["all", "/open"]);
+    expect(screen.queryByRole("tab", { name: ">commands" })).toBeNull();
   });
 
   it("shown payload with active colours reaches documentElement.style", async () => {
@@ -246,10 +257,10 @@ describe("Launcher", () => {
     expect(screen.getAllByRole("option")).toHaveLength(2);
   });
 
-  it("clicking a hint row enters its mode", async () => {
+  it("clicking a tab enters its mode", async () => {
     await mount();
     act(() => {
-      fireEvent.click(screen.getByRole("option", { name: /Open/ }));
+      fireEvent.click(screen.getByRole("tab", { name: "/open" }));
     });
     expect(screen.getByTestId("mode-chip").textContent).toBe("/Open");
   });
@@ -323,6 +334,7 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Backspace" });
     });
     expect(screen.queryByTestId("mode-chip")).toBeNull();
+    expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("the chip holds the prefix glyph, and the Settings hint shows in none mode only", async () => {

@@ -1,15 +1,11 @@
 import { Fragment, useRef } from "react";
-import { Keycaps } from "../Keycaps";
 import { Lens, useLens } from "../Lens";
-import { caps } from "../shortcuts";
 import type { Item, LaunchMode } from "../types";
-import { groupLabel } from "./kinds";
+import { groupLabel, HOME_GROUP } from "./kinds";
 import { ResultRow } from "./ResultRow";
 import { MODES } from "./reducer";
 
 export const LISTBOX_ID = "launcher-list";
-export const HINTS_ID = "launcher-hints";
-export const hintId = (i: number) => `launcher-hint-${i}`;
 export const optionId = (i: number) => `launcher-opt-${i}`;
 const MAX_ROWS = 8;
 
@@ -42,7 +38,7 @@ export function Results({ items, selected, query, pending = false, onActivate }:
             <Fragment key={item.id}>
               {(!prev || groupLabel(prev) !== label) && (
                 <div className="group" aria-hidden="true">
-                  {label}
+                  {label === HOME_GROUP ? `# ${label}` : label}
                 </div>
               )}
               <ResultRow
@@ -65,41 +61,40 @@ export function Results({ items, selected, query, pending = false, onActivate }:
   );
 }
 
-interface HintProps {
+interface TabsProps {
   modes: Exclude<LaunchMode, "none">[];
-  selected: number;
-  onEnter: (mode: LaunchMode) => void;
+  mode: LaunchMode;
+  onSelect: (mode: LaunchMode) => void;
 }
 
-/** Prefix cheat sheet shown in the default state; each row enters its mode. */
-export function PrefixHints({ modes, selected, onEnter }: HintProps) {
-  const list = useRef<HTMLDivElement>(null);
-  const lens = useRef<HTMLDivElement>(null);
-  useLens(list, lens, modes[selected] ? hintId(selected) : undefined, modes);
+/** Mode tab strip: `all` plus one tab per enabled prefix; selecting a tab enters that mode. */
+export function ModeTabs({ modes, mode, onSelect }: TabsProps) {
   return (
-    <div ref={list} id={HINTS_ID} className="hints" role="listbox" aria-label="Modes">
-      <div className="group" aria-hidden="true">
-        Narrow with a prefix
-      </div>
-      <Lens ref={lens} />
-      {modes.map((m, i) => (
+    <div className="tabs" role="tablist" aria-label="Modes">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "none"}
+        tabIndex={-1}
+        className="tab"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onSelect("none")}
+      >
+        all
+      </button>
+      {modes.map((m) => (
         <button
           key={m}
-          id={hintId(i)}
           type="button"
-          role="option"
-          aria-selected={i === selected}
+          role="tab"
+          aria-selected={m === mode}
           tabIndex={-1}
-          className={i === selected ? "hint-row sel" : "hint-row"}
+          className="tab"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onEnter(m)}
+          onClick={() => onSelect(m)}
         >
-          <span className="tile tile-ico tile-glyph">{MODES[m].prefix}</span>
-          <span className="hint-text">
-            <span className="hint-label">{MODES[m].label}</span>
-            <span className="hint-desc">{MODES[m].desc}</span>
-          </span>
-          <Keycaps caps={caps(`go:${m}`)} />
+          <b>{MODES[m].prefix}</b>
+          {MODES[m].label.toLowerCase()}
         </button>
       ))}
     </div>

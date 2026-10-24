@@ -47,7 +47,7 @@ export interface Shortcut {
   foot?: string;
 }
 
-const LIST_SCOPES = ["find", "commands", "calc", "projects"] as const;
+const LIST_SCOPES = ["none", "find", "commands", "calc", "projects"] as const;
 
 export const SHORTCUTS: readonly Shortcut[] = [
   {
@@ -58,7 +58,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
     when: "armedProcess",
     foot: "kill",
   },
-  { id: "enterMode", keys: "Enter", label: "Enter mode", scope: "none" },
   { id: "open", keys: "Enter", label: "Open", scope: LIST_SCOPES, foot: "open" },
   {
     id: "location",

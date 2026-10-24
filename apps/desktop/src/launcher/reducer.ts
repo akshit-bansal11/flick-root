@@ -44,6 +44,8 @@ export interface State {
   /** Id of the current ask; events carrying another token are stale and ignored. */
   askToken: number;
   items: Item[];
+  /** Recent picks for the blank `all` tab (`home_items`); kept across show and hide. */
+  home: Item[];
   selected: number;
   query: QueryState;
   /** Thinking modes (provider + model) Tab cycles through; `selected` is null until chosen. */
@@ -73,7 +75,8 @@ export type Event =
   | { type: "outcome"; commandId: string; outcome: Outcome }
   | { type: "actionFailed"; message: string }
   | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
-  | { type: "enterMode"; mode: LaunchMode }
+  | { type: "tab"; mode: LaunchMode }
+  | { type: "homeLoaded"; items: Item[]; pins: string[] }
   | { type: "enabledSources"; sources: string[]; webTitle: string | null }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
@@ -101,6 +104,7 @@ export type Effect =
     }
   | { type: "cancelAsk"; token: number }
   | { type: "loadThinkingModes" }
+  | { type: "loadHome" }
   | { type: "webSearch"; text: string }
   | { type: "setThinkingMode"; id: string }
   | { type: "hide" }
@@ -202,6 +206,7 @@ export const initialState = (
   seq: 0,
   askToken: 0,
   items: [],
+  home: [],
   selected: 0,
   query: {
     status: "idle",
@@ -227,6 +232,9 @@ export const initialState = (
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
 
+/** The blank `all` tab: none mode, nothing typed. It lists `home` instead of searching. */
+const isHome = (s: State): boolean => s.mode === "none" && s.input.trim() === "";
+
 /** Set mode and input; every mode but query searches (none only for non-blank text). */
 function search(s: State, mode: LaunchMode, input: string): Result {
   const next: State = {
@@ -238,13 +246,12 @@ function search(s: State, mode: LaunchMode, input: string): Result {
     armed: false,
     pending: false,
   };
-  if (mode === "query" || (mode === "none" && input.trim() === "")) {
-    return out({ ...next, items: [] });
-  }
+  if (mode === "query") return out({ ...next, items: [] });
+  if (isHome(next)) return out({ ...next, items: next.home });
   const { wire, sources } = mode === "none" ? PLAIN_SEARCH : MODES[mode];
   const seq = s.seq + 1;
   // Plain text shows the fallback rows at once, under the previous results until new ones land.
-  const kept = s.mode === "none" ? s.items.filter((i) => i.source !== "ui") : [];
+  const kept = s.mode === "none" && !isHome(s) ? s.items.filter((i) => i.source !== "ui") : [];
   const items = mode === "none" ? [...kept, ...fallbackRows(next)] : next.items;
   return out(
     { ...next, items, seq, pending: true },
@@ -276,12 +283,6 @@ function switchMode(s: State, mode: LaunchMode, input: string): Result {
   return { state: r.state, effects: [...cancel, ...r.effects, ...load] };
 }
 
-/** Enter a mode; plain text typed on the hint panel is carried into it. */
-function enterMode(s: State, mode: LaunchMode): Result {
-  if (mode !== "none" && !availableModes(s.enabledSources).includes(mode)) return out(s);
-  return switchMode(s, mode, mode !== "none" && s.mode === "none" ? s.input : "");
-}
-
 function textChange(s: State, text: string): Result {
   // A prefix counts as the first character into an empty field, typed or pasted.
   const target = s.input === "" ? modeOf(text.slice(0, 1)) : undefined;
@@ -292,10 +293,8 @@ function textChange(s: State, text: string): Result {
   return search({ ...s, notice: null }, s.mode, text);
 }
 
-const isPrefixList = (s: State): boolean => s.mode === "none" && s.input.trim() === "";
-
 function move(s: State, delta: number): Result {
-  const n = isPrefixList(s) ? availableModes(s.enabledSources).length : s.items.length;
+  const n = s.items.length;
   if (n === 0) return out(s);
   return out({ ...s, selected: (s.selected + delta + n) % n, armed: true });
 }
@@ -335,10 +334,6 @@ function enter(s: State): Result {
         thinkingMode: s.thinkingModes.selected ?? undefined,
       },
     );
-  }
-  if (isPrefixList(s)) {
-    const mode = availableModes(s.enabledSources)[s.selected];
-    return mode ? enterMode(s, mode) : out(s);
   }
   return openSelected(s, "open");
 }
@@ -459,10 +454,19 @@ function resultValue(item: Item | undefined): string | null {
   return typeof v === "string" ? v : null;
 }
 
-/** Ctrl+1..5: jump to a mode, carrying typed text; disabled modes and the current mode do nothing. */
-function goMode(s: State, mode: Entered): Result {
-  if (mode === s.mode || !availableModes(s.enabledSources).includes(mode)) return out(s);
+/** Select a tab (`none` is all), carrying typed text; a disabled or the current tab does nothing. */
+function goMode(s: State, mode: LaunchMode): Result {
+  if (mode === s.mode) return out(s);
+  if (mode !== "none" && !availableModes(s.enabledSources).includes(mode)) return out(s);
   return switchMode(s, mode, s.input);
+}
+
+/** Ctrl+Tab and Ctrl+Shift+Tab: the next or previous tab, `all` first, wrapping. */
+function cycleTab(s: State, delta: number): Result {
+  const tabs: LaunchMode[] = ["none", ...availableModes(s.enabledSources)];
+  const at = Math.max(0, tabs.indexOf(s.mode));
+  const next = tabs[(at + delta + tabs.length) % tabs.length];
+  return next ? goMode(s, next) : out(s);
 }
 
 function key(s: State, k: KeyInput): Result {
@@ -484,7 +488,6 @@ function key(s: State, k: KeyInput): Result {
       return move(s, 1);
     case "up":
       return move(s, -1);
-    case "enterMode":
     case "open":
     case "ask":
       return enter(s);
@@ -492,6 +495,10 @@ function key(s: State, k: KeyInput): Result {
       return openSelected(s, "location");
     case "admin":
       return openSelected(s, "admin");
+    case "tabNext":
+      return cycleTab(s, 1);
+    case "tabPrev":
+      return cycleTab(s, -1);
     case "model":
       return cycleThinking(s, 1);
     case "modelPrev":
@@ -504,8 +511,8 @@ function key(s: State, k: KeyInput): Result {
         ? out(s, { type: "kill", itemId: item.id })
         : out(s);
     case "leave":
-      // Empty input inside a mode: step back out to the hint panel.
-      return s.input === "" && s.mode !== "none" ? enterMode(s, "none") : out(s);
+      // Empty input inside a mode: step back out to the all tab.
+      return s.input === "" && s.mode !== "none" ? goMode(s, "none") : out(s);
     case "copyPath":
       return item?.id.startsWith("file:")
         ? copied(s, { type: "copyPath", itemId: item.id })
@@ -591,7 +598,7 @@ export function reduce(s: State, ev: Event): Result {
     case "text":
       return textChange(s, ev.text);
     case "results":
-      if (ev.seq !== s.seq || s.mode === "query" || isPrefixList(s)) return out(s);
+      if (ev.seq !== s.seq || s.mode === "query" || isHome(s)) return out(s);
       return out({
         ...s,
         items: s.mode === "none" ? [...ev.items, ...fallbackRows(s)] : ev.items,
@@ -641,14 +648,20 @@ export function reduce(s: State, ev: Event): Result {
     case "thinkingModes": {
       const next: State = { ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } };
       // The Ask fallback row names the chosen model; rebuild it when the modes arrive.
-      const plainText = next.mode === "none" && !isPrefixList(next);
+      const plainText = next.mode === "none" && !isHome(next);
       const items = plainText
         ? [...next.items.filter((i) => i.source !== "ui"), ...fallbackRows(next)]
         : next.items;
       return out({ ...next, items });
     }
-    case "enterMode":
-      return enterMode(s, ev.mode);
+    case "tab":
+      return goMode(s, ev.mode);
+    case "homeLoaded": {
+      const home = ev.items;
+      if (!isHome(s)) return out({ ...s, home });
+      const selected = Math.min(s.selected, Math.max(0, home.length - 1));
+      return out({ ...s, home, items: home, selected });
+    }
     case "enabledSources": {
       const load: Effect[] =
         ev.sources.includes("ask") && s.thinkingModes.modes.length === 0
@@ -657,18 +670,25 @@ export function reduce(s: State, ev: Event): Result {
       return out({ ...s, enabledSources: ev.sources, webTitle: ev.webTitle }, ...load);
     }
     case "shown":
-      return out({
-        ...initialState(s.enabledSources, s.webTitle),
-        thinkingModes: s.thinkingModes,
-        seq: s.seq,
-        askToken: s.askToken,
-        visible: true,
-      });
+      return out(
+        {
+          ...initialState(s.enabledSources, s.webTitle),
+          thinkingModes: s.thinkingModes,
+          home: s.home,
+          items: s.home,
+          seq: s.seq,
+          askToken: s.askToken,
+          visible: true,
+        },
+        { type: "loadHome" },
+      );
     case "hidden":
       return out(
         {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
+          home: s.home,
+          items: s.home,
           seq: s.seq,
           askToken: s.askToken,
         },

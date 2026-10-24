@@ -57,9 +57,9 @@ const streaming = (extra: Partial<State> = {}): State =>
   inMode("query", { query: { ...initialState().query, status: "streaming" }, ...extra });
 
 describe("reducer", () => {
-  it("shown resets to none mode, empty input, and does not search", () => {
+  it("shown resets to none mode, empty input, and loads home without searching", () => {
     const r = reduce(inMode("find", { input: "x" }), { type: "shown" });
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([{ type: "loadHome" }]);
     expect(r.state).toMatchObject({ mode: "none", input: "", items: [], visible: true });
   });
 
@@ -475,26 +475,108 @@ describe("reducer", () => {
     expect(r.effects).toEqual([{ type: "cancelAsk", token: 0 }]);
   });
 
-  it("none mode: arrows move over the hint rows and Enter enters the highlighted mode", () => {
-    const s = reduce(initialState(), k("ArrowDown")).state;
-    expect(s.selected).toBe(1);
-    const r = reduce(s, k("Enter"));
-    expect(r.state.mode).toBe("commands");
-    expect(r.effects).toEqual([
-      { type: "search", seq: 1, mode: "command", text: "", sources: MODES.commands.sources },
+  it("blank all tab shows home and Enter launches the first home row", () => {
+    const home = [item("h0"), item("h1")];
+    const s = reduce(initialState(), { type: "homeLoaded", items: home, pins: [] }).state;
+    expect(s.items).toEqual(home);
+    expect(s.home).toEqual(home);
+    expect(reduce(s, k("Enter")).effects).toEqual([{ type: "launch", itemId: "h0", admin: false }]);
+    const down = reduce(s, k("ArrowDown")).state;
+    expect(down.selected).toBe(1);
+    expect(reduce(down, k("Enter")).effects).toEqual([
+      { type: "launch", itemId: "h1", admin: false },
     ]);
   });
 
-  it("none mode: hints skip disabled modes", () => {
-    const s = initialState(["apps", "syscmd", "math", "projects"]);
-    expect(reduce(s, k("ArrowUp")).state.selected).toBe(3);
-    expect(reduce({ ...s, selected: 2 }, k("Enter")).state.mode).toBe("calc");
+  it("typing a prefix selects its tab and keeps the rest of the text", () => {
+    const r = reduce(initialState(), { type: "text", text: ">ab" });
+    expect(r.state).toMatchObject({ mode: "commands", input: "ab" });
+    expect(r.effects).toEqual([
+      { type: "search", seq: 1, mode: "command", text: "ab", sources: MODES.commands.sources },
+    ]);
   });
 
-  it("enterMode event enters a mode and ignores a disabled one", () => {
-    expect(reduce(initialState(), { type: "enterMode", mode: "find" }).state.mode).toBe("find");
+  it("the tab event sets the mode and keeps the typed text", () => {
+    const typed = reduce(initialState(), { type: "text", text: "ab" }).state;
+    const r = reduce(typed, { type: "tab", mode: "find" });
+    expect(r.state).toMatchObject({ mode: "find", input: "ab" });
+    expect(r.effects).toContainEqual(expect.objectContaining({ type: "search", text: "ab" }));
+  });
+
+  it("the tab event accepts none, restoring home on a blank field", () => {
+    const home = [item("h0")];
+    const s = inMode("find", { home });
+    const r = reduce(s, { type: "tab", mode: "none" });
+    expect(r.state).toMatchObject({ mode: "none", input: "", items: home });
+    expect(r.effects).toEqual([]);
+  });
+
+  it("the tab event ignores a disabled mode and the current mode", () => {
     const s = initialState(["apps"]);
-    expect(reduce(s, { type: "enterMode", mode: "query" }).state).toBe(s);
+    expect(reduce(s, { type: "tab", mode: "query" }).state).toBe(s);
+    expect(reduce(s, { type: "tab", mode: "none" }).state).toBe(s);
+  });
+
+  it("Ctrl+Tab cycles the tabs with all first and wraps", () => {
+    let s = initialState();
+    const seen: LaunchMode[] = [];
+    for (let i = 0; i < 6; i++) {
+      s = reduce(s, k("Tab", { ctrl: true })).state;
+      seen.push(s.mode);
+    }
+    expect(seen).toEqual(["find", "commands", "calc", "query", "projects", "none"]);
+  });
+
+  it("Ctrl+Shift+Tab cycles backwards and wraps from all to the last tab", () => {
+    const back = k("Tab", { ctrl: true, shift: true });
+    expect(reduce(initialState(), back).state.mode).toBe("projects");
+    expect(reduce(inMode("find"), back).state.mode).toBe("none");
+    expect(reduce(inMode("calc"), back).state.mode).toBe("commands");
+  });
+
+  it("the tab cycle skips disabled modes", () => {
+    const s = initialState(["apps", "math"]);
+    const next = reduce(s, k("Tab", { ctrl: true })).state;
+    expect(next.mode).toBe("find");
+    expect(reduce(next, k("Tab", { ctrl: true })).state.mode).toBe("calc");
+    const last = inMode("calc", { enabledSources: ["apps", "math"] });
+    expect(reduce(last, k("Tab", { ctrl: true })).state.mode).toBe("none");
+  });
+
+  it("a tab switch away from a streaming ask cancels it", () => {
+    const r = reduce(streaming({ askToken: 4 }), { type: "tab", mode: "none" });
+    expect(r.effects).toContainEqual({ type: "cancelAsk", token: 4 });
+    expect(r.state.query.status).toBe("idle");
+    const cycled = reduce(streaming({ askToken: 4 }), k("Tab", { ctrl: true }));
+    expect(cycled.effects).toContainEqual({ type: "cancelAsk", token: 4 });
+  });
+
+  it("results arriving while on home are ignored", () => {
+    const home = [item("h0")];
+    const s = inMode("none", { home, items: home, seq: 3 });
+    expect(reduce(s, { type: "results", seq: 3, items: [item("x")] }).state).toBe(s);
+  });
+
+  it("shown requests home exactly once and keeps the loaded home rows", () => {
+    const home = [item("h0")];
+    const r = reduce(inMode("find", { input: "x", home }), { type: "shown" });
+    expect(r.effects.filter((e) => e.type === "loadHome")).toHaveLength(1);
+    expect(r.state).toMatchObject({ mode: "none", input: "", home, items: home });
+    expect(reduce(inMode("find", { home }), { type: "hidden" }).state.home).toEqual(home);
+  });
+
+  it("homeLoaded clamps the selection and leaves other tabs' rows alone", () => {
+    const five = Array.from({ length: 5 }, (_, i) => item(`o${i}`));
+    const s = inMode("none", { home: five, items: five, selected: 4 });
+    const r = reduce(s, { type: "homeLoaded", items: [item("n0"), item("n1")], pins: [] });
+    expect(r.state.selected).toBe(1);
+    expect(r.state.items.map((i) => i.id)).toEqual(["n0", "n1"]);
+    const empty = reduce(s, { type: "homeLoaded", items: [], pins: [] }).state;
+    expect(empty).toMatchObject({ selected: 0, items: [] });
+    const away = withItems(inMode("find"));
+    const kept = reduce(away, { type: "homeLoaded", items: [item("n0")], pins: [] }).state;
+    expect(kept.items).toBe(away.items);
+    expect(kept.home.map((i) => i.id)).toEqual(["n0"]);
   });
 
   it("Ctrl+Shift+Enter skips a program row with no Admin action", () => {
@@ -789,7 +871,7 @@ describe("explain attachment", () => {
 
   it("switching mode clears it", () => {
     expect(
-      reduce(captured(att()), { type: "enterMode", mode: "find" }).state.attachment,
+      reduce(captured(att()), { type: "tab", mode: "find" }).state.attachment,
     ).toBeNull();
   });
 });
@@ -825,7 +907,7 @@ describe("thinking modes", () => {
   });
 
   it("entering query loads modes; the event stores them", () => {
-    expect(reduce(initialState(), { type: "enterMode", mode: "query" }).effects).toContainEqual({
+    expect(reduce(initialState(), { type: "tab", mode: "query" }).effects).toContainEqual({
       type: "loadThinkingModes",
     });
     const r = reduce(initialState(), { type: "thinkingModes", modes: tm, selected: "c/3" });

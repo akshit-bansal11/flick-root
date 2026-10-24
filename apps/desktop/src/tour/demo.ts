@@ -273,6 +273,7 @@ export function createDemoRunner(host: DemoHost) {
             0,
           );
           break;
+        case "loadHome":
         case "setThinkingMode":
           break;
       }

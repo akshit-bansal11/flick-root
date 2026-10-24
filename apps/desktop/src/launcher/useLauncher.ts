@@ -113,6 +113,12 @@ export function useLauncher(
             .then((r) => dispatch({ type: "thinkingModes", modes: r.modes, selected: r.selected }))
             .catch(warn);
           break;
+        case "loadHome":
+          ipc
+            .homeItems()
+            .then((r) => dispatch({ type: "homeLoaded", items: r.items, pins: r.pins }))
+            .catch(warn);
+          break;
         case "webSearch":
           outcome("ui:web", ipc.webSearch(e.text));
           break;
@@ -203,9 +209,9 @@ export function useLauncher(
     [dispatch],
   );
   const toggleEffort = useCallback(() => press(shortcut("effort").keys), [press]);
-  const enterMode = useCallback(
+  const selectTab = useCallback(
     (mode: LaunchMode) => {
-      dispatch({ type: "enterMode", mode });
+      dispatch({ type: "tab", mode });
       inputRef.current?.focus();
     },
     [dispatch, inputRef],
@@ -219,7 +225,7 @@ export function useLauncher(
     state,
     panelRef,
     removeAttachment,
-    enterMode,
+    selectTab,
     setText,
     activate,
     press,

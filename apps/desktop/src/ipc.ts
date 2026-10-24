@@ -10,6 +10,7 @@ import type {
   AskEvent,
   AskRequest,
   ExplainCaptured,
+  HomeView,
   Mode,
   Outcome,
   SearchResponse,
@@ -60,6 +61,8 @@ export function askStream(req: AskRequest, onEvent: (e: AskEvent) => void): Prom
 }
 
 export const listThinkingModes = () => invoke<ThinkingModes>("list_thinking_modes");
+
+export const homeItems = () => invoke<HomeView>("home_items");
 
 export const setThinkingMode = (id: string) => invoke<void>("set_thinking_mode", { id });
 

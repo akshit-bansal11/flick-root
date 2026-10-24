@@ -7,7 +7,7 @@ import { QueryView } from "../query/QueryView";
 import { Actions } from "./Actions";
 import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
-import { HINTS_ID, hintId, LISTBOX_ID, optionId, PrefixHints, Results } from "./Results";
+import { LISTBOX_ID, ModeTabs, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
 
@@ -17,7 +17,7 @@ export interface LauncherViewProps {
   inputRef: RefObject<HTMLInputElement | null>;
   panelRef?: Ref<HTMLDivElement>;
   removeAttachment: () => void;
-  enterMode: (mode: LaunchMode) => void;
+  selectTab: (mode: LaunchMode) => void;
   setText: (text: string) => void;
   activate: (index: number, mods?: { ctrl?: boolean; shift?: boolean }) => void;
   press: (chord: string) => void;
@@ -32,7 +32,7 @@ export function LauncherView({
   inputRef,
   panelRef,
   removeAttachment,
-  enterMode,
+  selectTab,
   setText,
   activate,
   press,
@@ -42,19 +42,13 @@ export function LauncherView({
 }: LauncherViewProps) {
   const q = state.query;
   const noProvider = q.errorCode === "no_provider";
-  // The prefix list is none mode with a blank field; with text it is the plain search list.
-  const prefixList = state.mode === "none" && state.input.trim() === "";
-  const plain = state.mode === "none" && !prefixList;
+  // Plain text is none mode with something typed; blank none is the all tab (recent list).
+  const plain = state.mode === "none" && state.input.trim() !== "";
   const selected = state.items[state.selected];
   const pathItem = selected?.id.startsWith("file:") ?? false;
   const revealable = selected?.actions.some((a) => a.type === "location") ?? false;
   const hints = availableModes(state.enabledSources);
-  const hasList = prefixList ? hints.length > 0 : state.items.length > 0;
-  const activeId = !hasList
-    ? undefined
-    : prefixList
-      ? hintId(state.selected)
-      : optionId(state.selected);
+  const activeId = state.items.length > 0 ? optionId(state.selected) : undefined;
 
   return (
     <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
@@ -62,11 +56,12 @@ export function LauncherView({
       <InputBar
         mode={state.mode}
         value={state.input}
-        listId={prefixList ? HINTS_ID : LISTBOX_ID}
+        listId={LISTBOX_ID}
         activeId={activeId}
         onChange={setText}
         inputRef={inputRef}
       />
+      <ModeTabs modes={hints} mode={state.mode} onSelect={selectTab} />
       {state.mode !== "query" && state.notice && (
         <p role="alert" className="launch-error">
           {state.notice}
@@ -97,8 +92,6 @@ export function LauncherView({
             onOpenSettings={() => openSettings("providers")}
             onOpenLink={openLink}
           />
-        ) : prefixList ? (
-          <PrefixHints modes={hints} selected={state.selected} onEnter={enterMode} />
         ) : (
           <Results
             items={state.items}

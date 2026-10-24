@@ -104,9 +104,9 @@ export function useDemo(onEvent: (e: TourEvent) => void) {
       [dispatch],
     ),
     toggleEffort: useCallback(() => press(shortcut("effort").keys), [press]),
-    enterMode: useCallback(
+    selectTab: useCallback(
       (mode: LaunchMode) => {
-        dispatch({ type: "enterMode", mode });
+        dispatch({ type: "tab", mode });
         inputRef.current?.focus();
       },
       [dispatch],

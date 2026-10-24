@@ -33,9 +33,25 @@ export const isProgram = (item: Item): boolean =>
   "program" in item.payload &&
   item.payload.program === true;
 
+/** True for rows `home_items` produced (payload.home === "recent"). */
+const isHome = (item: Item): boolean =>
+  typeof item.payload === "object" &&
+  item.payload !== null &&
+  "home" in item.payload &&
+  item.payload.home === "recent";
+
+/** Group label of the blank tab's recent picks; rendering prefixes it with `# `. */
+export const HOME_GROUP = "recent";
+
 /** Group label shown above a run of same-group results. */
 export const groupLabel = (item: Item): string =>
-  item.source === "ui" ? "Search instead" : isProgram(item) ? "Programs" : GROUP[item.kind];
+  item.source === "ui"
+    ? "Search instead"
+    : isHome(item)
+      ? HOME_GROUP
+      : isProgram(item)
+        ? "Programs"
+        : GROUP[item.kind];
 
 /** Human name of a kind, used as the subtitle when an item has none. */
 export const kindName = (kind: ItemKind): string => NAME[kind];
