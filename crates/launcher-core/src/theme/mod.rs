@@ -2,11 +2,13 @@
 
 pub mod color;
 pub mod derive;
+pub mod registry;
 
 use serde::{Deserialize, Serialize};
 
 pub use color::Rgb;
 pub use derive::{Ratios, Resolved, Roles, resolve};
+pub use registry::{Registry, Theme};
 
 /// Errors returned by the theme engine. Messages never carry user text.
 #[derive(thiserror::Error, Debug)]
@@ -17,6 +19,12 @@ pub enum ThemeError {
         /// Name of the seed field that failed to parse.
         field: &'static str,
     },
+    /// A theme id is empty, malformed, or already taken.
+    #[error("bad or duplicate theme id")]
+    BadId,
+    /// A theme seed list is not valid JSON for the seed schema.
+    #[error("theme JSON: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 /// Where a seed comes from.

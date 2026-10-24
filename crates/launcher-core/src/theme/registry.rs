@@ -1,0 +1,135 @@
+//! The set of known themes: two code defaults, bundled seeds, and user imports.
+
+use std::collections::HashSet;
+
+use super::{Resolved, Seed, Source, ThemeError, resolve};
+use crate::brand::{APP_DISPLAY_NAME, DEFAULT_THEME_ID, DEFAULT_THEME_LIGHT_ID};
+
+const FLICK_SEEDS: &str = include_str!("seeds/flick.json");
+const PORT_SEEDS: &str = include_str!("seeds/ports.json");
+
+/// A seed together with its derived, contrast-checked roles.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Theme {
+    /// The theme as authored.
+    pub seed: Seed,
+    /// Roles derived from the seed.
+    pub resolved: Resolved,
+}
+
+/// All themes available to the app, in display order.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Registry {
+    themes: Vec<Theme>,
+}
+
+fn default_seed(dark: bool) -> Seed {
+    let hex = |s: &str| s.to_owned();
+    let (id, suffix, c) = if dark {
+        (
+            DEFAULT_THEME_ID,
+            "",
+            [
+                "#0c0e12", "#14171d", "#e8ebf0", "#b6bbc3", "#5cc8e8", "#1d2a33", "#262b34",
+                "#1b1f27",
+            ],
+        )
+    } else {
+        (
+            DEFAULT_THEME_LIGHT_ID,
+            " Light",
+            [
+                "#f4f8fb", "#ffffff", "#0f2333", "#41545f", "#0b7699", "#d6e7ee", "#d0dee8",
+                "#e7eff5",
+            ],
+        )
+    };
+    Seed {
+        id: id.to_owned(),
+        name: format!("{APP_DISPLAY_NAME} Default{suffix}"),
+        source: Source::Builtin,
+        bg: hex(c[0]),
+        panel: hex(c[1]),
+        text: hex(c[2]),
+        muted: hex(c[3]),
+        accent: hex(c[4]),
+        sel: Some(hex(c[5])),
+        line: Some(hex(c[6])),
+        surface: Some(hex(c[7])),
+        upstream: None,
+    }
+}
+
+fn theme_of(seed: Seed) -> Result<Theme, ThemeError> {
+    let resolved = resolve(&seed)?;
+    Ok(Theme { seed, resolved })
+}
+
+impl Registry {
+    /// Only the two code defaults. Cannot fail: the seeds are constants.
+    pub fn defaults_only() -> Self {
+        let themes = [true, false]
+            .into_iter()
+            .filter_map(|dark| theme_of(default_seed(dark)).ok())
+            .collect();
+        Self { themes }
+    }
+
+    /// Code defaults plus every bundled seed. Fails when a bundled seed is invalid or repeats an id.
+    pub fn builtin() -> Result<Self, ThemeError> {
+        let mut themes = Vec::new();
+        let mut seen = HashSet::new();
+        let bundled = [FLICK_SEEDS, PORT_SEEDS]
+            .into_iter()
+            .map(serde_json::from_str::<Vec<Seed>>)
+            .collect::<Result<Vec<_>, _>>()?;
+        let seeds = [default_seed(true), default_seed(false)]
+            .into_iter()
+            .chain(bundled.into_iter().flatten());
+        for seed in seeds {
+            if !seen.insert(seed.id.clone()) {
+                return Err(ThemeError::BadId);
+            }
+            themes.push(theme_of(seed)?);
+        }
+        Ok(Self { themes })
+    }
+
+    /// Adds imported seeds, silently dropping any that fail to resolve or reuse an existing id.
+    #[must_use]
+    pub fn with_imported(mut self, seeds: Vec<Seed>) -> Self {
+        for seed in seeds {
+            if self.contains(&seed.id) {
+                continue;
+            }
+            if let Ok(theme) = theme_of(seed) {
+                self.themes.push(theme);
+            }
+        }
+        self
+    }
+
+    /// The theme with this id.
+    pub fn get(&self, id: &str) -> Option<&Theme> {
+        self.themes.iter().find(|t| t.seed.id == id)
+    }
+
+    /// Whether a theme with this id exists.
+    pub fn contains(&self, id: &str) -> bool {
+        self.get(id).is_some()
+    }
+
+    /// Every theme, in display order.
+    pub fn list(&self) -> &[Theme] {
+        &self.themes
+    }
+
+    /// The code default for the dark or light scheme.
+    pub fn default_for(&self, dark: bool) -> Option<&Theme> {
+        self.get(if dark {
+            DEFAULT_THEME_ID
+        } else {
+            DEFAULT_THEME_LIGHT_ID
+        })
+    }
+}
