@@ -14,6 +14,7 @@ import { Integrations } from "./Integrations";
 import { Nav, PAGES, type PageId } from "./Nav";
 import { Prefixes } from "./Prefixes";
 import { Providers } from "./Providers";
+import { PreviewProvider } from "./Row";
 import { errorText, type SettingsView } from "./types";
 import "./settings.css";
 
@@ -54,6 +55,7 @@ export function SettingsRoot() {
 export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageId) => void }) {
   const [settings, setSettings] = useState<SettingsView | null>(null);
   const [counts, setCounts] = useState<string | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [touring, setTouring] = useState(false);
 
@@ -68,6 +70,10 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
         .then((l) => setCounts(`${l.onCount}/${l.features.length} on`))
         .catch((e: unknown) => console.warn("list_features failed", e));
     refreshCounts();
+    api
+      .getAbout()
+      .then((a) => setVersion(a.version))
+      .catch((e: unknown) => console.warn("get_about failed", e));
     const un = api.onFeaturesChanged(refreshCounts);
     return () => {
       un.then((f) => f());
@@ -134,10 +140,12 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
 
   return (
     <div className="s-shell">
-      <Nav active={page} onSelect={onPage} featuresCount={counts} />
-      <main key={page} className="s-main">
-        {pages[page]}
-      </main>
+      <PreviewProvider resetKey={page}>
+        <Nav active={page} onSelect={onPage} featuresCount={counts} version={version} />
+        <main key={page} className="s-main">
+          {pages[page]}
+        </main>
+      </PreviewProvider>
     </div>
   );
 }
