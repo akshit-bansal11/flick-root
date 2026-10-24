@@ -1,5 +1,6 @@
 //! General settings, history, reindex, about and window sizing commands.
 use super::blocking;
+use super::themes::{ActiveTheme, active_theme};
 use crate::autostart;
 use crate::error::CommandError;
 use crate::hotkey;
@@ -7,6 +8,7 @@ use crate::state::{self, AppState};
 use launcher_core::brand::APP_NAME;
 use launcher_core::config::validate_skip;
 use launcher_core::store::ClearScope;
+use launcher_core::theme::Registry as ThemeRegistry;
 use serde::Serialize;
 use std::path::Path;
 use std::sync::Arc;
@@ -155,25 +157,47 @@ pub async fn get_settings(
     view(&app, &state).await
 }
 
-/// Theme, glass strength and scheme, as the UI applies them.
+/// Theme, glass strength, scheme and the active theme's colours, as the UI applies them.
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppearanceView {
-    /// Theme id.
+    /// Legacy theme id.
     pub theme: String,
     /// Tint opacity, percent.
     pub glass: u8,
     /// `system`, `dark` or `light`.
     pub scheme: String,
+    /// Theme id used in the dark scheme.
+    pub dark_theme: String,
+    /// Theme id used in the light scheme.
+    pub light_theme: String,
+    /// The theme in force right now; `None` only if the registry lost its defaults.
+    pub active: Option<ActiveTheme>,
 }
 
-impl From<&launcher_core::config::Appearance> for AppearanceView {
-    fn from(a: &launcher_core::config::Appearance) -> Self {
+impl AppearanceView {
+    /// The view of the live config; `active` follows the configured scheme ("system" asks Windows).
+    pub fn of(state: &AppState) -> Self {
+        let cfg = state.config.load();
+        let a = &cfg.appearance;
         Self {
             theme: a.theme.clone(),
             glass: a.glass,
             scheme: a.scheme.clone(),
+            dark_theme: a.dark_id().to_owned(),
+            light_theme: a.light_id().to_owned(),
+            active: active_theme(state),
         }
     }
+}
+
+/// Checks that the dark slot holds a dark theme and the light slot a light one, both known.
+fn check_themes(
+    a: &launcher_core::config::Appearance,
+    registry: &ThemeRegistry,
+) -> Result<(), CommandError> {
+    a.validate_themes(&|id| registry.get(id).map(|t| t.resolved.dark))
+        .map_err(|m| CommandError::new("invalid_appearance", m))
 }
 
 /// Returns the appearance settings.
@@ -181,10 +205,10 @@ impl From<&launcher_core::config::Appearance> for AppearanceView {
 pub async fn get_appearance(
     state: State<'_, Arc<AppState>>,
 ) -> Result<AppearanceView, CommandError> {
-    Ok(AppearanceView::from(&state.config.load().appearance))
+    Ok(AppearanceView::of(&state))
 }
 
-/// Changes any of theme, glass and scheme after validating the result.
+/// Changes any of theme, glass, scheme and the two theme slots after validating the result.
 #[tauri::command]
 pub async fn set_appearance(
     app: AppHandle,
@@ -192,9 +216,11 @@ pub async fn set_appearance(
     theme: Option<String>,
     glass: Option<u8>,
     scheme: Option<String>,
+    dark_theme: Option<String>,
+    light_theme: Option<String>,
 ) -> Result<AppearanceView, CommandError> {
     let s = Arc::clone(&state);
-    let next = blocking(move || {
+    blocking(move || {
         s.update_config(|c| {
             let mut next = c.appearance.clone();
             // Only the stored value is clamped; an explicit glass below is still validated.
@@ -208,16 +234,23 @@ pub async fn set_appearance(
             if let Some(sc) = scheme {
                 next.scheme = sc;
             }
+            if let Some(t) = dark_theme {
+                next.dark_theme = Some(t);
+            }
+            if let Some(t) = light_theme {
+                next.light_theme = Some(t);
+            }
             next.validate()
                 .map_err(|m| CommandError::new("invalid_appearance", m))?;
-            c.appearance = next.clone();
-            Ok(next)
+            check_themes(&next, &s.themes.load())?;
+            c.appearance = next;
+            Ok(())
         })
     })
     .await?;
     changed(&app, "appearance");
     crate::tray::sync_settings_theme(&app);
-    Ok(AppearanceView::from(&next))
+    Ok(AppearanceView::of(&state))
 }
 
 /// Changes general settings; a hotkey conflict keeps the old hotkey.
@@ -511,5 +544,57 @@ mod tests {
     fn scopes() {
         assert!(scope_of("all").is_ok());
         assert_eq!(scope_of("x").unwrap_err().code, "invalid_scope");
+    }
+
+    fn slots(dark: Option<&str>, light: Option<&str>) -> launcher_core::config::Appearance {
+        launcher_core::config::Appearance {
+            dark_theme: dark.map(str::to_owned),
+            light_theme: light.map(str::to_owned),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn check_themes_accepts_defaults_and_valid_slots() {
+        let reg = ThemeRegistry::builtin().expect("builtin registry");
+        assert!(check_themes(&slots(None, None), &reg).is_ok());
+        assert!(check_themes(&slots(Some("midnight"), Some("frost")), &reg).is_ok());
+    }
+
+    #[test]
+    fn check_themes_rejects_wrong_scheme_or_unknown_slot() {
+        let reg = ThemeRegistry::builtin().expect("builtin registry");
+        for a in [
+            slots(Some("frost"), None),
+            slots(None, Some("midnight")),
+            slots(Some("no-such-theme"), None),
+            slots(None, Some("no-such-theme")),
+        ] {
+            assert_eq!(
+                check_themes(&a, &reg).unwrap_err().code,
+                "invalid_appearance"
+            );
+        }
+    }
+
+    #[test]
+    fn appearance_view_serializes_camel_case_with_active_roles() {
+        let reg = ThemeRegistry::builtin().expect("builtin registry");
+        // `AppearanceView::of` needs a full AppState; its `active` comes from active_theme_in.
+        let view = AppearanceView {
+            theme: "glass".into(),
+            glass: 90,
+            scheme: "dark".into(),
+            dark_theme: "midnight".into(),
+            light_theme: "frost".into(),
+            active: super::super::themes::active_theme_in(&reg, true, "midnight", "frost"),
+        };
+        let v = serde_json::to_value(&view).expect("serialize");
+        assert_eq!(v["darkTheme"], "midnight");
+        assert_eq!(v["lightTheme"], "frost");
+        assert_eq!(v["active"]["id"], "midnight");
+        assert_eq!(v["active"]["dark"], true);
+        assert!(v["active"]["roles"]["accentText"].is_string());
+        assert!(v["active"]["roles"]["onAccent"].is_string());
     }
 }

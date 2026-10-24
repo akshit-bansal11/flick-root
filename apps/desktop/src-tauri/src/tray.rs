@@ -80,7 +80,16 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
             crate::hotkey::set_paused(&handle, false);
         }
         // The OS resets the caption on a system theme change; put Flick's scheme back.
-        tauri::WindowEvent::ThemeChanged(_) => sync_settings_theme(&handle),
+        // Settings also re-resolves a "system" scheme.
+        tauri::WindowEvent::ThemeChanged(_) => {
+            sync_settings_theme(&handle);
+            if let Err(err) = handle.emit(
+                "settings://changed",
+                serde_json::json!({ "section": "appearance" }),
+            ) {
+                tracing::warn!(%err, "emit failed");
+            }
+        }
         _ => {}
     });
     Ok(())

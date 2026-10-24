@@ -221,7 +221,9 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     let shown_id = s.shown_id;
     drop(s);
     let config = config(app);
-    let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
+    let appearance = crate::commands::settings::AppearanceView::of(
+        &app.state::<std::sync::Arc<crate::state::AppState>>(),
+    );
     let running = app
         .state::<std::sync::Arc<crate::state::AppState>>()
         .registry
@@ -310,7 +312,9 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
     resume(&win);
     sync_frame(app, &win);
     let config = config(app);
-    let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
+    let appearance = crate::commands::settings::AppearanceView::of(
+        &app.state::<std::sync::Arc<crate::state::AppState>>(),
+    );
     let update = crate::update::available(app).map(|version| json!({ "version": version }));
     emit(
         app,
