@@ -8,6 +8,7 @@ pub mod matcher;
 pub mod ranking;
 pub mod redact;
 pub mod store;
+pub mod theme;
 pub mod types;
 
 pub use config::Config;
