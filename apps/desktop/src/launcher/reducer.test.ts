@@ -870,9 +870,7 @@ describe("explain attachment", () => {
   });
 
   it("switching mode clears it", () => {
-    expect(
-      reduce(captured(att()), { type: "tab", mode: "find" }).state.attachment,
-    ).toBeNull();
+    expect(reduce(captured(att()), { type: "tab", mode: "find" }).state.attachment).toBeNull();
   });
 });
 
