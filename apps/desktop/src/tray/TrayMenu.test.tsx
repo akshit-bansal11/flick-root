@@ -27,7 +27,7 @@ describe("TrayMenu", () => {
     setup();
     expect(screen.getByText("v0.0.1")).toBeTruthy();
     const open = screen.getByRole("menuitem", { name: /^Open/ });
-    expect([...open.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Alt", "Space"]);
+    expect([...open.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["alt+space"]);
   });
 
   it("names each menuitem by its label only and exposes the chord as aria-keyshortcuts", () => {

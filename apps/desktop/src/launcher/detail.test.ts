@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { keyWords } from "../shortcuts";
 import type { ActionKind, Item, ItemKind } from "../types";
-import { detailOf, keyWords } from "./detail";
+import { detailOf } from "./detail";
 
 const make = (kind: ItemKind, o: Partial<Item> = {}): Item => ({
   id: `${kind}:x`,

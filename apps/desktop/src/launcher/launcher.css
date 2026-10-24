@@ -517,8 +517,6 @@ body,
 }
 
 .sheet-row dd {
-  display: flex;
-  gap: var(--l-sp-1);
   margin: 0;
 }
 

@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: var(--l-sp-3);
   padding: var(--l-sp-5) var(--l-sp-8);
-  border-top: var(--l-border-hair);
+  border-top: 1px solid var(--l-line);
 }
 
 .attach-head {
@@ -20,9 +20,8 @@
   gap: var(--l-sp-3);
   font: inherit;
   background: none;
-  border: 0;
-  box-shadow: inset 0 0 0 1px var(--l-hairline);
-  border-radius: var(--l-r-pill);
+  border: 1px solid var(--l-line);
+  border-radius: var(--l-r-control);
   color: var(--l-muted);
   padding: var(--l-sp-1) var(--l-sp-5);
   cursor: pointer;
@@ -47,7 +46,7 @@
 .attach-notice {
   margin: 0;
   padding: var(--l-sp-5) var(--l-sp-8);
-  border-top: var(--l-border-hair);
+  border-top: 1px solid var(--l-line);
   font-size: var(--l-fs-caption);
   color: var(--l-muted);
 }

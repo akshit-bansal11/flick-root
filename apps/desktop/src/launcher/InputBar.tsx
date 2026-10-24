@@ -1,5 +1,5 @@
 import type { Ref } from "react";
-import { caps } from "../shortcuts";
+import { keyWords, shortcut } from "../shortcuts";
 import type { LaunchMode } from "../types";
 import { MODES } from "./reducer";
 
@@ -8,7 +8,7 @@ const NONE_PLACEHOLDER = `Search apps and commands, or type ${Object.values(MODE
   .join(" ")}`;
 
 /** A shortcut as the bar shows it in words: `ctrl+,`. */
-const chord = (id: string) => caps(id).join("+").toLowerCase();
+const chord = (id: string) => keyWords(shortcut(id).keys);
 
 interface Props {
   mode: LaunchMode;

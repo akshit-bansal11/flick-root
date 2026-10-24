@@ -293,15 +293,20 @@ export function idFor(mode: LaunchMode | "settings", k: KeyInput): string | unde
   return undefined;
 }
 
-const CAP_NAMES: Record<string, string> = { Enter: "↵", Backspace: "⌫", Up: "↑", Down: "↓" };
+const CAP_NAMES: Record<string, string> = {
+  Enter: "enter",
+  Backspace: "backspace",
+  Up: "up",
+  Down: "down",
+};
 
-/** Key caps of a chord, ready for <kbd>: ["Ctrl", "Shift", "↵"]. */
+/** Key caps of a chord, ready for <kbd>: ["Ctrl", "Shift", "enter"]. */
 export const capsOf = (chord: string): string[] => chord.split("+").map((p) => CAP_NAMES[p] ?? p);
 
 /** Caps of a shortcut by id. */
 export const caps = (id: string): string[] => capsOf(shortcut(id).keys);
 
-/** Caps as one string, "Ctrl Shift ↵". */
+/** Caps as one string, "Ctrl Shift enter". */
 export const capsText = (id: string): string => caps(id).join(" ");
 
 export const SCOPE_LABEL: Record<Scope, string> = {
@@ -331,3 +336,6 @@ const SCOPE_ORDER: Scope[] = [
 /** The table grouped by scope, for the sheet. */
 export const groups = (): { scope: Scope; label: string; items: Shortcut[] }[] =>
   SCOPE_ORDER.map((scope) => ({ scope, label: SCOPE_LABEL[scope], items: inScope(scope) }));
+
+/** A chord as words, lower case: "Ctrl+Shift+Enter" becomes "ctrl+shift+enter". */
+export const keyWords = (chord: string): string => chord.toLowerCase();

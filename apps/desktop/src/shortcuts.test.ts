@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  capsOf,
   chordOf,
   groups,
   idFor,
   inScope,
   isReserved,
+  keyWords,
   matches,
   parseChord,
   RESERVED,
@@ -144,6 +146,29 @@ describe("mode tab cycling", () => {
   it("keeps Settings page cycling on the same chords", () => {
     expect(idFor("settings", key("Tab", { ctrl: true }))).toBe("pageNext");
     expect(idFor("settings", key("Tab", { ctrl: true, shift: true }))).toBe("pagePrev");
+  });
+});
+
+describe("keyWords and capsOf", () => {
+  it("writes chords as lower-case words", () => {
+    expect(keyWords("Ctrl+Shift+Enter")).toBe("ctrl+shift+enter");
+    expect(keyWords("Shift+Tab")).toBe("shift+tab");
+    expect(keyWords("Alt+Space")).toBe("alt+space");
+    expect(keyWords("Esc")).toBe("esc");
+    expect(keyWords("F1")).toBe("f1");
+    expect(keyWords("Ctrl+,")).toBe("ctrl+,");
+  });
+
+  it("names Enter, Backspace, Up and Down as words, not glyphs", () => {
+    expect(capsOf("Enter")).toEqual(["enter"]);
+    expect(capsOf("Backspace")).toEqual(["backspace"]);
+    expect(capsOf("Up")).toEqual(["up"]);
+    expect(capsOf("Down")).toEqual(["down"]);
+    expect(capsOf("Ctrl+Shift+Enter")).toEqual(["Ctrl", "Shift", "enter"]);
+  });
+
+  it("joins caps into the same words as the chord", () => {
+    expect(keyWords(capsOf("Ctrl+Backspace").join("+"))).toBe("ctrl+backspace");
   });
 });
 

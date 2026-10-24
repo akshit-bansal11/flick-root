@@ -21,6 +21,14 @@ describe("ShortcutSheet", () => {
     );
   });
 
+  it("shows a chord as words in a single kbd", () => {
+    const { container } = render(<ShortcutSheet />);
+    const texts = [...container.querySelectorAll("kbd")].map((k) => k.textContent);
+    expect(texts).toContain("ctrl+shift+enter");
+    expect(texts.every((t) => t === t?.toLowerCase())).toBe(true);
+    expect(container.querySelectorAll("kbd kbd").length).toBe(0);
+  });
+
   it("never lists the tour scope", () => {
     render(<ShortcutSheet />);
     expect(screen.queryByText("Tour")).toBeNull();

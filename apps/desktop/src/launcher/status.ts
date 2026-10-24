@@ -1,6 +1,5 @@
-import { type Condition, inScope } from "../shortcuts";
+import { type Condition, inScope, keyWords } from "../shortcuts";
 import type { Item, ItemKind, LaunchMode } from "../types";
-import { keyWords } from "./detail";
 
 export interface KindCount {
   kind: ItemKind;

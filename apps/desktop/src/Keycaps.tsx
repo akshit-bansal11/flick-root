@@ -1,4 +1,5 @@
 import "./keycaps.css";
+import { keyWords } from "./shortcuts";
 
 interface Props {
   caps: string[];
@@ -6,15 +7,11 @@ interface Props {
   decorative?: boolean;
 }
 
-/** One glass keycap per key of a chord. */
+/** A chord written as words, `ctrl+shift+enter`. */
 export function Keycaps({ caps, decorative }: Props) {
   return (
-    <span className="keys" aria-hidden={decorative || undefined}>
-      {caps.map((c) => (
-        <kbd key={c} className="key">
-          {c}
-        </kbd>
-      ))}
-    </span>
+    <kbd className="key" aria-hidden={decorative || undefined}>
+      {keyWords(caps.join("+"))}
+    </kbd>
   );
 }

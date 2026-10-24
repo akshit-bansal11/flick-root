@@ -1,4 +1,4 @@
-import { type Condition, shortcut } from "../shortcuts";
+import { type Condition, keyWords, shortcut } from "../shortcuts";
 import type { ActionKind, Item } from "../types";
 import { isProgram } from "./kinds";
 
@@ -24,9 +24,6 @@ export interface Detail {
   facts: DetailFact[];
   actions: DetailAction[];
 }
-
-/** A chord as words, lower case: "Ctrl+Shift+Enter" becomes "ctrl+shift+enter". */
-export const keyWords = (chord: string): string => chord.toLowerCase();
 
 const shortcutKeys = (id: string): string => keyWords(shortcut(id).keys);
 
