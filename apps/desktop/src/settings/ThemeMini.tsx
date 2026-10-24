@@ -23,7 +23,8 @@ export function ThemeMini({ roles }: { roles: ThemeRoles }) {
   return (
     <div className="tm" style={themeVars(roles)} aria-hidden="true">
       <div className="tm-in">
-        <b>/</b>code<span className="tm-caret" />
+        <b>/</b>code
+        <span className="tm-caret" />
       </div>
       <div className="tm-tabs">
         <span>/open</span>
