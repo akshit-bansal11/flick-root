@@ -20,16 +20,6 @@ body,
   color: var(--l-text);
   font: var(--l-fs-body) / var(--l-lh-body) var(--l-ui);
 }
-/* Mica window (?mica=1): the page stays clear so the OS backdrop shows under the tint. */
-[data-backdrop="mica"],
-[data-backdrop="mica"] body,
-[data-backdrop="mica"] #root {
-  background: transparent;
-}
-[data-backdrop="mica"] .s-shell {
-  background: var(--l-mica-tint);
-}
-
 /* Floating raised-glass sidebar. */
 .s-nav {
   display: flex;

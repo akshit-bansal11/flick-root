@@ -1,29 +1,20 @@
-//! Desktop Window Manager helpers: rounded corners, acrylic and Mica backdrops and the system theme settings.
+//! Desktop Window Manager helpers: rounded corners, the caption guard, the dark frame and the system theme setting.
 
 use crate::error::WinError;
 use std::ffi::c_void;
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Dwm::{
-    DWM_SYSTEMBACKDROP_TYPE, DWM_WINDOW_CORNER_PREFERENCE, DWMSBT_MAINWINDOW, DWMSBT_NONE,
-    DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
-    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmExtendFrameIntoClientArea,
-    DwmSetWindowAttribute,
+    DWM_WINDOW_CORNER_PREFERENCE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
+    DWMWCP_ROUND, DwmSetWindowAttribute,
 };
-use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
-use windows::Win32::System::Registry::{
-    HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ, RegGetValueW,
-};
-use windows::Win32::UI::Controls::MARGINS;
+use windows::Win32::System::Registry::{HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RegGetValueW};
 use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
 use windows::Win32::UI::WindowsAndMessaging::{
     GWL_STYLE, GetWindowLongPtrW, STYLESTRUCT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
     SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, WM_NCDESTROY, WM_STYLECHANGING,
     WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SYSMENU,
 };
-use windows::core::{PCWSTR, s, w};
-
-/// First Windows 11 build that understands `DWMWA_SYSTEMBACKDROP_TYPE`.
-const BACKDROP_MIN_BUILD: u32 = 22621;
+use windows::core::{PCWSTR, w};
 
 /// Asks DWM to round the corners of the window `hwnd` (Windows 11; older systems return an error).
 pub fn round_corners(hwnd: isize) -> Result<(), WinError> {
@@ -45,8 +36,7 @@ fn stripped_style(style: u32) -> u32 {
     style & !(WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0)
 }
 
-/// Removes the caption buttons DWM draws once the frame is extended into the client area.
-/// Call before `set_acrylic`.
+/// Removes the caption buttons and system menu bits from the window style.
 pub fn strip_caption(hwnd: isize) -> Result<(), WinError> {
     let h = HWND(hwnd as *mut c_void);
     // SAFETY: plain style get/set on a window handle; a stale hwnd makes the calls fail, not misbehave.
@@ -106,11 +96,6 @@ pub fn keep_caption_off(hwnd: isize) -> Result<(), WinError> {
     strip_caption(hwnd)
 }
 
-/// Whether the user allows transparency effects (Settings > Personalization > Colors). Missing value means yes.
-pub fn transparency_enabled() -> bool {
-    from_registry(personalize_dword(w!("EnableTransparency")))
-}
-
 /// Whether apps should be dark under the system setting (`AppsUseLightTheme`); missing means dark.
 pub fn system_prefers_dark() -> bool {
     personalize_dword(w!("AppsUseLightTheme")).is_none_or(|v| v == 0)
@@ -135,82 +120,7 @@ fn personalize_dword(name: PCWSTR) -> Option<u32> {
     rc.is_ok().then_some(data)
 }
 
-fn from_registry(value: Option<u32>) -> bool {
-    value != Some(0)
-}
-
-/// The Windows build number, or 0 when it cannot be read.
-fn build_number() -> u32 {
-    let mut buf = [0u16; 16];
-    let mut len = size_of_val(&buf) as u32;
-    // SAFETY: `buf` and `len` outlive the call and `len` is the byte size of `buf`.
-    let rc = unsafe {
-        RegGetValueW(
-            HKEY_LOCAL_MACHINE,
-            w!(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"),
-            w!("CurrentBuildNumber"),
-            RRF_RT_REG_SZ,
-            None,
-            Some(buf.as_mut_ptr().cast()),
-            Some(&raw mut len),
-        )
-    };
-    if rc.is_err() {
-        return 0;
-    }
-    let n = (len as usize / 2).min(buf.len());
-    parse_build(&String::from_utf16_lossy(&buf[..n]))
-}
-
-fn parse_build(s: &str) -> u32 {
-    s.trim_end_matches('\0').trim().parse().unwrap_or(0)
-}
-
-/// Whether DWM system backdrops exist on this build.
-fn has_backdrop(build: u32) -> bool {
-    build >= BACKDROP_MIN_BUILD
-}
-
-/// Whether DWM system backdrops (Mica, acrylic) exist on this Windows build (22621 or later).
-pub fn has_system_backdrop() -> bool {
-    has_backdrop(build_number())
-}
-
-/// `(frame margin, backdrop type)` for a backdrop on or off. -1 extends the frame over the whole client area.
-fn backdrop_values(on: bool, kind: DWM_SYSTEMBACKDROP_TYPE) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
-    if on { (-1, kind) } else { (0, DWMSBT_NONE) }
-}
-
-/// `(frame margin, backdrop type)` for glass on or off.
-fn glass_values(on: bool) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
-    backdrop_values(on, DWMSBT_TRANSIENTWINDOW)
-}
-
-/// `(frame margin, backdrop type)` for Mica on or off.
-fn mica_values(on: bool) -> (i32, DWM_SYSTEMBACKDROP_TYPE) {
-    backdrop_values(on, DWMSBT_MAINWINDOW)
-}
-
-/// Turns the acrylic backdrop of `hwnd` on or off; `dark` picks the dark tint.
-/// Builds before 22621 use the undocumented accent-policy blur instead.
-pub fn set_acrylic(hwnd: isize, on: bool, dark: bool) -> Result<(), WinError> {
-    let h = HWND(hwnd as *mut c_void);
-    if !has_backdrop(build_number()) {
-        return accent_blur(h, on);
-    }
-    apply_backdrop(h, glass_values(on), dark)
-}
-
-/// Turns the Mica backdrop of `hwnd` on or off; `dark` picks the dark Mica and caption.
-/// Builds before 22621 have no Mica: the call fails with `Unavailable` and changes nothing.
-pub fn set_mica(hwnd: isize, on: bool, dark: bool) -> Result<(), WinError> {
-    if !has_system_backdrop() {
-        return Err(WinError::Unavailable("Mica needs build 22621".into()));
-    }
-    apply_backdrop(HWND(hwnd as *mut c_void), mica_values(on), dark)
-}
-
-/// Switches the native frame of `hwnd` (caption, Mica) between dark and light.
+/// Switches the native frame of `hwnd` (caption, border) between dark and light.
 pub fn set_dark_frame(hwnd: isize, dark: bool) -> Result<(), WinError> {
     dark_mode(HWND(hwnd as *mut c_void), dark)
 }
@@ -229,106 +139,9 @@ fn dark_mode(h: HWND, dark: bool) -> Result<(), WinError> {
     .map_err(|e| WinError::os(e, "DwmSetWindowAttribute(dark)"))
 }
 
-/// Extends the frame by `m`, sets the dark mode, then the backdrop `kind`.
-fn apply_backdrop(
-    h: HWND,
-    (m, kind): (i32, DWM_SYSTEMBACKDROP_TYPE),
-    dark: bool,
-) -> Result<(), WinError> {
-    let margins = MARGINS {
-        cxLeftWidth: m,
-        cxRightWidth: m,
-        cyTopHeight: m,
-        cyBottomHeight: m,
-    };
-    // SAFETY: `margins` is a live MARGINS; DWM rejects a stale hwnd with an error.
-    unsafe { DwmExtendFrameIntoClientArea(h, &raw const margins) }
-        .map_err(|e| WinError::os(e, "DwmExtendFrameIntoClientArea"))?;
-    dark_mode(h, dark)?;
-    // SAFETY: `kind` is a live 4-byte enum value and the size passed matches it.
-    unsafe {
-        DwmSetWindowAttribute(
-            h,
-            DWMWA_SYSTEMBACKDROP_TYPE,
-            (&raw const kind).cast(),
-            size_of::<DWM_SYSTEMBACKDROP_TYPE>() as u32,
-        )
-    }
-    .map_err(|e| WinError::os(e, "DwmSetWindowAttribute(backdrop)"))
-}
-
-/// Mirror of the undocumented `ACCENT_POLICY`.
-#[repr(C)]
-struct AccentPolicy {
-    state: u32,
-    flags: u32,
-    gradient_color: u32,
-    animation_id: u32,
-}
-
-/// Mirror of the undocumented `WINDOWCOMPOSITIONATTRIBDATA`.
-#[repr(C)]
-struct CompositionAttrib {
-    attrib: u32,
-    data: *mut c_void,
-    size: usize,
-}
-
-type SetWca = unsafe extern "system" fn(HWND, *mut CompositionAttrib) -> i32;
-
-/// Pre-22621 fallback: `SetWindowCompositionAttribute` is not in the SDK, so it is looked up in
-/// user32 at runtime. Values: WCA_ACCENT_POLICY = 19, ACCENT_DISABLED = 0, ACCENT_ENABLE_ACRYLICBLURBEHIND = 4.
-fn accent_blur(h: HWND, on: bool) -> Result<(), WinError> {
-    const WCA_ACCENT_POLICY: u32 = 19;
-    // SAFETY: plain lookups in user32, which is loaded in every GUI process.
-    let f = unsafe {
-        let user32 =
-            GetModuleHandleW(w!("user32.dll")).map_err(|e| WinError::os(e, "GetModuleHandleW"))?;
-        GetProcAddress(user32, s!("SetWindowCompositionAttribute"))
-            .ok_or_else(|| WinError::Unavailable("SetWindowCompositionAttribute".into()))?
-    };
-    // SAFETY: the export has exactly this signature on every Windows build that has it.
-    let f: SetWca = unsafe { std::mem::transmute(f) };
-    let mut policy = AccentPolicy {
-        state: if on { 4 } else { 0 },
-        flags: 0,
-        // ABGR; near-zero alpha so the CSS tint decides the colour.
-        gradient_color: 0x0100_0000,
-        animation_id: 0,
-    };
-    let mut data = CompositionAttrib {
-        attrib: WCA_ACCENT_POLICY,
-        data: (&raw mut policy).cast(),
-        size: size_of::<AccentPolicy>(),
-    };
-    // SAFETY: `data` points at `policy`, both live for the call, and `size` matches `policy`.
-    if unsafe { f(h, &raw mut data) } == 0 {
-        return Err(WinError::Unavailable(
-            "SetWindowCompositionAttribute failed".into(),
-        ));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn missing_means_enabled() {
-        assert!(from_registry(None));
-        assert!(from_registry(Some(1)));
-        assert!(!from_registry(Some(0)));
-    }
-
-    #[test]
-    fn build_gate_and_parse() {
-        assert!(!has_backdrop(19045));
-        assert!(has_backdrop(22621));
-        assert!(has_backdrop(26200));
-        assert_eq!(parse_build("26200\0"), 26200);
-        assert_eq!(parse_build("x"), 0);
-    }
 
     #[test]
     fn strip_clears_caption_bits_only() {
@@ -336,17 +149,5 @@ mod tests {
         let all = keep | WS_CAPTION.0 | WS_SYSMENU.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0;
         assert_eq!(stripped_style(all), keep);
         assert_eq!(stripped_style(keep), keep);
-    }
-
-    #[test]
-    fn glass_values_select() {
-        assert_eq!(glass_values(true), (-1, DWMSBT_TRANSIENTWINDOW));
-        assert_eq!(glass_values(false), (0, DWMSBT_NONE));
-    }
-
-    #[test]
-    fn mica_values_select() {
-        assert_eq!(mica_values(true), (-1, DWMSBT_MAINWINDOW));
-        assert_eq!(mica_values(false), (0, DWMSBT_NONE));
     }
 }

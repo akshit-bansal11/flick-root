@@ -19,7 +19,7 @@ pub fn show_launcher(app: &AppHandle, reason: &str) {
     }
 }
 
-/// Builds the tray icon: left click shows the launcher, right click opens the glass menu
+/// Builds the tray icon: left click shows the launcher, right click opens the menu
 /// (rendered by the launcher window, see `window::show_menu`).
 pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
     crate::update::init(app);
@@ -60,22 +60,19 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
         )?;
         return Ok(());
     }
-    let mica = mica_wanted();
-    let query = if mica { "?mica=1" } else { "" };
     let url = match section {
-        Some(s) => format!("settings.html{query}#{s}"),
-        None => format!("settings.html{query}"),
+        Some(s) => format!("settings.html#{s}"),
+        None => "settings.html".to_owned(),
     };
     let win = WebviewWindowBuilder::new(app, SETTINGS_LABEL, WebviewUrl::App(url.into()))
         .title(format!("{} Settings", app.package_info().name))
         .inner_size(960.0, 640.0)
         .min_inner_size(760.0, 520.0)
         .decorations(true)
-        .transparent(mica)
         .visible(true)
         .center()
         .build()?;
-    apply_frame(app, &win, mica);
+    sync_settings_theme(app);
     // Hotkeys always come back when Settings goes away, even if the tour did not unmount cleanly.
     let handle = app.clone();
     win.on_window_event(move |event| match event {
@@ -89,41 +86,7 @@ pub fn open_settings_window(app: &AppHandle, section: Option<&str>) -> anyhow::R
     Ok(())
 }
 
-/// Mica needs Windows build 22621 and transparency effects on; otherwise Settings is opaque.
-#[cfg(windows)]
-fn mica_wanted() -> bool {
-    win::dwm::has_system_backdrop() && win::dwm::transparency_enabled()
-}
-
-/// No Mica outside Windows.
-#[cfg(not(windows))]
-fn mica_wanted() -> bool {
-    false
-}
-
-/// Puts Mica (when `mica`) and Flick's dark/light scheme on the native frame of Settings.
-fn apply_frame(app: &AppHandle, win: &tauri::WebviewWindow, mica: bool) {
-    #[cfg(windows)]
-    {
-        let dark = settings_dark(app);
-        let res = win.hwnd().map_err(anyhow::Error::from).and_then(|h| {
-            let h = h.0 as isize;
-            let r = if mica {
-                win::dwm::set_mica(h, true, dark)
-            } else {
-                win::dwm::set_dark_frame(h, dark)
-            };
-            r.map_err(anyhow::Error::from)
-        });
-        if let Err(err) = res {
-            tracing::warn!(%err, "settings frame");
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = (app, win, mica);
-}
-
-/// Re-applies Flick's scheme to the Settings caption and Mica, when the window exists.
+/// Puts Flick's dark/light scheme on the native Settings caption, when the window exists.
 pub fn sync_settings_theme(app: &AppHandle) {
     #[cfg(windows)]
     if let Some(win) = app.get_webview_window(SETTINGS_LABEL) {

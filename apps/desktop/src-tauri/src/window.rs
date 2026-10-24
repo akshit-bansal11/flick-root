@@ -89,9 +89,7 @@ struct Inner {
     t0: Option<Instant>,
     /// Last logical window height set by the UI.
     height: Option<f64>,
-    /// Whether the acrylic effect is currently applied.
-    glass: bool,
-    /// Dark flag last given to the backdrop.
+    /// Dark flag last given to the native frame (its Windows 11 border follows it).
     dark: bool,
     /// Whether the window currently shows the tray menu instead of the launcher.
     menu: bool,
@@ -115,7 +113,7 @@ pub fn setup(app: &tauri::App) -> anyhow::Result<()> {
         }
         Err(err) => tracing::warn!(%err, "no window handle"),
     }
-    sync_glass(app.handle(), &win);
+    sync_frame(app.handle(), &win);
     let handle = app.handle().clone();
     let w = win.clone();
     win.on_window_event(move |event| match event {
@@ -213,7 +211,7 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
     // Spawned; nothing on the show path waits for the refresh.
     crate::state::on_open(app);
     strip_caption(win);
-    let glass = sync_glass(app, win);
+    sync_frame(app, win);
     let state: State<ShowState> = app.state();
     let Ok(mut s) = state.inner.lock() else {
         return;
@@ -239,7 +237,6 @@ fn show_window(app: &AppHandle, win: &WebviewWindow, reason: &str, t0: Instant) 
         json!({
             "shownId": shown_id,
             "reason": reason,
-            "glass": glass,
             "appearance": appearance,
             "sources": sources,
             "webTitle": web_title,
@@ -311,7 +308,7 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
     }
     // Resume first so the page receives the event before the window appears.
     resume(&win);
-    let glass = sync_glass(app, &win);
+    sync_frame(app, &win);
     let config = config(app);
     let appearance = crate::commands::settings::AppearanceView::from(&config.appearance);
     let update = crate::update::available(app).map(|version| json!({ "version": version }));
@@ -322,7 +319,6 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
             "appVersion": env!("CARGO_PKG_VERSION"),
             "hotkey": config.general.hotkey,
             "update": update,
-            "glass": glass,
             "appearance": appearance,
         }),
     );
@@ -360,13 +356,9 @@ fn live_sources(cfg: &launcher_core::Config, running: &[&'static str]) -> Vec<St
     v
 }
 
-/// Applies or removes the acrylic effect to match the Windows transparency setting;
-/// returns whether glass is on.
-fn sync_glass(app: &AppHandle, win: &WebviewWindow) -> bool {
-    #[cfg(windows)]
-    let want = win::dwm::transparency_enabled();
-    #[cfg(not(windows))]
-    let want = false;
+/// Puts the configured dark/light scheme on the native frame (the Windows 11 border colour
+/// follows it); skipped while the scheme is unchanged.
+fn sync_frame(app: &AppHandle, win: &WebviewWindow) {
     let scheme = app
         .try_state::<std::sync::Arc<crate::state::AppState>>()
         .map(|st| st.config.load().appearance.scheme.clone())
@@ -374,24 +366,20 @@ fn sync_glass(app: &AppHandle, win: &WebviewWindow) -> bool {
     let dark = crate::commands::themes::scheme_is_dark(&scheme);
     let state: State<ShowState> = app.state();
     let Ok(mut s) = state.inner.lock() else {
-        return false;
+        return;
     };
-    if s.glass != want || s.dark != dark {
+    if s.dark != dark {
         #[cfg(windows)]
         match win.hwnd() {
-            Ok(h) => match win::dwm::set_acrylic(h.0 as isize, want, dark) {
-                Ok(()) => {
-                    s.glass = want;
-                    s.dark = dark;
-                }
-                Err(err) => tracing::warn!(%err, "acrylic failed"),
+            Ok(h) => match win::dwm::set_dark_frame(h.0 as isize, dark) {
+                Ok(()) => s.dark = dark,
+                Err(err) => tracing::warn!(%err, "dark frame failed"),
             },
             Err(err) => tracing::warn!(%err, "no window handle"),
         }
         #[cfg(not(windows))]
         let _ = win;
     }
-    s.glass
 }
 
 /// Sizes the window to the panel and centres it on the monitor under the cursor.
