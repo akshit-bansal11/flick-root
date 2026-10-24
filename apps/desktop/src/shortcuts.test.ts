@@ -51,6 +51,17 @@ describe("shortcut table", () => {
     expect(isReserved("Ctrl+Tab", "settings")).toBe(false);
   });
 
+  it("lets the launcher own Ctrl+Tab and Ctrl+Shift+Tab, and nothing else reserved", () => {
+    expect(isReserved("Ctrl+Tab", "launcher")).toBe(false);
+    expect(isReserved("Ctrl+Shift+Tab", "launcher")).toBe(false);
+    expect(isReserved("Ctrl+Tab")).toBe(true);
+    expect(isReserved("Ctrl+Shift+Tab")).toBe(true);
+    expect(isReserved("Ctrl+W", "launcher")).toBe(true);
+    expect(isReserved("Ctrl+W", "settings")).toBe(false);
+    expect(isReserved("Ctrl+Tab", "settings")).toBe(false);
+    expect(isReserved("Ctrl+Shift+Tab", "settings")).toBe(false);
+  });
+
   it("reads Ctrl+digit and Ctrl+/ from the physical key (AZERTY)", () => {
     expect(chordOf(key("&", { ctrl: true, code: "Digit1" }))).toBe("Ctrl+1");
     expect(chordOf(key(":", { ctrl: true, code: "Slash" }))).toBe("Ctrl+/");
@@ -114,6 +125,25 @@ describe("chordOf and matches", () => {
     expect(idFor("commands", key("1", { ctrl: true }))).toBe("go:find");
     expect(idFor("settings", key("w", { ctrl: true }))).toBe("closeSettingsW");
     expect(idFor("find", key("Backspace", { ctrl: true }))).toBeUndefined();
+  });
+});
+
+describe("mode tab cycling", () => {
+  it("maps Ctrl+Tab and Ctrl+Shift+Tab to tabNext and tabPrev in every launcher mode", () => {
+    for (const mode of ["none", "find", "commands", "calc", "query", "projects"] as const) {
+      expect(idFor(mode, key("Tab", { ctrl: true })), mode).toBe("tabNext");
+      expect(idFor(mode, key("Tab", { ctrl: true, shift: true })), mode).toBe("tabPrev");
+    }
+  });
+
+  it("keeps Tab alone on the model shortcut in the query scope", () => {
+    expect(idFor("query", key("Tab"))).toBe("model");
+    expect(idFor("query", key("Tab", { shift: true }))).toBe("modelPrev");
+  });
+
+  it("keeps Settings page cycling on the same chords", () => {
+    expect(idFor("settings", key("Tab", { ctrl: true }))).toBe("pageNext");
+    expect(idFor("settings", key("Tab", { ctrl: true, shift: true }))).toBe("pagePrev");
   });
 });
 

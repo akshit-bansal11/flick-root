@@ -119,6 +119,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "go:calc", keys: "Ctrl+3", label: "Go to Calc", scope: "launcher" },
   { id: "go:query", keys: "Ctrl+4", label: "Go to Ask", scope: "launcher" },
   { id: "go:projects", keys: "Ctrl+5", label: "Go to Projects", scope: "launcher" },
+  { id: "tabNext", keys: "Ctrl+Tab", label: "Next mode tab", scope: "launcher" },
+  { id: "tabPrev", keys: "Ctrl+Shift+Tab", label: "Previous mode tab", scope: "launcher" },
   { id: "leave", keys: "Backspace", label: "Leave mode (empty input)", scope: "launcher" },
   { id: "back", keys: "Esc", label: "Close, clear or hide", scope: "launcher" },
   { id: "openSettings", keys: "Ctrl+,", label: "Open Settings", scope: "launcher" },
@@ -197,12 +199,15 @@ export const BROWSER_CHORDS: readonly string[] = [
   "Ctrl+Shift+Tab",
 ];
 
-/** Browser chords with their native meaning in the Settings window (close, next page). */
-const SETTINGS_OWN = ["Ctrl+W", "Ctrl+Tab", "Ctrl+Shift+Tab"];
+/** Browser chords a scope may claim despite BROWSER_CHORDS (Settings: close, pages; launcher: tabs). */
+const OWN_CHORDS: Partial<Record<Scope, readonly string[]>> = {
+  settings: ["Ctrl+W", "Ctrl+Tab", "Ctrl+Shift+Tab"],
+  launcher: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
+};
 
 /** True for a chord a scope must never claim: listed above or any Win-key chord. */
 export const isReserved = (chord: string, scope?: Scope): boolean =>
-  !(scope === "settings" && SETTINGS_OWN.includes(chord)) &&
+  !(scope !== undefined && (OWN_CHORDS[scope] ?? []).includes(chord)) &&
   (RESERVED.includes(chord) || BROWSER_CHORDS.includes(chord) || chord.split("+").includes("Win"));
 
 const KEY_NAMES: Record<string, string> = {
