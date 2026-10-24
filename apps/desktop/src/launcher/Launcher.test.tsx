@@ -129,7 +129,7 @@ describe("Launcher", () => {
     expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
     expect(ipc.search).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("mode-chip")).toBeNull();
+    expect(screen.getByTestId("prompt").textContent).toBe("›");
   });
 
   it("shown loads the recent picks and lists them under # recent", async () => {
@@ -163,7 +163,7 @@ describe("Launcher", () => {
       fireEvent.click(tab("all"));
     });
     expect(tab("all").getAttribute("aria-selected")).toBe("true");
-    expect(screen.queryByTestId("mode-chip")).toBeNull();
+    expect(screen.getByTestId("prompt").textContent).toBe("›");
   });
 
   it("file rows render a tile icon", async () => {
@@ -239,14 +239,14 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "Enter" });
     });
-    expect(screen.getByTestId("mode-chip").textContent).toContain("Open");
+    expect(screen.getByTestId("prompt").textContent).toBe("/");
     expect(screen.getByRole<HTMLInputElement>("combobox").value).toBe("abc");
   });
 
-  it("typing a prefix shows a chip, the placeholder and searches with sources", async () => {
+  it("typing a prefix shows its glyph, the placeholder and searches with sources", async () => {
     await mount();
     await type("/");
-    expect(screen.getByTestId("mode-chip").textContent).toBe("/Open");
+    expect(screen.getByTestId("prompt").textContent).toBe("/");
     expect(screen.getByRole("combobox").getAttribute("aria-label")).toBe("Open search");
     expect(screen.getByPlaceholderText("Open an app, file or folder")).toBeTruthy();
     expect(ipc.search).toHaveBeenCalledWith({
@@ -263,7 +263,7 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.click(screen.getByRole("tab", { name: "/open" }));
     });
-    expect(screen.getByTestId("mode-chip").textContent).toBe("/Open");
+    expect(screen.getByTestId("prompt").textContent).toBe("/");
   });
 
   it("shows group label, subtitle and mode footer", async () => {
@@ -325,7 +325,7 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "Tab" });
     });
-    expect(screen.getByTestId("mode-chip").textContent).toBe(">Commands");
+    expect(screen.getByTestId("prompt").textContent).toBe(">");
   });
 
   it("Backspace on an empty input leaves the mode", async () => {
@@ -334,16 +334,31 @@ describe("Launcher", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "Backspace" });
     });
-    expect(screen.queryByTestId("mode-chip")).toBeNull();
+    expect(screen.getByTestId("prompt").textContent).toBe("›");
     expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("the chip holds the prefix glyph, and the Settings hint shows in none mode only", async () => {
+  it.each(["/", ">", "=", "?", "@"])("the prompt shows %s in its mode", async (prefix) => {
     await mount();
-    expect(screen.getByText("Settings")).toBeTruthy();
+    await type(prefix);
+    expect(screen.getByTestId("prompt").textContent).toBe(prefix);
+  });
+
+  it("the bar note says settings on all", async () => {
+    await mount();
+    expect(document.querySelector(".inputbar .bar-note")?.textContent).toBe("ctrl+, settings");
+  });
+
+  it("the bar note is absent in a mode with no text", async () => {
+    await mount();
     await type("/");
-    expect(screen.getByTestId("mode-chip").querySelector(".glyph")?.textContent).toBe("/");
-    expect(screen.queryByText("Settings")).toBeNull();
+    expect(document.querySelector(".inputbar .bar-note")).toBeNull();
+  });
+
+  it("the bar note says clear once text is typed in a mode", async () => {
+    await mount();
+    await type("/abc");
+    expect(document.querySelector(".inputbar .bar-note")?.textContent).toBe("esc clear");
   });
 
   it("F1 opens the shortcut sheet and Esc closes it before anything else", async () => {
@@ -357,7 +372,7 @@ describe("Launcher", () => {
       fireEvent.keyDown(window, { key: "Escape" });
     });
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByTestId("mode-chip").textContent).toBe(">Commands");
+    expect(screen.getByTestId("prompt").textContent).toBe(">");
     expect(ipc.hideLauncher).not.toHaveBeenCalled();
   });
 

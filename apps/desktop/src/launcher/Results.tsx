@@ -1,9 +1,8 @@
 import { Fragment, useRef } from "react";
 import { Lens, useLens } from "../Lens";
-import type { Item, LaunchMode } from "../types";
+import type { Item } from "../types";
 import { groupLabel, HOME_GROUP } from "./kinds";
 import { ResultRow } from "./ResultRow";
-import { MODES } from "./reducer";
 
 export const LISTBOX_ID = "launcher-list";
 export const optionId = (i: number) => `launcher-opt-${i}`;
@@ -58,45 +57,5 @@ export function Results({ items, selected, query, pending = false, onActivate }:
         <div className="empty">No matches</div>
       )}
     </>
-  );
-}
-
-interface TabsProps {
-  modes: Exclude<LaunchMode, "none">[];
-  mode: LaunchMode;
-  onSelect: (mode: LaunchMode) => void;
-}
-
-/** Mode tab strip: `all` plus one tab per enabled prefix; selecting a tab enters that mode. */
-export function ModeTabs({ modes, mode, onSelect }: TabsProps) {
-  return (
-    <div className="tabs" role="tablist" aria-label="Modes">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "none"}
-        tabIndex={-1}
-        className="tab"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => onSelect("none")}
-      >
-        all
-      </button>
-      {modes.map((m) => (
-        <button
-          key={m}
-          type="button"
-          role="tab"
-          aria-selected={m === mode}
-          tabIndex={-1}
-          className="tab"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onSelect(m)}
-        >
-          <b>{MODES[m].prefix}</b>
-          {MODES[m].label.toLowerCase()}
-        </button>
-      ))}
-    </div>
   );
 }

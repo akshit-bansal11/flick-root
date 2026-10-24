@@ -1,13 +1,14 @@
 import type { Ref } from "react";
-import { Keycaps } from "../Keycaps";
 import { caps } from "../shortcuts";
 import type { LaunchMode } from "../types";
-import { useExit } from "../useMotion";
 import { MODES } from "./reducer";
 
 const NONE_PLACEHOLDER = `Search apps and commands, or type ${Object.values(MODES)
   .map((m) => m.prefix)
   .join(" ")}`;
+
+/** A shortcut as the bar shows it in words: `ctrl+,`. */
+const chord = (id: string) => caps(id).join("+").toLowerCase();
 
 interface Props {
   mode: LaunchMode;
@@ -21,34 +22,11 @@ interface Props {
 
 export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: Props) {
   const def = mode === "none" ? null : MODES[mode];
-  const chip = useExit(def);
   return (
     <div className="inputbar">
-      <svg
-        className="input-icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        aria-hidden="true"
-      >
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-      {chip.shown && (
-        <span
-          className={chip.leaving ? "chip out" : "chip"}
-          data-testid={chip.leaving ? undefined : "mode-chip"}
-          aria-hidden={chip.leaving || undefined}
-          onAnimationEnd={chip.leaving ? chip.onEnd : undefined}
-        >
-          <span className="glyph" aria-hidden="true">
-            {chip.shown.prefix}
-          </span>
-          {chip.shown.label}
-        </span>
-      )}
+      <span className="prompt" data-testid="prompt" aria-hidden="true">
+        {def ? def.prefix : "›"}
+      </span>
       <input
         ref={inputRef}
         className="input"
@@ -65,13 +43,13 @@ export function InputBar({ mode, value, listId, activeId, onChange, inputRef }: 
         onChange={(e) => onChange(e.target.value)}
       />
       {mode === "none" ? (
-        <span className="bar-hint">
-          <Keycaps caps={caps("openSettings")} /> Settings
+        <span className="bar-note">
+          <em>{chord("openSettings")}</em> settings
         </span>
       ) : (
         value !== "" && (
-          <span className="bar-hint">
-            <Keycaps caps={caps("back")} /> Clear
+          <span className="bar-note">
+            <em>{chord("back")}</em> clear
           </span>
         )
       )}

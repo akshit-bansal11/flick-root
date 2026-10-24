@@ -7,7 +7,8 @@ import { QueryView } from "../query/QueryView";
 import { Actions } from "./Actions";
 import { Footer } from "./Footer";
 import { InputBar } from "./InputBar";
-import { LISTBOX_ID, ModeTabs, optionId, Results } from "./Results";
+import { ModeTabs } from "./ModeTabs";
+import { LISTBOX_ID, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
 
