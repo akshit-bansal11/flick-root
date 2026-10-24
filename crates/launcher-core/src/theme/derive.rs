@@ -131,6 +131,9 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
         }
         sel = mix(sel, panel, 0.15);
     }
+    if ratio(text, sel) < TARGET {
+        sel = panel;
+    }
 
     let on = [panel, bg, sel];
     let muted = lifted("muted", hex("muted", &seed.muted)?, &on, &mut adjusted);
@@ -153,17 +156,33 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
     let status = if dark { DARK_STATUS } else { LIGHT_STATUS };
     let [ok, warn, err] = status.map(|c| lift_all(c, &[panel], TARGET));
 
+    let ratios = Ratios {
+        text: min_ratio(text, &[panel, bg]),
+        muted: ratio(muted, panel),
+        accent_text: ratio(accent_text, panel),
+        on_accent: ratio(on_accent, accent),
+        sel_text: ratio(text, sel),
+        muted_bg: ratio(muted, bg),
+        muted_sel: ratio(muted, sel),
+    };
+    let checks = [
+        ("text", ratios.text, "panel or bg"),
+        ("muted", ratios.muted, "panel"),
+        ("accent_text", ratios.accent_text, "panel"),
+        ("on_accent", ratios.on_accent, "accent"),
+        ("text", ratios.sel_text, "sel"),
+        ("muted", ratios.muted_bg, "bg"),
+        ("muted", ratios.muted_sel, "sel"),
+    ];
+    if let Some((role, r, on)) = checks.into_iter().find(|c| c.1 < TARGET) {
+        return Err(ThemeError::Unreadable {
+            worst: format!("{role} {r:.2} on {on}"),
+        });
+    }
+
     Ok(Resolved {
         dark,
-        ratios: Ratios {
-            text: min_ratio(text, &[panel, bg]),
-            muted: ratio(muted, panel),
-            accent_text: ratio(accent_text, panel),
-            on_accent: ratio(on_accent, accent),
-            sel_text: ratio(text, sel),
-            muted_bg: ratio(muted, bg),
-            muted_sel: ratio(muted, sel),
-        },
+        ratios,
         roles: Roles {
             bg: to_hex(bg),
             panel: to_hex(panel),

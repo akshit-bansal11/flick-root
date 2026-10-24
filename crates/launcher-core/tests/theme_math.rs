@@ -4,7 +4,7 @@ use launcher_core::theme::color::{
     BLACK, WHITE, blend_over, lift, lift_all, luminance, min_ratio, mix, parse_hex,
     parse_hex_alpha, ratio, to_hex,
 };
-use launcher_core::theme::{Ratios, Rgb, Seed, resolve};
+use launcher_core::theme::{Ratios, Rgb, Seed, ThemeError, resolve};
 
 fn seed(bg: &str, panel: &str, text: &str, muted: &str, accent: &str) -> Seed {
     serde_json::from_value(serde_json::json!({
@@ -201,8 +201,18 @@ fn resolve_light_seed() {
 
 #[test]
 fn resolve_mid_tone_seed() {
-    let s = seed("#707070", "#777777", "#808080", "#7a7a7a", "#7f7f90");
+    // bg = panel = #777777: black reaches 4.68, so every role is reachable.
+    let s = seed("#777777", "#777777", "#808080", "#7a7a7a", "#7f7f90");
     assert_all_pass(&s);
+}
+
+#[test]
+fn resolve_rejects_unreachable_seed() {
+    // No colour reaches 4.5 on both #707070 and #777777.
+    let s = seed("#707070", "#777777", "#808080", "#7a7a7a", "#7f7f90");
+    let err = resolve(&s).expect_err("unreachable");
+    assert!(matches!(err, ThemeError::Unreadable { .. }), "{err:?}");
+    assert!(err.to_string().chars().any(|c| c.is_ascii_digit()), "{err}");
 }
 
 #[test]
@@ -224,12 +234,15 @@ fn on_accent_passes_across_accent_sweep() {
             ("#0b0f14", "#11161c", "#e6edf3", "#9aa7b4"),
             ("#f4f1ea", "#ffffff", "#1c1c1c", "#5a5a5a"),
         ] {
-            let res = resolve(&seed(bg, panel, text, muted, &accent)).expect("resolve");
-            assert!(
-                res.ratios.on_accent >= 4.5,
-                "accent {accent}: on_accent {}",
-                res.ratios.on_accent
-            );
+            match resolve(&seed(bg, panel, text, muted, &accent)) {
+                Ok(res) => assert!(
+                    res.ratios.on_accent >= 4.5,
+                    "accent {accent}: on_accent {}",
+                    res.ratios.on_accent
+                ),
+                Err(ThemeError::Unreadable { .. }) => {}
+                Err(e) => panic!("accent {accent}: {e}"),
+            }
         }
     }
     // Mid-grey accents sit at the luminance where #111111 alone gives about 4.35:1.

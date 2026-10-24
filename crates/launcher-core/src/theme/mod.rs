@@ -22,6 +22,12 @@ pub enum ThemeError {
     /// A theme id is empty, malformed, or already taken.
     #[error("bad or duplicate theme id")]
     BadId,
+    /// No colours can make every role reach 4.5:1 on this seed.
+    #[error("theme is unreadable: {worst}")]
+    Unreadable {
+        /// The first failing role and its ratio, like `text 4.48 on bg`.
+        worst: String,
+    },
     /// A theme seed list is not valid JSON for the seed schema.
     #[error("theme JSON: {0}")]
     Json(#[from] serde_json::Error),
