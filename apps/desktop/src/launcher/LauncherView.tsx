@@ -2,7 +2,6 @@ import type { Ref, RefObject } from "react";
 import { Attachment } from "../query/Attachment";
 import type { LaunchMode } from "../types";
 import "../query/attachment.css";
-import { LiquidFilter } from "../query/LiquidFilter";
 import { QueryView } from "../query/QueryView";
 import { DetailPane } from "./DetailPane";
 import { InputBar } from "./InputBar";
@@ -62,7 +61,6 @@ export function LauncherView({
 
   return (
     <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
-      <LiquidFilter />
       <InputBar
         mode={state.mode}
         value={state.input}

@@ -1,20 +1,15 @@
-.query,
 .query-empty {
   display: flex;
   flex-direction: column;
-  gap: var(--l-sp-5);
-  padding: var(--l-sp-8) var(--l-sp-9) var(--l-sp-9);
-  border-top: var(--l-border-hair);
-}
-
-.query-empty {
   align-items: center;
   gap: var(--l-sp-4);
   padding: var(--l-sp-10) var(--l-sp-10) var(--l-sp-9);
+  border-top: 1px solid var(--l-line);
   text-align: center;
 }
 
-.query-q {
+.right .query-q {
+  margin-bottom: var(--l-sp-5);
   font-size: var(--l-fs-body);
   line-height: var(--l-lh-body);
   font-weight: 600;
@@ -22,109 +17,41 @@
 
 /* Persistent AI disclosure: stays above the answer while it is on screen. */
 .ai-mark {
-  align-self: flex-start;
-  margin: 0;
-  padding: var(--l-sp-1) var(--l-sp-4) var(--l-sp-1) var(--l-sp-3);
-  border-radius: var(--l-r-pill);
-  font-size: var(--l-fs-micro);
-  line-height: var(--l-lh-micro);
-  color: var(--l-muted);
-}
-
-/* Raised glass bar floating over the scrolled answer. Blur everywhere, refraction where url() filters work. */
-.liquid {
-  background: var(--l-raise);
-  -webkit-backdrop-filter: blur(8px) saturate(1.6);
-  backdrop-filter: blur(8px) saturate(1.6);
-  box-shadow:
-    inset 0 1px 0 var(--l-spec),
-    inset 0 0 0 1px var(--l-hairline),
-    var(--l-shadow-raised);
-}
-
-@supports (backdrop-filter: url(#liquid)) {
-  .liquid {
-    backdrop-filter: url(#liquid) blur(5px) saturate(1.7) brightness(1.04);
-  }
-}
-
-.float-bar {
-  position: sticky;
-  bottom: var(--l-sp-4);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: var(--l-sp-5);
-  min-height: var(--l-foot-h);
-  margin-top: auto;
-  padding: 0 var(--l-sp-3) 0 var(--l-sp-5);
-  border-radius: var(--l-r-card);
+  margin: 0 0 var(--l-sp-5);
   font-size: var(--l-fs-caption);
   line-height: var(--l-lh-caption);
   color: var(--l-muted);
 }
 
-.mode-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--l-sp-3);
-  min-height: var(--l-tile-lg);
-  padding: 0 var(--l-sp-5);
-  border-radius: var(--l-r-control);
-  color: var(--l-text);
-  font-weight: 500;
-  animation: chip-swap var(--l-dur) var(--l-ease-out);
-}
-
-.dot {
+.left .dot {
+  flex: none;
   width: var(--l-sp-4);
   height: var(--l-sp-4);
   border-radius: var(--l-r-pill);
   background: var(--l-ok);
 }
 
-.query-pill {
-  min-height: var(--l-tile-row);
-  padding: 0 var(--l-sp-5);
+.effort {
+  width: 100%;
   border: 0;
-  border-radius: var(--l-r-control);
   background: none;
-  box-shadow: inset 0 0 0 1px var(--l-hairline);
-  font: 500 var(--l-fs-caption) var(--l-ui);
-  color: var(--l-muted);
-  cursor: pointer;
-  transition:
-    background var(--l-dur-fast) var(--l-ease-out),
-    color var(--l-dur-fast) var(--l-ease-out),
-    transform var(--l-dur-fast) var(--l-ease-out);
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
-.query-pill:hover {
-  background: var(--l-raise-hover);
+.effort:hover {
+  background: var(--l-hover);
 }
 
-.query-pill.on {
-  background: var(--l-lens);
-  box-shadow: inset 0 0 0 1px var(--l-lens-ring);
-  color: var(--l-text);
-}
-
-.query-pill:active,
-.query-btn:active {
-  transform: scale(0.98);
-}
-
-.query-pill:focus-visible,
+.effort:focus-visible,
 .query-btn:focus-visible {
   outline: 2px solid var(--l-focus);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-.float-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--l-sp-3);
-  margin-left: auto;
+.query-btn:active {
+  transform: scale(0.98);
 }
 
 @keyframes chip-swap {
@@ -158,6 +85,7 @@
 }
 
 [data-answer] {
+  font-family: var(--l-prose);
   white-space: pre-wrap;
   font-size: var(--l-fs-body);
   line-height: var(--l-lh-answer);

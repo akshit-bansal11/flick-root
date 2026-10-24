@@ -250,7 +250,8 @@ body,
   flex: 1;
   min-width: 0;
   padding: var(--l-sp-9) var(--l-sp-10);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .row {
