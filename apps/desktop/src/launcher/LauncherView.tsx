@@ -10,8 +10,8 @@ import { ModeTabs } from "./ModeTabs";
 import { LISTBOX_ID, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
-import { countsOf, statusHints } from "./status";
 import { StatusLine } from "./StatusLine";
+import { countsOf, statusHints } from "./status";
 
 /** What the launcher panel needs: a reducer state and the callbacks that feed events back. */
 export interface LauncherViewProps {
