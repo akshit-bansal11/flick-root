@@ -41,6 +41,7 @@
     "allow-complete-first-run",
     "allow-set-tutorial-done",
     "allow-get-about",
-    "allow-set-hotkeys-paused"
+    "allow-set-hotkeys-paused",
+    "allow-list-themes"
   ]
 }

@@ -476,6 +476,8 @@ pub struct AppState {
     pub find_run: FindRun,
     /// Optional Spotify connection (also feeds the media feature).
     pub spotify: Arc<Spotify>,
+    /// Known themes with their derived roles.
+    pub themes: ArcSwap<launcher_core::theme::Registry>,
     /// Feature registry.
     pub registry: Arc<Registry>,
     /// Handles given to features.
@@ -920,6 +922,7 @@ pub fn init(app: &tauri::App) -> anyhow::Result<()> {
         vault,
         spotify,
         find_run: FindRun::default(),
+        themes: ArcSwap::from_pointee(build_themes()),
         registry: Arc::new(Registry::new()),
         ctx,
         icons: Icons::new(index_apps::icons::IconCache::new(&cache_dir)),
@@ -2155,4 +2158,12 @@ mod tests {
         ];
         assert_eq!(drive_letters(&roots), ['D']);
     }
+}
+
+/// Bundled themes; a bad seed is logged and only the two code defaults are kept.
+fn build_themes() -> launcher_core::theme::Registry {
+    launcher_core::theme::Registry::builtin().unwrap_or_else(|e| {
+        tracing::warn!("bundled themes failed to load, using defaults only: {e}");
+        launcher_core::theme::Registry::defaults_only()
+    })
 }

@@ -49,6 +49,7 @@ fn main() {
         "complete_first_run",
         "set_tutorial_done",
         "get_about",
+        "list_themes",
         "set_hotkeys_paused",
     ];
     let attrs = tauri_build::Attributes::new()

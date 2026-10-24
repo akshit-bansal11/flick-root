@@ -371,7 +371,7 @@ fn sync_glass(app: &AppHandle, win: &WebviewWindow) -> bool {
         .try_state::<std::sync::Arc<crate::state::AppState>>()
         .map(|st| st.config.load().appearance.scheme.clone())
         .unwrap_or_default();
-    let dark = is_dark(&scheme);
+    let dark = crate::commands::themes::scheme_is_dark(&scheme);
     let state: State<ShowState> = app.state();
     let Ok(mut s) = state.inner.lock() else {
         return false;
@@ -392,18 +392,6 @@ fn sync_glass(app: &AppHandle, win: &WebviewWindow) -> bool {
         let _ = win;
     }
     s.glass
-}
-
-/// Whether a configured scheme resolves to dark; "system" follows Windows.
-fn is_dark(scheme: &str) -> bool {
-    match scheme {
-        "dark" => true,
-        "light" => false,
-        #[cfg(windows)]
-        _ => win::dwm::system_prefers_dark(),
-        #[cfg(not(windows))]
-        _ => true,
-    }
 }
 
 /// Sizes the window to the panel and centres it on the monitor under the cursor.
@@ -585,8 +573,9 @@ mod tests {
 
     #[test]
     fn explicit_schemes_resolve() {
-        assert!(is_dark("dark"));
-        assert!(!is_dark("light"));
+        use crate::commands::themes::scheme_is_dark;
+        assert!(scheme_is_dark("dark"));
+        assert!(!scheme_is_dark("light"));
     }
 
     // Menu is 280x225 with an 8 px gap at scale 1.

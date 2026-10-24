@@ -25,6 +25,7 @@
     "allow-set-thinking-mode",
     "allow-get-first-run",
     "allow-complete-first-run",
-    "allow-probe-providers"
+    "allow-probe-providers",
+    "allow-list-themes"
   ]
 }

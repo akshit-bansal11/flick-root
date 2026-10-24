@@ -133,6 +133,7 @@ pub fn run() {
             commands::settings::clear_history,
             commands::settings::reindex,
             commands::settings::get_about,
+            commands::themes::list_themes,
             hotkey::set_hotkeys_paused
         ])
         .build(tauri::generate_context!());
