@@ -21,8 +21,6 @@ vi.mock("./api", () => ({
   onFeaturesChanged: vi.fn(() => Promise.resolve(() => {})),
   getAppearance: vi.fn(() =>
     Promise.resolve({
-      theme: "glass",
-      glass: 62,
       scheme: "system",
       darkTheme: "a",
       lightTheme: "b",

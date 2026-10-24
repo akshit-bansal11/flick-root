@@ -38,8 +38,6 @@ const THEMES = [
   theme("l2", "Sage", false),
 ];
 const cur: AppearanceView = {
-  theme: "glass",
-  glass: 90,
   scheme: "system",
   darkTheme: "d1",
   lightTheme: "l1",

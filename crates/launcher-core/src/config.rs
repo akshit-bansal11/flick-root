@@ -19,7 +19,7 @@ pub struct Config {
     pub schema_version: u32,
     /// General settings.
     pub general: General,
-    /// Theme, glass strength and colour scheme.
+    /// Colour scheme and the two theme slots.
     pub appearance: Appearance,
     /// Launcher window geometry.
     pub window: Window,
@@ -215,21 +215,16 @@ pub struct General {
     pub check_updates: bool,
 }
 
-/// Theme ids the UI ships.
-pub const THEMES: [&str; 6] = ["glass", "frost", "midnight", "aurora", "ember", "solid"];
 /// Colour schemes.
 pub const SCHEMES: [&str; 3] = ["system", "dark", "light"];
-/// Allowed range of the glass tint opacity, percent.
-pub const GLASS_RANGE: std::ops::RangeInclusive<u8> = 80..=95;
 
 /// `[appearance]`
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Appearance {
-    /// One of [`THEMES`].
-    pub theme: String,
-    /// Tint opacity in percent, within [`GLASS_RANGE`].
-    pub glass: u8,
+    /// Pre-themes `theme` key; read once by [`Appearance::migrate_legacy`], never written.
+    #[serde(rename = "theme", default, skip_serializing)]
+    pub legacy_theme: Option<String>,
     /// One of [`SCHEMES`].
     pub scheme: String,
     /// Theme id used in the dark scheme; absent means the built-in dark default.
@@ -243,8 +238,7 @@ pub struct Appearance {
 impl Default for Appearance {
     fn default() -> Self {
         Self {
-            theme: "glass".into(),
-            glass: 90,
+            legacy_theme: None,
             scheme: "system".into(),
             dark_theme: None,
             light_theme: None,
@@ -274,32 +268,40 @@ impl Appearance {
             .unwrap_or(brand::DEFAULT_THEME_LIGHT_ID)
     }
 
-    /// Maps the legacy `theme` value onto the two theme slots, once: runs only while both slots
-    /// are unset. `frost` becomes the light theme, `midnight`, `aurora` and `ember` the dark
-    /// theme; `glass` and `solid` leave the defaults. When the old theme forced a scheme and
-    /// `scheme` is `system`, the scheme becomes that one so the look is kept.
+    /// Maps the legacy `theme` value onto the two theme slots, once: the value is consumed, and
+    /// nothing changes while a slot is already set. `frost` becomes the light theme, `midnight`,
+    /// `aurora` and `ember` the dark theme; any other value (`glass`, `solid`) leaves the defaults.
+    /// When the old theme forced a scheme and `scheme` is `system`, the scheme becomes that one so
+    /// the look is kept.
     pub fn migrate_legacy(&mut self) {
+        let Some(theme) = self.legacy_theme.take() else {
+            return;
+        };
         if self.dark_theme.is_some() || self.light_theme.is_some() {
             return;
         }
-        let dark = match self.theme.as_str() {
+        let dark = match theme.as_str() {
             "frost" => false,
             "midnight" | "aurora" | "ember" => true,
             _ => return,
         };
         if dark {
-            self.dark_theme = Some(self.theme.clone());
+            self.dark_theme = Some(theme);
         } else {
-            self.light_theme = Some(self.theme.clone());
+            self.light_theme = Some(theme);
         }
         if self.scheme == "system" {
             self.scheme = if dark { "dark" } else { "light" }.into();
         }
     }
 
-    /// Checks both theme slots against `lookup`, which returns `Some(is_dark)` for a known id and
-    /// `None` for an unknown one. The dark slot must hold a dark theme, the light slot a light one.
+    /// Checks the scheme and both theme slots against `lookup`, which returns `Some(is_dark)` for a
+    /// known id and `None` for an unknown one. The dark slot must hold a dark theme, the light slot
+    /// a light one.
     pub fn validate_themes(&self, lookup: &dyn Fn(&str) -> Option<bool>) -> Result<(), String> {
+        if !SCHEMES.contains(&self.scheme.as_str()) {
+            return Err("scheme must be system, dark or light".into());
+        }
         for (slot, id, want_dark) in [
             ("dark_theme", self.dark_id(), true),
             ("light_theme", self.light_id(), false),
@@ -312,29 +314,6 @@ impl Appearance {
                 }
                 Some(_) => {}
             }
-        }
-        Ok(())
-    }
-
-    /// Pulls a stored glass value into [`GLASS_RANGE`], for configs saved under an older range.
-    pub fn clamp_glass(&mut self) {
-        self.glass = self.glass.clamp(*GLASS_RANGE.start(), *GLASS_RANGE.end());
-    }
-
-    /// Checks every field; the error names the first bad one.
-    pub fn validate(&self) -> Result<(), String> {
-        if !THEMES.contains(&self.theme.as_str()) {
-            return Err(format!("theme must be one of {}", THEMES.join(", ")));
-        }
-        if !SCHEMES.contains(&self.scheme.as_str()) {
-            return Err("scheme must be system, dark or light".into());
-        }
-        if !GLASS_RANGE.contains(&self.glass) {
-            return Err(format!(
-                "glass must be between {} and {}",
-                GLASS_RANGE.start(),
-                GLASS_RANGE.end()
-            ));
         }
         Ok(())
     }
@@ -814,7 +793,6 @@ impl Config {
             path: path.to_path_buf(),
             source,
         })?;
-        c.appearance.clamp_glass();
         c.apps.skip = sanitize_skip(std::mem::take(&mut c.apps.skip));
         // Configs written before the Custom engine existed lack it in the order.
         if !c.decision.order.iter().any(|i| i == "custom") {
@@ -974,42 +952,23 @@ threshold = 0.7
         fs::write(&p, "[general]\ntheme = \"light\"\n").unwrap();
         let c = Config::load(&p).unwrap();
         assert_eq!(c.appearance.scheme, "light");
-        assert_eq!(c.appearance.theme, "glass");
-        assert_eq!(c.appearance.glass, 90);
-        assert!(c.appearance.validate().is_ok());
-        let with_glass = |glass| Appearance {
-            glass,
-            ..Appearance::default()
-        };
-        assert!(with_glass(79).validate().is_err());
-        assert!(with_glass(80).validate().is_ok());
-        assert!(with_glass(95).validate().is_ok());
-        assert_eq!(
-            with_glass(96).validate().unwrap_err(),
-            "glass must be between 80 and 95"
-        );
+        assert_eq!(c.appearance.dark_theme, None);
+        assert_eq!(c.appearance.light_theme, None);
         assert_eq!(c.general.hotkey, "Alt+Space");
     }
 
     #[test]
-    fn stored_glass_below_range_loads_clamped_and_still_edits() {
+    fn old_appearance_keys_load_and_are_not_written_back() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("config.toml");
-        fs::write(&p, "[appearance]\nglass = 62\n").unwrap();
+        fs::write(&p, "[appearance]\ntheme = \"midnight\"\nglass = 62\n").unwrap();
         let c = Config::load(&p).unwrap();
-        assert_eq!(c.appearance.glass, 80);
-        // The set_appearance path: clamp the stored value, apply the change, validate.
-        let mut stored = Appearance {
-            glass: 62,
-            ..Appearance::default()
-        };
-        stored.clamp_glass();
-        stored.theme = "midnight".into();
-        assert!(stored.validate().is_ok());
-        assert_eq!(stored.glass, 80);
-        // An explicit out-of-range request is still rejected.
-        stored.glass = 62;
-        assert!(stored.validate().is_err());
+        assert_eq!(c.appearance.dark_theme.as_deref(), Some("midnight"));
+        assert_eq!(c.appearance.scheme, "dark");
+        assert_eq!(c.appearance.legacy_theme, None);
+        c.save(&p).unwrap();
+        let text = fs::read_to_string(&p).unwrap();
+        assert!(!text.contains("glass"));
     }
 }
 

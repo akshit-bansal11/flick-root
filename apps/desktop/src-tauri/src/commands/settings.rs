@@ -157,14 +157,10 @@ pub async fn get_settings(
     view(&app, &state).await
 }
 
-/// Theme, glass strength, scheme and the active theme's colours, as the UI applies them.
+/// Scheme, theme slots and the active theme's colours, as the UI applies them.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppearanceView {
-    /// Legacy theme id.
-    pub theme: String,
-    /// Tint opacity, percent.
-    pub glass: u8,
     /// `system`, `dark` or `light`.
     pub scheme: String,
     /// Theme id used in the dark scheme.
@@ -181,8 +177,6 @@ impl AppearanceView {
         let cfg = state.config.load();
         let a = &cfg.appearance;
         Self {
-            theme: a.theme.clone(),
-            glass: a.glass,
             scheme: a.scheme.clone(),
             dark_theme: a.dark_id().to_owned(),
             light_theme: a.light_id().to_owned(),
@@ -191,7 +185,7 @@ impl AppearanceView {
     }
 }
 
-/// Checks that the dark slot holds a dark theme and the light slot a light one, both known.
+/// Checks the scheme and both slots: known ids, a dark theme in the dark slot, light in the light.
 fn check_themes(
     a: &launcher_core::config::Appearance,
     registry: &ThemeRegistry,
@@ -208,13 +202,11 @@ pub async fn get_appearance(
     Ok(AppearanceView::of(&state))
 }
 
-/// Changes any of theme, glass, scheme and the two theme slots after validating the result.
+/// Changes any of scheme and the two theme slots after validating the result.
 #[tauri::command]
 pub async fn set_appearance(
     app: AppHandle,
     state: State<'_, Arc<AppState>>,
-    theme: Option<String>,
-    glass: Option<u8>,
     scheme: Option<String>,
     dark_theme: Option<String>,
     light_theme: Option<String>,
@@ -223,14 +215,6 @@ pub async fn set_appearance(
     blocking(move || {
         s.update_config(|c| {
             let mut next = c.appearance.clone();
-            // Only the stored value is clamped; an explicit glass below is still validated.
-            next.clamp_glass();
-            if let Some(t) = theme {
-                next.theme = t;
-            }
-            if let Some(g) = glass {
-                next.glass = g;
-            }
             if let Some(sc) = scheme {
                 next.scheme = sc;
             }
@@ -240,8 +224,6 @@ pub async fn set_appearance(
             if let Some(t) = light_theme {
                 next.light_theme = Some(t);
             }
-            next.validate()
-                .map_err(|m| CommandError::new("invalid_appearance", m))?;
             check_themes(&next, &s.themes.load())?;
             c.appearance = next;
             Ok(())
@@ -582,8 +564,6 @@ mod tests {
         let reg = ThemeRegistry::builtin().expect("builtin registry");
         // `AppearanceView::of` needs a full AppState; its `active` comes from active_theme_in.
         let view = AppearanceView {
-            theme: "glass".into(),
-            glass: 90,
             scheme: "dark".into(),
             dark_theme: "midnight".into(),
             light_theme: "frost".into(),

@@ -85,24 +85,64 @@ fn none_options_are_omitted_when_saved() {
 #[test]
 fn migration_is_idempotent() {
     let mut a = Appearance {
-        theme: "midnight".into(),
-        scheme: "system".into(),
+        legacy_theme: Some("midnight".into()),
         ..Appearance::default()
     };
     a.migrate_legacy();
+    assert_eq!(a.legacy_theme, None, "consumed");
+    assert_eq!(a.dark_theme.as_deref(), Some("midnight"));
     let once = a.clone();
     a.migrate_legacy();
     assert_eq!(a, once);
 
     // Once an id is chosen, a stale legacy `theme` never overrides it.
     let mut b = Appearance {
-        theme: "frost".into(),
+        legacy_theme: Some("frost".into()),
         dark_theme: Some("imported:x".into()),
         ..Appearance::default()
     };
-    let before = b.clone();
     b.migrate_legacy();
-    assert_eq!(b, before);
+    assert_eq!(b.light_theme, None);
+    assert_eq!(b.dark_theme.as_deref(), Some("imported:x"));
+    assert_eq!(b.scheme, "system");
+}
+
+/// True when some line of `text` starts with `key` followed by ` =`.
+fn has_key(text: &str, key: &str) -> bool {
+    text.lines().any(|l| {
+        l.trim_start()
+            .strip_prefix(key)
+            .is_some_and(|r| r.trim_start().starts_with('='))
+    })
+}
+
+#[test]
+fn saving_never_writes_theme_or_glass() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("config.toml");
+    let c = load("[appearance]\ntheme = \"frost\"\nglass = 85\n");
+    assert_eq!(c.appearance.light_theme.as_deref(), Some("frost"));
+    c.save(&path).expect("save");
+    let text = std::fs::read_to_string(&path).expect("read");
+    assert!(!has_key(&text, "theme"), "{text}");
+    assert!(!has_key(&text, "glass"), "{text}");
+    assert!(has_key(&text, "light_theme"), "{text}");
+    // Reloading the saved file is stable.
+    assert_eq!(
+        Config::load(&path).expect("reload").appearance,
+        c.appearance
+    );
+}
+
+#[test]
+fn old_glass_key_loads_and_is_dropped_on_save() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("config.toml");
+    let c = load("[appearance]\nglass = 85\n");
+    assert_eq!(c.appearance.scheme, "system");
+    c.save(&path).expect("save");
+    let text = std::fs::read_to_string(&path).expect("read");
+    assert!(!text.contains("glass"), "{text}");
 }
 
 #[test]

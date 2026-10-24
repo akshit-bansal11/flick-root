@@ -4,17 +4,10 @@
 import type { Appearance } from "../theme";
 
 /** Payload of get_appearance / set_appearance; mirrors AppearanceView in Rust. */
-export interface AppearanceView extends Appearance {
-  /** Legacy theme id; removed in U1c. */
-  theme: string;
-  /** Legacy glass strength; removed in U1c. */
-  glass: number;
-}
+export type AppearanceView = Appearance;
 
 /** Fields set_appearance accepts, each optional. */
-export type AppearancePatch = Partial<
-  Pick<AppearanceView, "theme" | "glass" | "scheme" | "darkTheme" | "lightTheme">
->;
+export type AppearancePatch = Partial<Pick<AppearanceView, "scheme" | "darkTheme" | "lightTheme">>;
 
 export interface SettingsView {
   hotkeyLauncher: string;

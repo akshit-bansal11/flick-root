@@ -112,29 +112,17 @@ pub fn sync_settings_theme(app: &AppHandle) {
     let _ = app;
 }
 
-/// Whether Settings renders dark under the saved appearance; "system" follows Windows.
+/// Whether Settings renders dark under the saved appearance: the active theme's `dark` flag,
+/// which follows the scheme ("system" asks Windows).
 #[cfg(windows)]
 fn settings_dark(app: &AppHandle) -> bool {
-    let (theme, scheme) = app
-        .try_state::<std::sync::Arc<crate::state::AppState>>()
-        .map(|st| {
-            let cfg = st.config.load();
-            (cfg.appearance.theme.clone(), cfg.appearance.scheme.clone())
+    app.try_state::<std::sync::Arc<crate::state::AppState>>()
+        .map_or_else(win::dwm::system_prefers_dark, |st| {
+            crate::commands::themes::active_theme(&st).map_or_else(
+                || crate::commands::themes::scheme_is_dark(&st.config.load().appearance.scheme),
+                |t| t.dark,
+            )
         })
-        .unwrap_or_default();
-    scheme_dark(&theme, &scheme).unwrap_or_else(win::dwm::system_prefers_dark)
-}
-
-/// Dark (`Some(true)`) or light for a theme and scheme, mirroring `FORCED_SCHEME` in theme.ts;
-/// `None` means follow the system.
-fn scheme_dark(theme: &str, scheme: &str) -> Option<bool> {
-    match (theme, scheme) {
-        ("frost", _) => Some(false),
-        ("midnight" | "aurora" | "ember", _) => Some(true),
-        (_, "dark") => Some(true),
-        (_, "light") => Some(false),
-        _ => None,
-    }
 }
 
 /// An item of the tray menu, as the launcher UI sends it.
@@ -208,16 +196,5 @@ mod tests {
         for bad in ["", "Quit", " open", "exit", "settings\0"] {
             assert_eq!(TrayAction::parse(bad), None, "{bad:?}");
         }
-    }
-
-    #[test]
-    fn scheme_dark_table() {
-        assert_eq!(scheme_dark("frost", "dark"), Some(false));
-        assert_eq!(scheme_dark("midnight", "light"), Some(true));
-        assert_eq!(scheme_dark("aurora", "system"), Some(true));
-        assert_eq!(scheme_dark("ember", "light"), Some(true));
-        assert_eq!(scheme_dark("glass", "dark"), Some(true));
-        assert_eq!(scheme_dark("solid", "light"), Some(false));
-        assert_eq!(scheme_dark("glass", "system"), None);
     }
 }
