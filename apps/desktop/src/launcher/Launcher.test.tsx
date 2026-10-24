@@ -1,13 +1,11 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
 import type { Appearance, ThemeRoles } from "../theme";
-import type { ExplainCaptured, Item, ItemKind } from "../types";
+import type { ExplainCaptured, Item } from "../types";
 import { footHints } from "./Footer";
-import { KindIcon } from "./KindIcon";
 import { Launcher } from "./Launcher";
 
 vi.mock("../ipc", () => ({
@@ -166,11 +164,11 @@ describe("Launcher", () => {
     expect(screen.getByTestId("prompt").textContent).toBe("›");
   });
 
-  it("file rows render a tile icon", async () => {
+  it("file rows carry their kind tag", async () => {
     await mount();
     mockFileResults();
     await type("/x");
-    expect(document.querySelector(".row .tile-ico svg")).not.toBeNull();
+    expect(document.querySelector(".row .row-meta")?.textContent).toBe("file");
   });
 
   it("shown with sources [apps] leaves only the all and open tabs", async () => {
@@ -215,18 +213,58 @@ describe("Launcher", () => {
       expect.objectContaining({ mode: "command", sources: ["apps", "features"], text: "abc" }),
     );
     expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
-    expect(screen.getByText("Search instead")).toBeTruthy();
+    expect(screen.getByText("# search instead")).toBeTruthy();
     const titles = [...document.querySelectorAll(".row-title")].map((t) => t.textContent);
     expect(titles.slice(-3)).toEqual([
       "Find files named “abc”",
       "Search Google for “abc”",
       "Ask your AI: “abc”",
     ]);
-    expect(document.querySelectorAll(".row .tile-glyph")).toHaveLength(3);
     const rows = [...document.querySelectorAll(".row")].slice(-3);
     expect(rows.every((r) => r.querySelector(".row-sub") === null)).toBe(true);
     expect(rows.every((r) => r.querySelector(".row-meta") === null)).toBe(true);
     expect(screen.queryByText("No matches")).toBeNull();
+  });
+
+  it("the › marker is only on the selected row and moves with ArrowDown", async () => {
+    await mount();
+    await type("abc");
+    const marks = () =>
+      [...document.querySelectorAll(".row")].map((r) => r.querySelector(".row-mark")?.textContent);
+    expect(marks()[0]).toBe("›");
+    expect(marks().filter((m) => m === "›")).toHaveLength(1);
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+    });
+    expect(marks()[0]).toBe("");
+    expect(marks()[1]).toBe("›");
+    expect(marks().filter((m) => m === "›")).toHaveLength(1);
+  });
+
+  it("the group header reads # apps and the list has no lens", async () => {
+    await mount();
+    await type("abc");
+    expect(screen.getByText("# apps")).toBeTruthy();
+    expect(document.querySelector(".lens")).toBeNull();
+  });
+
+  it("aria-activedescendant follows the selection", async () => {
+    await mount();
+    await type("abc");
+    const active = () => screen.getByRole("combobox").getAttribute("aria-activedescendant");
+    const options = screen.getAllByRole("option");
+    expect(active()).toBe(options[0]?.id);
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+    });
+    expect(active()).toBe(options[1]?.id);
+  });
+
+  it("matched text is wrapped in mark", async () => {
+    await mount();
+    await type("alp");
+    const marked = [...document.querySelectorAll(".row-title mark")].map((m) => m.textContent);
+    expect(marked).toEqual(["Alp"]);
   });
 
   it("Enter on the Find row enters Open carrying the text", async () => {
@@ -519,25 +557,5 @@ describe("footHints", () => {
   it("typed none lists the open hint exactly once", () => {
     const hints = footHints("none", {}, ["find", "calc"], true);
     expect(hints.filter((h) => h.id === "open")).toHaveLength(1);
-  });
-});
-
-describe("KindIcon", () => {
-  it("draws an svg for every kind", () => {
-    const kinds: ItemKind[] = [
-      "app",
-      "command",
-      "file",
-      "folder",
-      "project",
-      "result",
-      "process",
-      "media",
-      "capture",
-      "choice",
-    ];
-    for (const kind of kinds) {
-      expect(renderToStaticMarkup(<KindIcon kind={kind} />)).toContain("<svg");
-    }
   });
 });

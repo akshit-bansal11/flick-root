@@ -1,7 +1,6 @@
-import { Fragment, useRef } from "react";
-import { Lens, useLens } from "../Lens";
+import { Fragment } from "react";
 import type { Item } from "../types";
-import { groupLabel, HOME_GROUP } from "./kinds";
+import { groupLabel } from "./kinds";
 import { ResultRow } from "./ResultRow";
 
 export const LISTBOX_ID = "launcher-list";
@@ -20,15 +19,10 @@ interface Props {
 export function Results({ items, selected, query, pending = false, onActivate }: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
-  const list = useRef<HTMLDivElement>(null);
-  const lens = useRef<HTMLDivElement>(null);
   const visible = items.slice(start, start + MAX_ROWS);
-  // One lens glides to the selected row; it moves only when the selection or the rows change.
-  useLens(list, lens, items[selected] ? optionId(selected) : undefined, [start, ...visible]);
   return (
-    <>
-      <div ref={list} id={LISTBOX_ID} role="listbox" aria-label="Results" className="results">
-        <Lens ref={lens} />
+    <div className="split">
+      <div id={LISTBOX_ID} role="listbox" aria-label="Results" className="left">
         {visible.map((item, k) => {
           const index = start + k;
           const label = groupLabel(item);
@@ -37,15 +31,14 @@ export function Results({ items, selected, query, pending = false, onActivate }:
             <Fragment key={item.id}>
               {(!prev || groupLabel(prev) !== label) && (
                 <div className="group" aria-hidden="true">
-                  {label === HOME_GROUP ? `# ${label}` : label}
+                  {`# ${label.toLowerCase()}`}
                 </div>
               )}
               <ResultRow
                 item={item}
-                index={index}
                 id={optionId(index)}
+                index={index}
                 selected={index === selected}
-                order={k}
                 query={query}
                 onActivate={onActivate}
               />
@@ -53,9 +46,11 @@ export function Results({ items, selected, query, pending = false, onActivate }:
           );
         })}
       </div>
-      {items.length === 0 && !pending && query.trim() !== "" && (
-        <div className="empty">No matches</div>
-      )}
-    </>
+      <div className="right">
+        {items.length === 0 && !pending && query.trim() !== "" && (
+          <div className="empty">No matches</div>
+        )}
+      </div>
+    </div>
   );
 }
