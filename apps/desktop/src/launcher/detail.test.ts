@@ -40,6 +40,11 @@ describe("detailOf facts", () => {
     expect(detailOf(make("app", { payload: { program: true } })).tag).toBe("program");
   });
 
+  it("shows a drive-scan program's folder as its path", () => {
+    const prog = make("app", { payload: { program: true }, subtitle: "D:/tools" });
+    expect(detailOf(prog).facts).toEqual([{ label: "path", value: "D:/tools" }]);
+  });
+
   it("takes a file or folder path from the id minus file:", () => {
     const file = make("file", { id: "file:C:/a/b.txt" });
     const folder = make("folder", { id: "file:C:/a" });

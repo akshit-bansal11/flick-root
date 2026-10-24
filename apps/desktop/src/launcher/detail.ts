@@ -43,7 +43,8 @@ const parsingName = (item: Item): string | undefined =>
 function factsOf(item: Item): DetailFact[] {
   switch (item.kind) {
     case "app": {
-      const path = parsingName(item);
+      // Drive-scan programs have no parsing name; their subtitle is the folder they live in.
+      const path = parsingName(item) ?? (isProgram(item) && item.subtitle ? item.subtitle : null);
       return path ? [{ label: "path", value: path }] : [];
     }
     case "file":

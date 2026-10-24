@@ -262,7 +262,8 @@ describe("Launcher", () => {
   it("matched text is wrapped in mark", async () => {
     await mount();
     await type("alp");
-    const marked = [...document.querySelectorAll(".row-title mark")].map((m) => m.textContent);
+    const row = screen.getByRole("option", { name: /Alpha/ });
+    const marked = [...row.querySelectorAll(".row-title mark")].map((m) => m.textContent);
     expect(marked).toEqual(["Alp"]);
   });
 
@@ -306,8 +307,9 @@ describe("Launcher", () => {
   it("shows group label, subtitle and mode footer", async () => {
     await mount();
     await type(">");
-    expect(screen.getByText("Apps")).toBeTruthy();
-    expect(screen.getAllByText("App")).toHaveLength(2);
+    expect(screen.getByText("# apps")).toBeTruthy();
+    const tags = [...document.querySelectorAll(".row-meta")].map((t) => t.textContent);
+    expect(tags).toEqual(["app", "app"]);
     expect(screen.queryByText("admin")).toBeNull();
     expect(screen.queryByText("Tab mode")).toBeNull();
   });
@@ -336,7 +338,7 @@ describe("Launcher", () => {
       }),
     );
     await type("/");
-    expect(screen.getByText("Programs")).toBeTruthy();
+    expect(screen.getByText("# programs")).toBeTruthy();
     expect(screen.getByText("D:/tools")).toBeTruthy();
   });
 
