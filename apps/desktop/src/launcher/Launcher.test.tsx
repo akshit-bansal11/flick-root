@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
-import { ROLES, type ThemeRoles } from "../theme";
+import type { Appearance, ThemeRoles } from "../theme";
 import type { ExplainCaptured, Item, ItemKind } from "../types";
 import { footHints } from "./Footer";
 import { KindIcon } from "./KindIcon";
@@ -43,16 +43,28 @@ const item = (id: string, title: string): Item => ({
   payload: null,
 });
 const items = [item("a", "Alpha"), item("b", "Beta")];
-const APPEARANCE = {
+const C = "#123456";
+const ROLE_FIXTURE: ThemeRoles = {
+  bg: C,
+  panel: C,
+  surface: C,
+  line: C,
+  text: C,
+  muted: C,
+  accent: C,
+  accentText: C,
+  onAccent: C,
+  sel: C,
+  ok: C,
+  warn: C,
+  err: C,
+};
+const APPEARANCE: Appearance = {
   scheme: "dark",
   darkTheme: "t",
   lightTheme: "t",
-  active: {
-    id: "t",
-    dark: true,
-    roles: Object.fromEntries(ROLES.map((r) => [r, "#123456"])) as ThemeRoles,
-  },
-} as const;
+  active: { id: "t", dark: true, roles: ROLE_FIXTURE },
+};
 
 let root: Root | undefined;
 

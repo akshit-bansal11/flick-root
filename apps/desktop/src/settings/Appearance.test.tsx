@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ROLES, type ThemeRoles, type ThemeView } from "../theme";
 import { Appearance } from "./Appearance";
 import * as api from "./api";
+import type { AppearanceView } from "./types";
 
 vi.mock("./api", () => ({
   getAppearance: vi.fn(),
@@ -36,16 +37,21 @@ const THEMES = [
   theme("l1", "Paper", false),
   theme("l2", "Sage", false),
 ];
-const cur = { theme: "glass", glass: 90, scheme: "system", darkTheme: "d1", lightTheme: "l1" };
+const cur: AppearanceView = {
+  theme: "glass",
+  glass: 90,
+  scheme: "system",
+  darkTheme: "d1",
+  lightTheme: "l1",
+  active: null,
+};
 const active = { id: "d2", dark: true, roles: { ...roles, bg: "#010203" } };
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
-  vi.mocked(api.getAppearance).mockResolvedValue({ ...cur, active: null });
+  vi.mocked(api.getAppearance).mockResolvedValue({ ...cur });
   vi.mocked(api.listThemes).mockResolvedValue(THEMES);
-  vi.mocked(api.setAppearance).mockImplementation((p) =>
-    Promise.resolve({ ...cur, ...p, active: null }),
-  );
+  vi.mocked(api.setAppearance).mockImplementation((p) => Promise.resolve({ ...cur, ...p }));
 });
 afterEach(() => {
   cleanup();
