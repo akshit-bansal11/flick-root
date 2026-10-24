@@ -30,7 +30,7 @@ fn recent_ids(rows: &[FrecencyRow], limit: usize) -> Vec<(&str, bool)> {
         .iter()
         .filter(|r| r.item_key.starts_with("app:") || r.item_key.starts_with("file:"))
         .collect();
-    v.sort_by(|a, b| b.last_used_ms.cmp(&a.last_used_ms));
+    v.sort_by_key(|r| std::cmp::Reverse(r.last_used_ms));
     v.into_iter()
         .take(limit)
         .map(|r| (r.item_key.as_str(), r.kind == "folder"))
