@@ -146,6 +146,27 @@ fn defaults_only_has_just_the_defaults() {
 }
 
 #[test]
+fn with_imported_requires_imported_slug_ids() {
+    let long_ok = format!("imported:{}", "a".repeat(64));
+    let too_long = format!("imported:{}", "a".repeat(65));
+    let reg = Registry::defaults_only().with_imported(vec![
+        seed("x", "#0b0f14"),
+        seed("imported:Bad", "#0b0f14"),
+        seed("imported:", "#0b0f14"),
+        seed(&too_long, "#0b0f14"),
+        seed("imported:a_b", "#0b0f14"),
+        seed("imported:x", "#0b0f14"),
+        seed(&long_ok, "#0b0f14"),
+    ]);
+    for dropped in ["x", "imported:Bad", "imported:", &too_long, "imported:a_b"] {
+        assert!(!reg.contains(dropped), "{dropped} should be dropped");
+    }
+    assert!(reg.contains("imported:x"));
+    assert!(reg.contains(&long_ok));
+    assert_eq!(reg.list().len(), 4);
+}
+
+#[test]
 fn with_imported_keeps_valid_drops_duplicate_and_invalid() {
     let reg = Registry::defaults_only().with_imported(vec![
         seed("imported:x", "#0b0f14"),

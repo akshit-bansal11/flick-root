@@ -151,12 +151,32 @@ describe("tokens.css contrast", () => {
     const roles = [
       "bg panel surface line text muted muted-strong accent accent-text on-accent sel",
       "ok ok-text err warn scrim focus control-edge hover hairline rim-top rim-low spec",
-      "sheen raise raise-hover key-bottom warn-wash droplet mica-tint",
+      "sheen raise raise-hover key-bottom warn-wash droplet",
       "shadow-raised shadow-overlay shadow-window",
     ].flatMap((line) => line.split(" "));
     for (const mode of MODES) {
       const missing = roles.filter((r) => declared(`--l-${r}`, mode) === undefined);
       expect(missing).toEqual([]);
+    }
+  });
+
+  it("derives six chrome roles from the theme roles in the shared alias block", () => {
+    const expected: Record<string, string> = {
+      "--l-muted-strong": "var(--l-muted)",
+      "--l-ok-text": "var(--l-ok)",
+      "--l-scrim": "color-mix(in oklab, var(--l-bg) 70%, transparent)",
+      "--l-focus": "var(--l-accent-text)",
+      "--l-control-edge": "var(--l-muted)",
+      "--l-hover": "var(--l-surface)",
+    };
+    const shared = [":root", "[data-theme]", "[data-scheme]"];
+    for (const [name, value] of Object.entries(expected)) {
+      const owners = RULES.filter((r) => r.decls.has(name));
+      expect(owners.length, `${name} is declared once`).toBe(1);
+      const owner = owners[0];
+      expect(owner?.selectors, name).toEqual(shared);
+      expect(owner?.media, name).toBe(false);
+      expect(owner?.decls.get(name), name).toBe(value);
     }
   });
 

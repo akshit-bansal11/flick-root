@@ -11,10 +11,6 @@
   font-size: var(--l-fs-body);
   line-height: var(--l-lh-body);
 }
-/* First run shares the Settings window: under Mica the tint replaces the opaque page colour. */
-[data-backdrop="mica"] .fr-shell {
-  background: var(--l-mica-tint);
-}
 .fr-step {
   margin: 0;
   color: var(--l-muted);

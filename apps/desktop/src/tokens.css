@@ -46,7 +46,6 @@
   --l-raw-mist-200: #d0dee8;
   --l-raw-mist-300: #d6e7ee;
   --l-raw-mist-600: #41545f;
-  --l-raw-mist-700: #3b4e5b;
   --l-raw-mist-900: #0f2333;
   --l-raw-cyan-50: #f2fbff;
   --l-raw-cyan-300: #5cc8e8;
@@ -55,9 +54,7 @@
   --l-raw-cyan-800: #0a5873;
   --l-raw-cyan-950: #062130;
   --l-raw-green-400: #4cc38a;
-  --l-raw-green-300: #70cfa1;
   --l-raw-green-700: #1e7f50;
-  --l-raw-green-800: #16583b;
   --l-raw-red-400: #f6ada6;
   --l-raw-red-700: #8c2c22;
   --l-raw-amber-400: #eab85c;
@@ -70,7 +67,6 @@
   --l-raw-mist-900-12: rgb(15 35 51 / 0.12);
   --l-raw-mist-900-16: rgb(15 35 51 / 0.16);
   --l-raw-mist-900-22: rgb(15 35 51 / 0.22);
-  --l-raw-mist-900-35: rgb(15 35 51 / 0.35);
 }
 
 /* Scales (theme independent): type, space, radius, sizes, motion, mixes. */
@@ -173,19 +169,13 @@
   --l-line: var(--l-raw-slate-800);
   --l-text: var(--l-raw-slate-100);
   --l-muted: var(--l-raw-slate-400);
-  --l-muted-strong: var(--l-raw-slate-400);
   --l-accent: var(--l-raw-cyan-300);
   --l-accent-text: var(--l-raw-cyan-200);
   --l-on-accent: var(--l-raw-cyan-950);
   --l-sel: var(--l-raw-slate-700);
   --l-ok: var(--l-raw-green-400);
-  --l-ok-text: var(--l-raw-green-300);
   --l-err: var(--l-raw-red-400);
   --l-warn: var(--l-raw-amber-400);
-  --l-scrim: var(--l-raw-black-50);
-  --l-focus: var(--l-accent);
-  --l-control-edge: var(--l-muted);
-  --l-hover: var(--l-surface);
   --l-key-bottom: var(--l-raw-black-35);
   --l-warn-wash: color-mix(in oklab, var(--l-warn) 14%, transparent);
   --l-shadow-raised: 0 1px 2px var(--l-raw-black-30);
@@ -203,16 +193,13 @@
     --l-line: var(--l-raw-mist-200);
     --l-text: var(--l-raw-mist-900);
     --l-muted: var(--l-raw-mist-600);
-    --l-muted-strong: var(--l-raw-mist-700);
     --l-accent: var(--l-raw-cyan-700);
     --l-accent-text: var(--l-raw-cyan-800);
     --l-on-accent: var(--l-raw-cyan-50);
     --l-sel: var(--l-raw-mist-300);
     --l-ok: var(--l-raw-green-700);
-    --l-ok-text: var(--l-raw-green-800);
     --l-err: var(--l-raw-red-700);
     --l-warn: var(--l-raw-amber-800);
-    --l-scrim: var(--l-raw-mist-900-35);
     --l-key-bottom: var(--l-raw-mist-900-16);
     --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
     --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
@@ -229,16 +216,13 @@
   --l-line: var(--l-raw-mist-200);
   --l-text: var(--l-raw-mist-900);
   --l-muted: var(--l-raw-mist-600);
-  --l-muted-strong: var(--l-raw-mist-700);
   --l-accent: var(--l-raw-cyan-700);
   --l-accent-text: var(--l-raw-cyan-800);
   --l-on-accent: var(--l-raw-cyan-50);
   --l-sel: var(--l-raw-mist-300);
   --l-ok: var(--l-raw-green-700);
-  --l-ok-text: var(--l-raw-green-800);
   --l-err: var(--l-raw-red-700);
   --l-warn: var(--l-raw-amber-800);
-  --l-scrim: var(--l-raw-mist-900-35);
   --l-key-bottom: var(--l-raw-mist-900-16);
   --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
   --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
@@ -246,11 +230,17 @@
   --l-shadow-window: 0 8px 24px var(--l-raw-mist-900-22);
 }
 
-/* Flat aliases for the retired glass tokens. Declared on the element so a themed child (the Settings swatch)
-   recomputes them. Card C1 deletes them with their last consumer. */
+/* Derived roles, plus flat aliases for the retired glass tokens. Declared on the element so a themed child
+   (the Settings swatch, the tour demo) recomputes them. Card C1 deletes the glass aliases with their last consumer. */
 :root,
 [data-theme],
 [data-scheme] {
+  --l-muted-strong: var(--l-muted);
+  --l-ok-text: var(--l-ok);
+  --l-scrim: color-mix(in oklab, var(--l-bg) 70%, transparent);
+  --l-focus: var(--l-accent-text);
+  --l-control-edge: var(--l-muted);
+  --l-hover: var(--l-surface);
   --l-hairline: var(--l-line);
   --l-rim-top: transparent;
   --l-rim-low: transparent;
@@ -265,7 +255,6 @@
   --l-sheen-bg: none;
   --l-glass-tint: var(--l-panel);
   --l-preview-wall: var(--l-bg);
-  --l-mica-tint: color-mix(in srgb, var(--l-bg) 40%, transparent);
   --l-border: 1px solid var(--l-line);
   --l-border-hair: 1px solid var(--l-hairline);
 }

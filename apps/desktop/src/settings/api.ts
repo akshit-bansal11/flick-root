@@ -1,7 +1,6 @@
 // Typed bindings for every settings-window command. Tauri maps camelCase keys to Rust snake_case params.
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ThemeView } from "../theme";
 import type {
   About,
   AppearancePatch,
@@ -47,7 +46,7 @@ export const setHotkeysPaused = (paused: boolean) => invoke<void>("set_hotkeys_p
 export const getAppearance = () => invoke<AppearanceView>("get_appearance");
 export const setAppearance = (patch: AppearancePatch) =>
   invoke<AppearanceView>("set_appearance", patch);
-export const listThemes = () => invoke<ThemeView[]>("list_themes");
+export { listThemes } from "../ipc";
 export const setRoots = (roots: string[]) => invoke<SettingsView>("set_roots", { roots });
 export const setIncludeDrives = (includeDrives: boolean) =>
   invoke<SettingsView>("set_roots", { includeDrives });

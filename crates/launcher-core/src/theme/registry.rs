@@ -65,6 +65,15 @@ fn theme_of(seed: Seed) -> Result<Theme, ThemeError> {
     Ok(Theme { seed, resolved })
 }
 
+fn is_imported_id(id: &str) -> bool {
+    id.strip_prefix("imported:").is_some_and(|slug| {
+        (1..=64).contains(&slug.len())
+            && slug
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    })
+}
+
 impl Registry {
     /// Only the two code defaults. Cannot fail: the seeds are constants.
     pub fn defaults_only() -> Self {
@@ -95,11 +104,12 @@ impl Registry {
         Ok(Self { themes })
     }
 
-    /// Adds imported seeds, silently dropping any that fail to resolve or reuse an existing id.
+    /// Adds imported seeds, silently dropping any whose id is not `imported:<slug>` (slug of 1-64
+    /// lowercase `a-z`, `0-9` or `-`), that fail to resolve, or that reuse an existing id.
     #[must_use]
     pub fn with_imported(mut self, seeds: Vec<Seed>) -> Self {
         for seed in seeds {
-            if self.contains(&seed.id) {
+            if !is_imported_id(&seed.id) || self.contains(&seed.id) {
                 continue;
             }
             if let Ok(theme) = theme_of(seed) {

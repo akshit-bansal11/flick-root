@@ -185,12 +185,24 @@ impl AppearanceView {
     }
 }
 
-/// Checks the scheme and both slots: known ids, a dark theme in the dark slot, light in the light.
+/// Checks the scheme and the slots named by `dark` / `light` (those present in the patch): known id,
+/// a dark theme in the dark slot, light in the light. An untouched slot is not checked, so a stale id
+/// in the stored config cannot block an unrelated change.
 fn check_themes(
     a: &launcher_core::config::Appearance,
     registry: &ThemeRegistry,
+    dark: bool,
+    light: bool,
 ) -> Result<(), CommandError> {
-    a.validate_themes(&|id| registry.get(id).map(|t| t.resolved.dark))
+    let mut probe = a.clone();
+    if !dark {
+        probe.dark_theme = None;
+    }
+    if !light {
+        probe.light_theme = None;
+    }
+    probe
+        .validate_themes(&|id| registry.get(id).map(|t| t.resolved.dark))
         .map_err(|m| CommandError::new("invalid_appearance", m))
 }
 
@@ -215,6 +227,7 @@ pub async fn set_appearance(
     blocking(move || {
         s.update_config(|c| {
             let mut next = c.appearance.clone();
+            let (dark, light) = (dark_theme.is_some(), light_theme.is_some());
             if let Some(sc) = scheme {
                 next.scheme = sc;
             }
@@ -224,7 +237,7 @@ pub async fn set_appearance(
             if let Some(t) = light_theme {
                 next.light_theme = Some(t);
             }
-            check_themes(&next, &s.themes.load())?;
+            check_themes(&next, &s.themes.load(), dark, light)?;
             c.appearance = next;
             Ok(())
         })
@@ -539,21 +552,43 @@ mod tests {
     #[test]
     fn check_themes_accepts_defaults_and_valid_slots() {
         let reg = ThemeRegistry::builtin().expect("builtin registry");
-        assert!(check_themes(&slots(None, None), &reg).is_ok());
-        assert!(check_themes(&slots(Some("midnight"), Some("frost")), &reg).is_ok());
+        assert!(check_themes(&slots(None, None), &reg, false, false).is_ok());
+        assert!(check_themes(&slots(Some("midnight"), Some("frost")), &reg, true, true).is_ok());
+    }
+
+    #[test]
+    fn check_themes_ignores_a_stale_id_in_an_unpatched_slot() {
+        let reg = ThemeRegistry::builtin().expect("builtin registry");
+        let stale_dark = slots(Some("gone"), Some("frost"));
+        assert!(check_themes(&stale_dark, &reg, false, true).is_ok());
+        // Scheme-only patch: neither slot is checked.
+        assert!(check_themes(&stale_dark, &reg, false, false).is_ok());
+        let stale_light = slots(Some("midnight"), Some("gone"));
+        assert!(check_themes(&stale_light, &reg, true, false).is_ok());
+    }
+
+    #[test]
+    fn check_themes_still_validates_scheme_when_no_slot_is_patched() {
+        let reg = ThemeRegistry::builtin().expect("builtin registry");
+        let mut a = slots(None, None);
+        a.scheme = "sepia".into();
+        assert_eq!(
+            check_themes(&a, &reg, false, false).unwrap_err().code,
+            "invalid_appearance"
+        );
     }
 
     #[test]
     fn check_themes_rejects_wrong_scheme_or_unknown_slot() {
         let reg = ThemeRegistry::builtin().expect("builtin registry");
-        for a in [
-            slots(Some("frost"), None),
-            slots(None, Some("midnight")),
-            slots(Some("no-such-theme"), None),
-            slots(None, Some("no-such-theme")),
+        for (a, dark, light) in [
+            (slots(Some("frost"), None), true, false),
+            (slots(None, Some("midnight")), false, true),
+            (slots(Some("no-such-theme"), None), true, false),
+            (slots(None, Some("no-such-theme")), false, true),
         ] {
             assert_eq!(
-                check_themes(&a, &reg).unwrap_err().code,
+                check_themes(&a, &reg, dark, light).unwrap_err().code,
                 "invalid_appearance"
             );
         }

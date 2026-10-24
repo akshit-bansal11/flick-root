@@ -13,6 +13,10 @@ interface Props {
   onDone: (completed: boolean) => void;
 }
 
+/** Inline style carrying CSS custom properties; the template-literal index keeps it cast-free. */
+type CssVars = CSSProperties & Record<`--${string}`, string | number>;
+const cssVars = (vars: CssVars): CSSProperties => vars;
+
 const SHOW_LABEL = { type: "Show me", hotkey: "Show me", select: "Show me", theme: "Next theme" };
 
 /** Caps with a unique id each, since a chord list can repeat a cap ("Ctrl" twice). */
@@ -37,7 +41,7 @@ export function Tour({ onDone }: Props) {
         {t.keys.length > 0 && (
           <p className="tour-keys">
             {capList(t.keys).map((c, i) => (
-              <span key={c.id} className="tour-cap" style={{ "--i": i } as CSSProperties}>
+              <span key={c.id} className="tour-cap" style={cssVars({ "--i": i })}>
                 <Keycaps caps={[c.k]} />
               </span>
             ))}
@@ -56,13 +60,11 @@ export function Tour({ onDone }: Props) {
                 key={v.id}
                 type="button"
                 className="tour-swatch"
-                style={
-                  {
-                    "--sw-panel": v.roles.panel,
-                    "--sw-text": v.roles.text,
-                    "--sw-line": v.roles.line,
-                  } as CSSProperties
-                }
+                style={cssVars({
+                  "--sw-panel": v.roles.panel,
+                  "--sw-text": v.roles.text,
+                  "--sw-line": v.roles.line,
+                })}
                 aria-pressed={t.theme === v.id}
                 onClick={() => t.pickTheme(v.id)}
               >
