@@ -17,7 +17,7 @@ const DARK_STATUS: [Rgb; 3] = [
     Rgb(0xf6, 0xad, 0xa6),
 ];
 const LIGHT_STATUS: [Rgb; 3] = [
-    Rgb(0x1e, 0x7f, 0x50),
+    Rgb(0x16, 0x58, 0x3b),
     Rgb(0x6c, 0x46, 0x00),
     Rgb(0x8c, 0x2c, 0x22),
 ];
@@ -154,7 +154,7 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
         });
 
     let status = if dark { DARK_STATUS } else { LIGHT_STATUS };
-    let [ok, warn, err] = status.map(|c| lift_all(c, &[panel], TARGET));
+    let [ok, warn, err] = status.map(|c| lift_all(c, &[panel, bg, sel], TARGET));
 
     let ratios = Ratios {
         text: min_ratio(text, &[panel, bg]),

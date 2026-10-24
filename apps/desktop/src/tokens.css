@@ -54,7 +54,7 @@
   --l-raw-cyan-800: #0a5873;
   --l-raw-cyan-950: #062130;
   --l-raw-green-400: #4cc38a;
-  --l-raw-green-700: #1e7f50;
+  --l-raw-green-800: #16583b;
   --l-raw-red-400: #f6ada6;
   --l-raw-red-700: #8c2c22;
   --l-raw-amber-400: #eab85c;
@@ -197,7 +197,7 @@
     --l-accent-text: var(--l-raw-cyan-800);
     --l-on-accent: var(--l-raw-cyan-50);
     --l-sel: var(--l-raw-mist-300);
-    --l-ok: var(--l-raw-green-700);
+    --l-ok: var(--l-raw-green-800);
     --l-err: var(--l-raw-red-700);
     --l-warn: var(--l-raw-amber-800);
     --l-key-bottom: var(--l-raw-mist-900-16);
@@ -220,7 +220,7 @@
   --l-accent-text: var(--l-raw-cyan-800);
   --l-on-accent: var(--l-raw-cyan-50);
   --l-sel: var(--l-raw-mist-300);
-  --l-ok: var(--l-raw-green-700);
+  --l-ok: var(--l-raw-green-800);
   --l-err: var(--l-raw-red-700);
   --l-warn: var(--l-raw-amber-800);
   --l-key-bottom: var(--l-raw-mist-900-16);
