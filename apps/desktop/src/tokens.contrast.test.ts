@@ -54,7 +54,7 @@ function applies(selector: string, theme: ThemeId, scheme: Scheme): boolean | nu
 }
 
 /** Selectors that are not part of the role cascade. */
-const ALLOWED_UNSUPPORTED = [".tile-letter", ':root[data-glass="off"]'];
+const ALLOWED_UNSUPPORTED = [".tile-letter"];
 
 /** All selectors have equal specificity, so source order is the cascade. */
 function declared(name: string, theme: ThemeId, scheme: Scheme): string | undefined {

@@ -48,8 +48,6 @@
   --l-raw-mist-600: #41545f;
   --l-raw-mist-700: #3b4e5b;
   --l-raw-mist-900: #0f2333;
-  --l-raw-steel-100: #dfe6ec;
-  --l-raw-steel-50: #eef3f6;
   --l-raw-cyan-50: #f2fbff;
   --l-raw-cyan-300: #5cc8e8;
   --l-raw-cyan-200: #6cceea;
@@ -112,56 +110,28 @@
   --l-raw-brown-300: #d1c2b8;
   --l-raw-brown-100: #f6ece4;
 
-  /* Alpha overlays: white, black, mist-900 (light-scheme ink) and the per-theme rim and sheen tints. */
-  --l-raw-white-05: rgb(255 255 255 / 0.05);
-  --l-raw-white-06: rgb(255 255 255 / 0.06);
-  --l-raw-white-07: rgb(255 255 255 / 0.07);
-  --l-raw-white-08: rgb(255 255 255 / 0.08);
-  --l-raw-white-10: rgb(255 255 255 / 0.1);
-  --l-raw-white-14: rgb(255 255 255 / 0.14);
-  --l-raw-white-42: rgb(255 255 255 / 0.42);
-  --l-raw-white-45: rgb(255 255 255 / 0.45);
-  --l-raw-white-55: rgb(255 255 255 / 0.55);
-  --l-raw-white-70: rgb(255 255 255 / 0.7);
-  --l-raw-white-75: rgb(255 255 255 / 0.75);
-  --l-raw-white-90: rgb(255 255 255 / 0.9);
-  --l-raw-white-95: rgb(255 255 255 / 0.95);
+  /* Alpha overlays: black and mist-900 (light-scheme ink), for scrims, flat shadows and key edges. */
   --l-raw-black-30: rgb(0 0 0 / 0.3);
   --l-raw-black-35: rgb(0 0 0 / 0.35);
-  --l-raw-black-40: rgb(0 0 0 / 0.4);
   --l-raw-black-50: rgb(0 0 0 / 0.5);
-  --l-raw-black-65: rgb(0 0 0 / 0.65);
-  --l-raw-black-70: rgb(0 0 0 / 0.7);
-  --l-raw-mist-900-10: rgb(15 35 51 / 0.1);
   --l-raw-mist-900-12: rgb(15 35 51 / 0.12);
   --l-raw-mist-900-16: rgb(15 35 51 / 0.16);
   --l-raw-mist-900-22: rgb(15 35 51 / 0.22);
-  --l-raw-mist-900-30: rgb(15 35 51 / 0.3);
   --l-raw-mist-900-35: rgb(15 35 51 / 0.35);
-  --l-raw-mist-900-38: rgb(15 35 51 / 0.38);
-  --l-raw-blue-rim-20: rgb(60 110 180 / 0.2);
-  --l-raw-sky-05: rgb(120 200 255 / 0.05);
-  --l-raw-sky-10: rgb(120 200 255 / 0.1);
-  --l-raw-sky-40: rgb(120 200 255 / 0.4);
-  --l-raw-sand-05: rgb(255 190 110 / 0.05);
-  --l-raw-sand-10: rgb(255 190 110 / 0.1);
-  --l-raw-sand-40: rgb(255 190 110 / 0.4);
-  --l-raw-teal-16: rgb(45 212 191 / 0.16);
-  --l-raw-teal-50: rgb(45 212 191 / 0.5);
-  --l-raw-violet-16: rgb(167 139 250 / 0.16);
-  --l-raw-violet-50: rgb(167 139 250 / 0.5);
 }
 
 /* Scales (theme independent): type, space, radius, sizes, motion, mixes. */
 :root {
-  --l-ui: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+  --l-ui: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  /* Prose only: the Ask answer and long help text. Everything else is chrome and uses --l-ui. */
+  --l-prose: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
   --l-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
 
   --l-fs-micro: 11px;
   --l-lh-micro: 14px;
   --l-fs-caption: 12px;
   --l-lh-caption: 16px;
-  --l-fs-body: 14px;
+  --l-fs-body: 13px;
   --l-lh-body: 20px;
   --l-fs-input: 18px;
   --l-lh-input: 24px;
@@ -185,9 +155,9 @@
   --l-sp-11: 32px;
   --l-sp-12: 48px;
 
-  --l-r-key: 5px;
-  --l-r-control: 10px;
-  --l-r-card: 14px;
+  --l-r-key: 2px;
+  --l-r-control: 2px;
+  --l-r-card: 2px;
   /* Fixed by DWMWCP_ROUND, do not raise it; Rust window.rs sets that corner mode. */
   --l-r-window: 8px;
   --l-r-pill: 999px;
@@ -225,9 +195,8 @@
   --l-dur-caret: 1s;
   --l-stagger: 12ms;
   --l-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  /* The spring is the glass droplet settling. It is used only by the selection lens, the prefix chip and
-     switch thumbs; everything else uses ease-out. Reduced motion zeroes the durations. */
-  --l-ease-liquid: cubic-bezier(0.3, 1.35, 0.55, 1);
+  /* Alias until C1 removes the glass consumers; there is no spring any more. */
+  --l-ease-liquid: var(--l-ease-out);
 
   --l-sel-mix: 14%;
   --l-kbd-mix: 8%;
@@ -266,21 +235,11 @@
   --l-focus: var(--l-accent);
   --l-control-edge: var(--l-muted);
   --l-hover: var(--l-surface);
-  --l-hairline: var(--l-raw-white-08);
-  --l-rim-top: var(--l-raw-white-42);
-  --l-rim-low: var(--l-raw-white-05);
-  --l-spec: var(--l-raw-white-14);
-  --l-sheen: var(--l-raw-white-07);
-  --l-raise: var(--l-raw-white-06);
-  --l-raise-hover: var(--l-raw-white-10);
   --l-key-bottom: var(--l-raw-black-35);
   --l-warn-wash: color-mix(in oklab, var(--l-warn) 14%, transparent);
-  --l-droplet: linear-gradient(180deg, var(--l-raw-white), var(--l-raw-steel-100));
-  --l-shadow-raised: 0 1px 1px var(--l-raw-black-30), 0 6px 16px -6px var(--l-raw-black-50);
-  --l-shadow-overlay: 0 18px 48px -14px var(--l-raw-black-65), 0 2px 6px var(--l-raw-black-35);
-  --l-shadow-window: 0 40px 90px -20px var(--l-raw-black-70), 0 6px 18px var(--l-raw-black-40);
-  /* Decorative wallpaper behind the Settings mini-launcher preview. */
-  --l-preview-wall: linear-gradient(135deg, var(--l-raw-navy-850), var(--l-raw-indigo-800));
+  --l-shadow-raised: 0 1px 2px var(--l-raw-black-30);
+  --l-shadow-overlay: 0 8px 24px var(--l-raw-black-50);
+  --l-shadow-window: 0 8px 24px var(--l-raw-black-50);
 }
 
 /* Roles, light: the OS-preference fallback (no data-scheme yet), then the resolved light scheme and frost. */
@@ -303,24 +262,11 @@
     --l-err: var(--l-raw-red-700);
     --l-warn: var(--l-raw-amber-800);
     --l-scrim: var(--l-raw-mist-900-35);
-    --l-hairline: var(--l-raw-mist-900-10);
-    --l-rim-top: var(--l-raw-white-95);
-    --l-rim-low: var(--l-raw-mist-900-12);
-    --l-spec: var(--l-raw-white-90);
-    --l-sheen: var(--l-raw-white-45);
-    --l-raise: var(--l-raw-white-55);
-    --l-raise-hover: var(--l-raw-white-75);
     --l-key-bottom: var(--l-raw-mist-900-16);
     --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
-    --l-droplet: linear-gradient(180deg, var(--l-raw-white), var(--l-raw-steel-50));
-    --l-shadow-raised: 0 1px 1px var(--l-raw-mist-900-10), 0 6px 14px -6px var(--l-raw-mist-900-22);
-    --l-shadow-overlay:
-      0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
-    --l-shadow-window:
-      0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
-    --l-lens: color-mix(in oklab, var(--l-accent) 11%, var(--l-raise));
-    --l-lens-ring: color-mix(in oklab, var(--l-accent) 38%, transparent);
-    --l-preview-wall: linear-gradient(135deg, var(--l-raw-frost-150), var(--l-raw-cyan-300));
+    --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
+    --l-shadow-overlay: 0 8px 24px var(--l-raw-mist-900-22);
+    --l-shadow-window: 0 8px 24px var(--l-raw-mist-900-22);
   }
 }
 
@@ -343,49 +289,35 @@
   --l-err: var(--l-raw-red-700);
   --l-warn: var(--l-raw-amber-800);
   --l-scrim: var(--l-raw-mist-900-35);
-  --l-hairline: var(--l-raw-mist-900-10);
-  --l-rim-top: var(--l-raw-white-95);
-  --l-rim-low: var(--l-raw-mist-900-12);
-  --l-spec: var(--l-raw-white-90);
-  --l-sheen: var(--l-raw-white-45);
-  --l-raise: var(--l-raw-white-55);
-  --l-raise-hover: var(--l-raw-white-75);
   --l-key-bottom: var(--l-raw-mist-900-16);
   --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
-  --l-droplet: linear-gradient(180deg, var(--l-raw-white), var(--l-raw-steel-50));
-  --l-shadow-raised: 0 1px 1px var(--l-raw-mist-900-10), 0 6px 14px -6px var(--l-raw-mist-900-22);
-  --l-shadow-overlay:
-    0 18px 44px -14px var(--l-raw-mist-900-30), 0 2px 6px var(--l-raw-mist-900-12);
-  --l-shadow-window:
-    0 36px 80px -20px var(--l-raw-mist-900-38), 0 4px 14px var(--l-raw-mist-900-16);
-  --l-preview-wall: linear-gradient(135deg, var(--l-raw-frost-150), var(--l-raw-cyan-300));
+  --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
+  --l-shadow-overlay: 0 8px 24px var(--l-raw-mist-900-22);
+  --l-shadow-window: 0 8px 24px var(--l-raw-mist-900-22);
 }
 
-/* Derived glass tokens. Declared on the element so a themed child (the Settings swatch) recomputes them.
-   Dark amounts first, light amounts after. */
+/* Flat aliases for the retired glass tokens. Declared on the element so a themed child (the Settings swatch)
+   recomputes them. Card C1 deletes them with their last consumer. */
 :root,
 [data-theme],
 [data-scheme] {
-  --l-lens: color-mix(in oklab, var(--l-accent) 15%, var(--l-raise));
-  --l-lens-ring: color-mix(in oklab, var(--l-accent) 42%, transparent);
-  --l-rim: linear-gradient(
-    180deg,
-    var(--l-rim-top),
-    var(--l-rim-low) 45%,
-    var(--l-rim-low) 80%,
-    color-mix(in oklab, var(--l-rim-top) 45%, transparent)
-  );
-  --l-sheen-bg: linear-gradient(180deg, var(--l-sheen), transparent);
-  --l-glass-tint: color-mix(in srgb, var(--l-panel) var(--l-glass-alpha), transparent);
+  --l-hairline: var(--l-line);
+  --l-rim-top: transparent;
+  --l-rim-low: transparent;
+  --l-spec: transparent;
+  --l-sheen: transparent;
+  --l-raise: var(--l-surface);
+  --l-raise-hover: var(--l-surface);
+  --l-droplet: none;
+  --l-lens: var(--l-sel);
+  --l-lens-ring: var(--l-line);
+  --l-rim: none;
+  --l-sheen-bg: none;
+  --l-glass-tint: var(--l-panel);
+  --l-preview-wall: var(--l-bg);
   --l-mica-tint: color-mix(in srgb, var(--l-bg) 40%, transparent);
   --l-border: 1px solid var(--l-line);
   --l-border-hair: 1px solid var(--l-hairline);
-}
-
-[data-scheme="light"],
-[data-theme="frost"] {
-  --l-lens: color-mix(in oklab, var(--l-accent) 11%, var(--l-raise));
-  --l-lens-ring: color-mix(in oklab, var(--l-accent) 38%, transparent);
 }
 
 /* Named themes. Each states its target; contrast is measured by the contrast test (D1.2).
@@ -404,9 +336,6 @@
   --l-accent-text: var(--l-raw-blue-800);
   --l-on-accent: var(--l-raw-white);
   --l-sel: var(--l-raw-frost-150);
-  --l-rim-top: var(--l-raw-white);
-  --l-rim-low: var(--l-raw-blue-rim-20);
-  --l-sheen: var(--l-raw-white-70);
 }
 
 /* midnight: deep navy, cyan accent. Forces dark. Target: pale text on near-black navy. */
@@ -422,12 +351,9 @@
   --l-accent-text: var(--l-raw-cyan-400);
   --l-on-accent: var(--l-raw-navy-990);
   --l-sel: var(--l-raw-navy-700);
-  --l-rim-top: var(--l-raw-sky-40);
-  --l-rim-low: var(--l-raw-sky-05);
-  --l-sheen: var(--l-raw-sky-10);
 }
 
-/* aurora: dark with a teal-to-violet sheen, violet accent. Forces dark. Target: pale text on deep indigo. */
+/* aurora: dark indigo, violet accent. Forces dark. Target: pale text on deep indigo. */
 [data-theme="aurora"] {
   --l-bg: var(--l-raw-indigo-950);
   --l-panel: var(--l-raw-indigo-900);
@@ -440,13 +366,6 @@
   --l-accent-text: var(--l-raw-violet-300);
   --l-on-accent: var(--l-raw-indigo-990);
   --l-sel: var(--l-raw-indigo-750);
-  --l-rim: linear-gradient(135deg, var(--l-raw-teal-50), var(--l-raw-violet-50));
-  --l-sheen-bg: linear-gradient(
-    135deg,
-    var(--l-raw-teal-16),
-    var(--l-raw-violet-16) 60%,
-    transparent
-  );
 }
 
 /* ember: dark warm, amber accent. Forces dark. Target: warm off-white text on near-black brown. */
@@ -462,28 +381,6 @@
   --l-accent-text: var(--l-raw-amber-300);
   --l-on-accent: var(--l-raw-amber-990);
   --l-sel: var(--l-raw-brown-750);
-  --l-rim-top: var(--l-raw-sand-40);
-  --l-rim-low: var(--l-raw-sand-05);
-  --l-sheen: var(--l-raw-sand-10);
-}
-
-/* solid: opaque panel (tint = panel). theme.ts sets data-glass="off", which also drops the sheen. Uses the base palette. */
-[data-theme="solid"] {
-  --l-glass-tint: var(--l-panel);
-  --l-sheen-bg: none;
-}
-
-/* Modifiers. Opaque panel: Windows transparency off (data-glass set from Rust) or reduced transparency. */
-:root[data-glass="off"] {
-  --l-glass-tint: var(--l-panel);
-  --l-sheen-bg: none;
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --l-glass-tint: var(--l-panel);
-    --l-sheen-bg: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

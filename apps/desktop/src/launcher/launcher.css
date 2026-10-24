@@ -8,43 +8,17 @@ body,
   color: var(--l-text);
 }
 
-/* Base glass. DWM acrylic blurs the desktop and carries the shadow, so the panel has no backdrop-filter. */
+/* Flat opaque panel with a 1px line edge. The edge is an inset shadow because a shadow outside the window is clipped. */
 .launcher {
   position: relative;
   width: 100%;
   max-height: var(--l-panel-max);
   display: flex;
   flex-direction: column;
-  background: var(--l-glass-tint);
+  background: var(--l-panel);
   border-radius: var(--l-r-window);
   overflow: hidden;
-  box-shadow: none;
-}
-
-/* Specular sheen across the top of the glass. */
-.launcher::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 90px;
-  background: var(--l-sheen-bg);
-  pointer-events: none;
-}
-
-/* 1px specular rim whose brightness fades top to bottom (masked ring). */
-.launcher::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: var(--l-rim);
-  mask:
-    linear-gradient(var(--l-mask) 0 0) content-box,
-    linear-gradient(var(--l-mask) 0 0);
-  mask-composite: exclude;
-  pointer-events: none;
-  z-index: 1;
+  box-shadow: inset 0 0 0 1px var(--l-line);
 }
 
 .launch-error {
