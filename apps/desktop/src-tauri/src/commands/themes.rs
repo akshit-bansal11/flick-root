@@ -120,17 +120,6 @@ pub async fn list_themes(state: State<'_, Arc<AppState>>) -> Result<Vec<ThemeVie
     Ok(theme_views(&state.themes.load()))
 }
 
-/// The theme currently in force for the configured scheme.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ActiveTheme {
-    /// Theme id.
-    pub id: String,
-    /// True when the panel is dark.
-    pub dark: bool,
-    /// Derived role colours.
-    pub roles: Roles,
-}
-
 /// Whether a configured scheme resolves to dark; "system" follows Windows.
 pub fn scheme_is_dark(scheme: &str) -> bool {
     match scheme {
@@ -141,35 +130,6 @@ pub fn scheme_is_dark(scheme: &str) -> bool {
         #[cfg(not(windows))]
         _ => true,
     }
-}
-
-/// Resolves scheme, then the configured id for that scheme, then the registry; an unknown id
-/// falls back to the code default. `None` only if the registry lost its defaults.
-pub fn active_theme_in(
-    registry: &ThemeRegistry,
-    dark: bool,
-    dark_id: &str,
-    light_id: &str,
-) -> Option<ActiveTheme> {
-    let id = if dark { dark_id } else { light_id };
-    let theme = registry.get(id).or_else(|| registry.default_for(dark))?;
-    Some(ActiveTheme {
-        id: theme.seed.id.clone(),
-        dark,
-        roles: theme.resolved.roles.clone(),
-    })
-}
-
-/// The active theme for the live config.
-pub fn active_theme(state: &AppState) -> Option<ActiveTheme> {
-    let cfg = state.config.load();
-    let a = &cfg.appearance;
-    active_theme_in(
-        &state.themes.load(),
-        scheme_is_dark(&a.scheme),
-        a.dark_id(),
-        a.light_id(),
-    )
 }
 
 #[cfg(test)]
@@ -214,25 +174,5 @@ mod tests {
             ["builtin", "port", "imported"].contains(&source),
             "{source}"
         );
-    }
-
-    #[test]
-    fn active_theme_in_picks_slot_by_scheme() {
-        let reg = registry();
-        let dark = active_theme_in(&reg, true, "midnight", "frost").expect("dark");
-        assert_eq!(dark.id, "midnight");
-        assert!(dark.dark);
-        let light = active_theme_in(&reg, false, "midnight", "frost").expect("light");
-        assert_eq!(light.id, "frost");
-        assert!(!light.dark);
-    }
-
-    #[test]
-    fn active_theme_in_falls_back_to_default_for_unknown_id() {
-        let reg = registry();
-        let dark = active_theme_in(&reg, true, "nope", "nope").expect("dark");
-        assert_eq!(dark.id, DEFAULT_THEME_ID);
-        let light = active_theme_in(&reg, false, "nope", "nope").expect("light");
-        assert_eq!(light.id, DEFAULT_THEME_LIGHT_ID);
     }
 }

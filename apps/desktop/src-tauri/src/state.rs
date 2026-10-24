@@ -1624,6 +1624,14 @@ pub fn shutdown(app: &AppHandle) {
     state.save_snapshot();
 }
 
+/// Bundled themes; a bad seed is logged and only the two code defaults are kept.
+fn build_themes() -> launcher_core::theme::Registry {
+    launcher_core::theme::Registry::builtin().unwrap_or_else(|e| {
+        tracing::warn!("bundled themes failed to load, using defaults only: {e}");
+        launcher_core::theme::Registry::defaults_only()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2158,12 +2166,4 @@ mod tests {
         ];
         assert_eq!(drive_letters(&roots), ['D']);
     }
-}
-
-/// Bundled themes; a bad seed is logged and only the two code defaults are kept.
-fn build_themes() -> launcher_core::theme::Registry {
-    launcher_core::theme::Registry::builtin().unwrap_or_else(|e| {
-        tracing::warn!("bundled themes failed to load, using defaults only: {e}");
-        launcher_core::theme::Registry::defaults_only()
-    })
 }
