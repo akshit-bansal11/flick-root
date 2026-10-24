@@ -232,6 +232,12 @@ pub struct Appearance {
     pub glass: u8,
     /// One of [`SCHEMES`].
     pub scheme: String,
+    /// Theme id used in the dark scheme; absent means the built-in dark default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dark_theme: Option<String>,
+    /// Theme id used in the light scheme; absent means the built-in light default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub light_theme: Option<String>,
 }
 
 impl Default for Appearance {
@@ -240,11 +246,76 @@ impl Default for Appearance {
             theme: "glass".into(),
             glass: 90,
             scheme: "system".into(),
+            dark_theme: None,
+            light_theme: None,
         }
     }
 }
 
+/// Keeps only `[a-z0-9:-]` so an id can be shown in an error without echoing arbitrary text.
+fn safe_id(id: &str) -> String {
+    id.chars()
+        .filter(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, ':' | '-'))
+        .collect()
+}
+
 impl Appearance {
+    /// Theme id for the dark scheme: the stored id or [`brand::DEFAULT_THEME_ID`].
+    pub fn dark_id(&self) -> &str {
+        self.dark_theme
+            .as_deref()
+            .unwrap_or(brand::DEFAULT_THEME_ID)
+    }
+
+    /// Theme id for the light scheme: the stored id or [`brand::DEFAULT_THEME_LIGHT_ID`].
+    pub fn light_id(&self) -> &str {
+        self.light_theme
+            .as_deref()
+            .unwrap_or(brand::DEFAULT_THEME_LIGHT_ID)
+    }
+
+    /// Maps the legacy `theme` value onto the two theme slots, once: runs only while both slots
+    /// are unset. `frost` becomes the light theme, `midnight`, `aurora` and `ember` the dark
+    /// theme; `glass` and `solid` leave the defaults. When the old theme forced a scheme and
+    /// `scheme` is `system`, the scheme becomes that one so the look is kept.
+    pub fn migrate_legacy(&mut self) {
+        if self.dark_theme.is_some() || self.light_theme.is_some() {
+            return;
+        }
+        let dark = match self.theme.as_str() {
+            "frost" => false,
+            "midnight" | "aurora" | "ember" => true,
+            _ => return,
+        };
+        if dark {
+            self.dark_theme = Some(self.theme.clone());
+        } else {
+            self.light_theme = Some(self.theme.clone());
+        }
+        if self.scheme == "system" {
+            self.scheme = if dark { "dark" } else { "light" }.into();
+        }
+    }
+
+    /// Checks both theme slots against `lookup`, which returns `Some(is_dark)` for a known id and
+    /// `None` for an unknown one. The dark slot must hold a dark theme, the light slot a light one.
+    pub fn validate_themes(&self, lookup: &dyn Fn(&str) -> Option<bool>) -> Result<(), String> {
+        for (slot, id, want_dark) in [
+            ("dark_theme", self.dark_id(), true),
+            ("light_theme", self.light_id(), false),
+        ] {
+            match lookup(id) {
+                None => return Err(format!("{slot}: unknown theme {}", safe_id(id))),
+                Some(is_dark) if is_dark != want_dark => {
+                    let kind = if want_dark { "dark" } else { "light" };
+                    return Err(format!("{slot}: {} is not a {kind} theme", safe_id(id)));
+                }
+                Some(_) => {}
+            }
+        }
+        Ok(())
+    }
+
     /// Pulls a stored glass value into [`GLASS_RANGE`], for configs saved under an older range.
     pub fn clamp_glass(&mut self) {
         self.glass = self.glass.clamp(*GLASS_RANGE.start(), *GLASS_RANGE.end());
@@ -756,6 +827,7 @@ impl Config {
         {
             c.appearance.scheme = t;
         }
+        c.appearance.migrate_legacy();
         Ok(c)
     }
 
