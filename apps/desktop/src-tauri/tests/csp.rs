@@ -68,6 +68,7 @@ fn settings_lacks_launcher_commands() {
         "ask-stream",
         "web-search",
         "tray-action",
+        "home-items",
     ] {
         assert!(!p.contains(&format!("allow-{c}")), "settings has {c}");
     }

@@ -6,6 +6,7 @@ fn main() {
         "open_settings",
         "tray_action",
         "search",
+        "home_items",
         "launch",
         "reveal",
         "copy_path",

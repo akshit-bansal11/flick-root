@@ -390,6 +390,32 @@ pub(crate) fn file_item(h: FileHit) -> Item {
     }
 }
 
+/// A recent app or program as a result row (score 0), for the home list.
+/// `idx` is the entry's position in its own list; see [`app_item`].
+pub fn app_row(a: &AppEntry, idx: usize, program: bool, removable: bool) -> Item {
+    app_item(a, idx, 0.0, program, removable)
+}
+
+/// A recent file or folder as a result row, built from the path alone (no disk access).
+/// Same actions and payload as a Find hit; a missing file is reported when it is launched.
+pub fn recent_file_row(path: &str, is_dir: bool) -> Item {
+    let p = std::path::Path::new(path);
+    file_item(FileHit {
+        idx: 0,
+        path: p.to_path_buf(),
+        name: p
+            .file_name()
+            .map_or_else(|| path.to_owned(), |n| n.to_string_lossy().into_owned()),
+        parent: p
+            .parent()
+            .map(|d| d.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        is_dir,
+        score: 0,
+        modified: 0,
+    })
+}
+
 /// Find-mode results from the file index, at most `k`.
 pub fn find_search(index: &FileIndex, overlay: &Overlay, input: &Input, k: usize) -> Vec<Item> {
     let q = FindQuery {
@@ -788,5 +814,33 @@ mod tests {
         assert_eq!(top("lock", &r).source, "syscmd");
         assert_eq!(top("g cats", &r).source, "web");
         assert_eq!(top("notepad", &r).title, "Notepad");
+    }
+
+    #[test]
+    fn recent_file_row_file_fields() {
+        let it = recent_file_row("C:\\docs\\notes.txt", false);
+        assert_eq!(it.id.0, "file:C:\\docs\\notes.txt");
+        assert_eq!(it.title, "notes.txt");
+        assert_eq!(it.subtitle, "C:\\docs");
+        assert_eq!(it.kind, ItemKind::File);
+        assert_eq!(
+            it.actions,
+            vec![
+                ActionKind::Primary,
+                ActionKind::Location,
+                ActionKind::CopyPath
+            ]
+        );
+        assert_eq!(it.payload["path"], "C:\\docs\\notes.txt");
+    }
+
+    #[test]
+    fn recent_file_row_folder_kind() {
+        let it = recent_file_row("C:\\docs\\work", true);
+        assert_eq!(it.id.0, "file:C:\\docs\\work");
+        assert_eq!(it.title, "work");
+        assert_eq!(it.subtitle, "C:\\docs");
+        assert_eq!(it.kind, ItemKind::Folder);
+        assert_eq!(it.payload["path"], "C:\\docs\\work");
     }
 }

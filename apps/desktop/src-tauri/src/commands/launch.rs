@@ -4,7 +4,7 @@ use crate::state::AppState;
 use features::search::program_entry;
 use index_apps::AppsError;
 use index_apps::launch as ia;
-use launcher_core::{Action, ActionKind, Item, Outcome};
+use launcher_core::{Action, ActionKind, Input, Item, Mode, Outcome};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -225,9 +225,23 @@ pub async fn launch(
     Ok(outcome)
 }
 
+/// The input a pick is recorded under. A home row (recent list, nothing typed) gets an empty one so
+/// no stale prefix is learned from the last search.
+fn record_input(last: Option<Input>, it: &Item) -> Option<Input> {
+    if it.payload.get("home").is_some() {
+        return Some(Input {
+            raw: String::new(),
+            text: String::new(),
+            mode: Mode::Command,
+            seq: 0,
+        });
+    }
+    last
+}
+
 /// Frecency (via `on_chosen`) owns history writes; the shell only notifies features.
 fn record(state: &AppState, it: &Item) {
-    if let Some(input) = state.last_input.lock().clone() {
+    if let Some(input) = record_input(state.last_input.lock().clone(), it) {
         state.registry.on_chosen_all(&input, it);
     }
 }
@@ -381,5 +395,46 @@ mod tests {
         assert_eq!(parse_id("app:p.X"), IdRef::App("p.X"));
         assert_eq!(parse_id("file:C:\\a b"), IdRef::File("C:\\a b"));
         assert_eq!(parse_id("calc:1"), IdRef::Other);
+    }
+
+    fn item_with(payload: serde_json::Value) -> Item {
+        use launcher_core::{ItemId, ItemKind};
+        Item {
+            id: ItemId("app:x".into()),
+            kind: ItemKind::App,
+            title: "X".into(),
+            subtitle: String::new(),
+            icon: None,
+            score: 0.0,
+            source: "apps".into(),
+            actions: vec![],
+            payload,
+        }
+    }
+
+    fn typed() -> Input {
+        Input {
+            raw: "f code".into(),
+            text: "code".into(),
+            mode: Mode::Find,
+            seq: 7,
+        }
+    }
+
+    #[test]
+    fn record_input_home_row_is_empty_command() {
+        let it = item_with(serde_json::json!({ "home": "recent" }));
+        let got = record_input(Some(typed()), &it).expect("home row always records");
+        assert_eq!(got.raw, "");
+        assert_eq!(got.text, "");
+        assert_eq!(got.mode, Mode::Command);
+        assert!(record_input(None, &it).is_some());
+    }
+
+    #[test]
+    fn record_input_normal_row_passes_last_through() {
+        let it = item_with(serde_json::json!({ "path": "C:\\a" }));
+        assert_eq!(record_input(Some(typed()), &it), Some(typed()));
+        assert_eq!(record_input(None, &it), None);
     }
 }
