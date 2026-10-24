@@ -144,13 +144,13 @@
   gap: var(--l-sp-4);
 }
 
-/* Each swatch carries its own data-theme, so it paints with that theme's tokens. */
+/* Each swatch gets its theme's panel, text and line colours as inline --sw-* properties. */
 .tour-swatch {
   padding: var(--l-sp-3) var(--l-sp-7);
-  border: var(--l-border);
+  border: 1px solid var(--sw-line);
   border-radius: var(--l-r-pill);
-  background: var(--l-panel);
-  color: var(--l-text);
+  background: var(--sw-panel);
+  color: var(--sw-text);
   font: inherit;
   cursor: pointer;
 }

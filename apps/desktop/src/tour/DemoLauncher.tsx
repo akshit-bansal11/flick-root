@@ -1,16 +1,15 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { LauncherView } from "../launcher/LauncherView";
-import { resolveScheme, type ThemeId } from "../theme";
+import { applyTheme, type ThemeView } from "../theme";
 import type { useDemo } from "./useDemo";
 
 interface Props {
   demo: ReturnType<typeof useDemo>;
-  theme: ThemeId;
+  /** Resolved theme to preview; null keeps the tokens.css defaults. */
+  theme: ThemeView | null;
   /** False before the hotkey step is done: the bar is dimmed and waits for the hotkey. */
   open: boolean;
 }
-
-const systemDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
 
 /** The real launcher panel inside the tour. Themed on its own element; effects are fake. */
 export function DemoLauncher({ demo, theme, open }: Props) {
@@ -18,8 +17,7 @@ export function DemoLauncher({ demo, theme, open }: Props) {
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    el.dataset.theme = theme;
-    el.dataset.scheme = resolveScheme({ theme, glass: 100, scheme: "system" }, systemDark());
+    applyTheme(el, theme);
   }, [theme]);
 
   // Focus moves into the bar as soon as it opens (and on first mount of a later step).

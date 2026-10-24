@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { FORCED_SCHEME, GLASS_DEFAULT, GLASS_MAX, GLASS_MIN, THEMES, type ThemeId } from "./theme";
+import { GLASS_DEFAULT, GLASS_MAX, GLASS_MIN } from "./theme";
 import css from "./tokens.css?raw";
 
 type Scheme = "dark" | "light";
+
+// U1b3 deletes the CSS theme blocks and this list. Ids with a `[data-theme=...]` block left in tokens.css,
+// and the scheme each one forces (none: it follows the scheme).
+const THEMES = ["glass", "frost", "midnight", "aurora", "ember", "solid"] as const;
+type ThemeId = (typeof THEMES)[number];
+const FORCED_SCHEME: Partial<Record<ThemeId, Scheme>> = {
+  frost: "light",
+  midnight: "dark",
+  aurora: "dark",
+  ember: "dark",
+};
 type Rgb = readonly [number, number, number];
 interface Rule {
   selectors: string[];

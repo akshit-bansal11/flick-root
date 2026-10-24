@@ -96,33 +96,3 @@ export function applyTheme(root: HTMLElement, active: ActiveTheme | null) {
   }
   root.dataset.scheme = scheme;
 }
-
-// Legacy exports below: removed in U1b2 (the tour still uses them) and U1b3 (tokens.contrast.test.ts).
-export const THEMES = ["glass", "frost", "midnight", "aurora", "ember", "solid"] as const;
-export type ThemeId = (typeof THEMES)[number];
-
-/** Lowest tint opacity that keeps every text role at 4.5:1 over a white or black backdrop (tokens.contrast.test.ts). */
-export const GLASS_MIN = 80;
-export const GLASS_MAX = 95;
-export const GLASS_DEFAULT = 90;
-
-/** Themes whose palette only works in one scheme. */
-export const FORCED_SCHEME: Partial<Record<ThemeId, "dark" | "light">> = {
-  frost: "light",
-  midnight: "dark",
-  aurora: "dark",
-  ember: "dark",
-};
-
-interface LegacyAppearance {
-  theme: ThemeId;
-  glass: number;
-  scheme: Scheme;
-}
-
-/** The dark/light scheme a legacy theme renders in. */
-export function resolveScheme(a: LegacyAppearance, systemDark: boolean): "dark" | "light" {
-  const forced = FORCED_SCHEME[a.theme];
-  if (forced) return forced;
-  return a.scheme === "system" ? (systemDark ? "dark" : "light") : a.scheme;
-}

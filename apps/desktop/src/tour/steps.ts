@@ -1,5 +1,4 @@
 import { caps, capsOf, capsText, chordOf, fromEvent } from "../shortcuts";
-import type { ThemeId } from "../theme";
 import type { LaunchMode } from "../types";
 
 /** Things the user did in the demo that a step can wait for. */
@@ -212,12 +211,12 @@ export function isAccelerator(accel: string, e: Parameters<typeof fromEvent>[0])
   return want !== null && chordOf(fromEvent(e)) === want;
 }
 
-/** Theme choices offered by the Themes step. */
-export const TOUR_THEMES: readonly ThemeId[] = [
-  "glass",
+/** Registry ids of the theme choices offered by the Themes step, in display order. */
+export const TOUR_THEMES: readonly string[] = [
+  "flick-default",
+  "flick-default-light",
   "frost",
   "midnight",
   "aurora",
   "ember",
-  "solid",
 ];

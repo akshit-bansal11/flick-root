@@ -4,7 +4,7 @@ import "../launcher/launcher.css";
 import { MODES } from "../launcher/reducer";
 import { DemoLauncher } from "./DemoLauncher";
 import { Logo } from "./Logo";
-import { isLastStep, TOUR_STEPS, TOUR_THEMES } from "./steps";
+import { isLastStep, TOUR_STEPS } from "./steps";
 import { useTour } from "./useTour";
 import "./tour.css";
 
@@ -29,7 +29,7 @@ export function Tour({ onDone }: Props) {
   return (
     <section className="tour" aria-label="Interactive tour">
       <div className="tour-stage">
-        <DemoLauncher demo={t.demo} theme={t.theme} open={t.open} />
+        <DemoLauncher demo={t.demo} theme={t.themeView} open={t.open} />
       </div>
       <div className="tour-card" key={def.id} aria-live="polite">
         <h2 className="tour-title">{def.title}</h2>
@@ -51,16 +51,22 @@ export function Tour({ onDone }: Props) {
         {def.id === "themes" && (
           <fieldset className="tour-themes">
             <legend className="sr-only">Themes</legend>
-            {TOUR_THEMES.map((id) => (
+            {t.themes.map((v) => (
               <button
-                key={id}
+                key={v.id}
                 type="button"
                 className="tour-swatch"
-                data-theme={id}
-                aria-pressed={t.theme === id}
-                onClick={() => t.pickTheme(id)}
+                style={
+                  {
+                    "--sw-panel": v.roles.panel,
+                    "--sw-text": v.roles.text,
+                    "--sw-line": v.roles.line,
+                  } as CSSProperties
+                }
+                aria-pressed={t.theme === v.id}
+                onClick={() => t.pickTheme(v.id)}
               >
-                {id}
+                {v.name}
               </button>
             ))}
             <button type="button" className="tour-link" onClick={t.saveTheme}>

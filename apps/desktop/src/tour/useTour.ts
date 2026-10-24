@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isBrowserChord } from "../launcher/keys";
 import * as api from "../settings/api";
 import { fromEvent, matches, shortcut } from "../shortcuts";
-import type { ThemeId } from "../theme";
+import type { ThemeView } from "../theme";
 import { ghostType, SAMPLE_PARAGRAPH } from "./demo";
 import {
   ADVANCE_MS,
@@ -27,7 +27,8 @@ export function useTour(onDone: (completed: boolean) => void) {
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState<ReadonlySet<TourEvent>>(new Set());
   const [completed, setCompleted] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>("glass");
+  const [theme, setTheme] = useState<string>(TOUR_THEMES[0] ?? "");
+  const [themes, setThemes] = useState<ThemeView[]>([]);
   const [themeSaved, setThemeSaved] = useState(false);
   const [hotkeys, setHotkeys] = useState({ launcher: "Alt+Space", explain: "Alt+Shift+Space" });
   const sample = useRef<HTMLParagraphElement>(null);
@@ -48,6 +49,10 @@ export function useTour(onDone: (completed: boolean) => void) {
     api
       .getSettings()
       .then((s) => setHotkeys({ launcher: s.hotkeyLauncher, explain: s.hotkeyExplain }))
+      .catch(warn);
+    api
+      .listThemes()
+      .then((all) => setThemes(TOUR_THEMES.flatMap((id) => all.filter((x) => x.id === id))))
       .catch(warn);
     const resume = () => {
       api.setHotkeysPaused(false).catch(warn);
@@ -131,7 +136,7 @@ export function useTour(onDone: (completed: boolean) => void) {
   }, [dispatch, mark]);
 
   const pickTheme = useCallback(
-    (t: ThemeId) => {
+    (t: string) => {
       setTheme(t);
       setThemeSaved(false);
       mark("theme");
@@ -140,11 +145,13 @@ export function useTour(onDone: (completed: boolean) => void) {
   );
 
   const saveTheme = useCallback(() => {
+    const view = themes.find((x) => x.id === theme);
+    if (!view) return;
     api
-      .setAppearance({ theme })
+      .setAppearance(view.dark ? { darkTheme: view.id } : { lightTheme: view.id })
       .then(() => setThemeSaved(true))
       .catch(warn);
-  }, [theme]);
+  }, [theme, themes]);
 
   const showMe = useCallback(() => {
     stopGhost();
@@ -165,9 +172,11 @@ export function useTour(onDone: (completed: boolean) => void) {
         capture();
         break;
       }
-      case "theme":
-        pickTheme(TOUR_THEMES[(TOUR_THEMES.indexOf(theme) + 1) % TOUR_THEMES.length] ?? theme);
+      case "theme": {
+        const i = themes.findIndex((x) => x.id === theme);
+        pickTheme(themes[(i + 1) % themes.length]?.id ?? theme);
         break;
+      }
       case "type":
         if (!def.example) break;
         reset();
@@ -181,7 +190,7 @@ export function useTour(onDone: (completed: boolean) => void) {
         );
         break;
     }
-  }, [def, stopGhost, mark, capture, pickTheme, theme, reset, inputRef, dispatch]);
+  }, [def, stopGhost, mark, capture, pickTheme, theme, themes, reset, inputRef, dispatch]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -219,6 +228,8 @@ export function useTour(onDone: (completed: boolean) => void) {
     def,
     demo,
     theme,
+    themes,
+    themeView: themes.find((x) => x.id === theme) ?? null,
     themeSaved,
     completed,
     open: step !== 0 || seen.has("hotkey"),
