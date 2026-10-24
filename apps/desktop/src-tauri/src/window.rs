@@ -548,8 +548,11 @@ mod tests {
 
     #[test]
     fn max_height_fits_short_screens() {
-        // 1366x768 at 125%: work area 1366x728 physical -> 582 logical, minus margin.
-        assert!((max_height(728, 1.25) - (582.4 - WORK_MARGIN)).abs() < 1e-9);
+        // 1366x768 at 125%: work area 728 physical -> 582.4 logical; the full panel fits.
+        assert_eq!(max_height(728, 1.25), PANEL_MAX_H);
+        // 1280x720 at 150%: work area 680 physical -> 453.3 logical, minus margin, so it caps.
+        assert!((max_height(680, 1.5) - (680.0 / 1.5 - WORK_MARGIN)).abs() < 1e-9);
+        assert!(max_height(680, 1.5) < PANEL_MAX_H);
         assert_eq!(max_height(2000, 1.0), PANEL_MAX_H);
         assert_eq!(max_height(10, 1.0), PANEL_MIN_H);
     }
