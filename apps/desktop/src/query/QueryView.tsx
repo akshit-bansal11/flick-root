@@ -46,6 +46,7 @@ export function QueryView(p: Props) {
                   <div
                     key={m.id}
                     role="option"
+                    tabIndex={-1}
                     aria-selected={selected}
                     className={selected ? "row sel" : "row"}
                   >
