@@ -30,6 +30,7 @@ export type PickerEvent =
   | { type: "query"; query: string }
   | { type: "chip"; chip: PickerChip }
   | { type: "key"; key: PickerKey }
+  | { type: "pick"; id: string }
   | { type: "loaded"; themes: ThemeView[] };
 
 export type PickerEffect =
@@ -116,6 +117,10 @@ export function reducePicker(state: PickerState, event: PickerEvent): Step {
       return refilter({ ...state, query: event.query });
     case "chip":
       return refilter({ ...state, chip: event.chip });
+    case "pick":
+      return visibleThemes(state).some((t) => t.id === event.id)
+        ? select(state, event.id)
+        : { state, effects: [] };
     case "loaded":
       return refilter({ ...state, themes: event.themes });
     case "key": {

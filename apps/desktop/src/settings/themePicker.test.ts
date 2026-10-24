@@ -282,3 +282,34 @@ describe("reducePicker loaded", () => {
     expect(loaded(initPicker([], "all", null), THEMES).state.selected).toBe("flick-dark");
   });
 });
+
+describe("reducePicker pick", () => {
+  it("selects a visible id with exactly one preview", () => {
+    const r = reducePicker(start(), { type: "pick", id: "dracula" });
+    expect(r.state.selected).toBe("dracula");
+    expect(r.effects).toEqual([{ type: "preview", id: "dracula" }]);
+  });
+
+  it("ignores an id hidden by the chip or the query", () => {
+    const s = start("light", "flick-light");
+    const r = reducePicker(s, { type: "pick", id: "dracula" });
+    expect(r.state).toEqual(s);
+    expect(r.effects).toEqual([]);
+    const q = reducePicker(start(), { type: "query", query: "solar" }).state;
+    const hidden = reducePicker(q, { type: "pick", id: "dracula" });
+    expect(hidden.state.selected).toBe("solarized-light");
+    expect(hidden.effects).toEqual([]);
+  });
+
+  it("ignores an unknown id", () => {
+    const r = reducePicker(start(), { type: "pick", id: "nope" });
+    expect(r.state.selected).toBe("flick-dark");
+    expect(r.effects).toEqual([]);
+  });
+
+  it("emits nothing when the id is already selected", () => {
+    const r = reducePicker(start("all", "dracula"), { type: "pick", id: "dracula" });
+    expect(r.state.selected).toBe("dracula");
+    expect(r.effects).toEqual([]);
+  });
+});
