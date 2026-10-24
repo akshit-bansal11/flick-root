@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
+import { ROLES, type ThemeRoles } from "../theme";
 import type { ExplainCaptured, Item, ItemKind } from "../types";
 import { footHints } from "./Footer";
 import { KindIcon } from "./KindIcon";
@@ -42,6 +43,16 @@ const item = (id: string, title: string): Item => ({
   payload: null,
 });
 const items = [item("a", "Alpha"), item("b", "Beta")];
+const APPEARANCE = {
+  scheme: "dark",
+  darkTheme: "t",
+  lightTheme: "t",
+  active: {
+    id: "t",
+    dark: true,
+    roles: Object.fromEntries(ROLES.map((r) => [r, "#123456"])) as ThemeRoles,
+  },
+} as const;
 
 let root: Root | undefined;
 
@@ -144,13 +155,23 @@ describe("Launcher", () => {
         shownId: 1,
         reason: "hotkey",
         sources: ["apps"],
-        appearance: { theme: "glass", glass: 90, scheme: "dark" },
+        appearance: APPEARANCE,
       });
       return Promise.resolve(() => {});
     });
     await mount();
     expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(1);
     expect(screen.queryByText("commands")).toBeNull();
+  });
+
+  it("shown payload with active colours reaches documentElement.style", async () => {
+    vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+      cb({ shownId: 1, reason: "hotkey", sources: ["apps"], appearance: APPEARANCE });
+      return Promise.resolve(() => {});
+    });
+    await mount();
+    expect(document.documentElement.style.getPropertyValue("--l-accent")).toBe("#123456");
+    expect(document.documentElement.dataset.scheme).toBe("dark");
   });
 
   it("plain text searches apps and features and lists the Search instead rows", async () => {
@@ -160,7 +181,7 @@ describe("Launcher", () => {
         reason: "hotkey",
         sources: ["apps", "files", "ask"],
         webTitle: "Google",
-        appearance: { theme: "glass", glass: 90, scheme: "dark" },
+        appearance: APPEARANCE,
       });
       return Promise.resolve(() => {});
     });

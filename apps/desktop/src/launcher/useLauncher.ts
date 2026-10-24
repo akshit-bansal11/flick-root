@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
 import { errorText } from "../settings/types";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
-import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
+import { applyTheme } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { cancelsDefault } from "./keys";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
@@ -126,10 +126,7 @@ export function useLauncher(
   const first = useRef(initialShown);
   useEffect(() => {
     const onShown = (p: ipc.ShownEvent) => {
-      applyAppearance(document.documentElement, {
-        ...(p.appearance ?? DEFAULT_APPEARANCE),
-        glassAvailable: p.glass !== false,
-      });
+      applyTheme(document.documentElement, p.appearance?.active ?? null);
       dispatch({ type: "shown" });
       if (p.sources) {
         dispatch({ type: "enabledSources", sources: p.sources, webTitle: p.webTitle ?? null });

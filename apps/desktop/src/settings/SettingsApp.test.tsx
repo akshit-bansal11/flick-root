@@ -19,7 +19,17 @@ vi.mock("./api", () => ({
   reindex: vi.fn(() => Promise.resolve()),
   listFeatures: vi.fn(),
   onFeaturesChanged: vi.fn(() => Promise.resolve(() => {})),
-  getAppearance: vi.fn(() => Promise.resolve({ theme: "glass", glass: 62, scheme: "system" })),
+  getAppearance: vi.fn(() =>
+    Promise.resolve({
+      theme: "glass",
+      glass: 62,
+      scheme: "system",
+      darkTheme: "a",
+      lightTheme: "b",
+      active: null,
+    }),
+  ),
+  listThemes: vi.fn(() => Promise.resolve([])),
   onSettingsChanged: vi.fn(() => Promise.resolve(() => {})),
 }));
 

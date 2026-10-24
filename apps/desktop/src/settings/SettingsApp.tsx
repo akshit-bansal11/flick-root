@@ -3,7 +3,7 @@ import { type ReactElement, useEffect, useState } from "react";
 import { FirstRun } from "../firstrun/FirstRun";
 import * as ipc from "../ipc";
 import { fromEvent, idFor } from "../shortcuts";
-import { applyAppearance } from "../theme";
+import { applyTheme } from "../theme";
 import { Tour } from "../tour/Tour";
 import { About } from "./About";
 import { Appearance } from "./Appearance";
@@ -102,7 +102,7 @@ export function SettingsApp({ page, onPage }: { page: PageId; onPage: (id: PageI
     const apply = () =>
       api
         .getAppearance()
-        .then((a) => applyAppearance(document.documentElement, { ...a, glassAvailable: true }))
+        .then((a) => applyTheme(document.documentElement, a.active))
         .catch((e: unknown) => console.warn("get_appearance failed", e));
     apply();
     const un = api.onSettingsChanged((p) => {

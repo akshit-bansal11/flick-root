@@ -3,7 +3,7 @@ import { APP_DISPLAY_NAME } from "../brand";
 import type { TrayMenuEvent } from "../ipc";
 import { Keycaps } from "../Keycaps";
 import { Lens, useLens } from "../Lens";
-import { applyAppearance, DEFAULT_APPEARANCE } from "../theme";
+import { applyTheme } from "../theme";
 import { buildItems, type MenuAction, reduceMenu } from "./menuReducer";
 
 interface Props {
@@ -29,11 +29,8 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
-    applyAppearance(document.documentElement, {
-      ...(event.appearance ?? DEFAULT_APPEARANCE),
-      glassAvailable: event.glass !== false,
-    });
-  }, [event.appearance, event.glass]);
+    applyTheme(document.documentElement, event.appearance?.active ?? null);
+  }, [event.appearance]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

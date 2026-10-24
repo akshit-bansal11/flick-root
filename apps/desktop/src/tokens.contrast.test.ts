@@ -201,6 +201,18 @@ describe("tokens.css contrast", () => {
     }
   });
 
+  it("is flat: square radii, mono chrome font, prose font, 13px body, no inset shadows", () => {
+    const get = (n: string) => declared(n, "glass", "dark");
+    for (const r of ["key", "control", "card"]) expect(get(`--l-r-${r}`)).toBe("2px");
+    expect(get("--l-ui")).toMatch(/^"IBM Plex Mono"/);
+    expect(get("--l-prose")).toMatch(/^"IBM Plex Sans"/);
+    expect(get("--l-fs-body")).toBe("13px");
+    for (const s of ["raised", "overlay", "window"]) {
+      expect(get(`--l-shadow-${s}`)).not.toMatch(/inset|gradient/);
+    }
+    expect(get("--l-hairline")).toBe("var(--l-line)");
+  });
+
   it("keeps the glass range ordered", () => {
     expect(GLASS_MIN).toBeLessThanOrEqual(GLASS_DEFAULT);
     expect(GLASS_DEFAULT).toBeLessThanOrEqual(GLASS_MAX);

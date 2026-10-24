@@ -5,7 +5,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { Appearance } from "./theme";
+import type { Appearance, ThemeView } from "./theme";
 import type {
   AskEvent,
   AskRequest,
@@ -78,13 +78,15 @@ export const reportShown = (shownId: number) => invoke<void>("report_shown", { s
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });
 
 export type ShownEvent = ShownPayload & {
-  glass?: boolean;
   appearance?: Appearance;
   /** Live source ids (apps, files, ask, running feature ids); absent from older shells. */
   sources?: string[];
   /** Title of the first web shortcut when the web feature runs. */
   webTitle?: string | null;
 };
+
+/** Every theme with its resolved roles; loaded once, never per keystroke. */
+export const listThemes = () => invoke<ThemeView[]>("list_themes");
 
 export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>
   listen<ShownEvent>("launcher://shown", (e) => cb(e.payload));
@@ -93,7 +95,6 @@ export type TrayMenuEvent = {
   appVersion: string;
   hotkey: string;
   update: { version: string } | null;
-  glass?: boolean;
   appearance?: Appearance;
 };
 

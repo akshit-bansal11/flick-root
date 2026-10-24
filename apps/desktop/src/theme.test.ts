@@ -1,35 +1,42 @@
-import { describe, expect, it } from "vitest";
-import { applyAppearance, clampGlass, GLASS_MIN, resolveScheme } from "./theme";
+import { describe, expect, it, vi } from "vitest";
+import { type ActiveTheme, applyTheme, ROLE_VARS, ROLES, type ThemeRoles } from "./theme";
 
-const base = { theme: "glass", glass: 62, scheme: "system", glassAvailable: true } as const;
+const roles = Object.fromEntries(ROLES.map((r, i) => [r, `#0${i.toString(16)}0a0b`])) as ThemeRoles;
+const active: ActiveTheme = { id: "t", dark: true, roles };
+const el = () => document.createElement("html");
 
-describe("applyAppearance", () => {
-  it("sets attributes and alpha", () => {
-    const el = document.createElement("html");
-    applyAppearance(el, { ...base, glass: 80, systemDark: () => true });
-    expect(el.dataset.theme).toBe("glass");
-    expect(el.dataset.scheme).toBe("dark");
-    expect(el.dataset.glass).toBe("on");
-    expect(el.style.getPropertyValue("--l-glass-alpha")).toBe("80%");
+describe("applyTheme", () => {
+  it("sets every role var and data-scheme", () => {
+    const root = el();
+    applyTheme(root, active);
+    for (const r of ROLES) expect(root.style.getPropertyValue(ROLE_VARS[r])).toBe(roles[r]);
+    expect(root.dataset.scheme).toBe("dark");
+    applyTheme(root, { ...active, id: "l", dark: false, roles: { ...roles, bg: "#ffffff" } });
+    expect(root.dataset.scheme).toBe("light");
   });
-  it("resolves system to light", () => {
-    const el = document.createElement("html");
-    applyAppearance(el, { ...base, systemDark: () => false });
-    expect(el.dataset.scheme).toBe("light");
+
+  it("is a no-op on an identical signature", () => {
+    const root = el();
+    applyTheme(root, active);
+    const spy = vi.spyOn(root.style, "setProperty");
+    applyTheme(root, { ...active, roles: { ...roles } });
+    expect(spy).not.toHaveBeenCalled();
   });
-  it("solid and unavailable transparency turn glass off", () => {
-    const el = document.createElement("html");
-    applyAppearance(el, { ...base, theme: "solid", scheme: "dark" });
-    expect(el.dataset.glass).toBe("off");
-    applyAppearance(el, { ...base, scheme: "dark", glassAvailable: false });
-    expect(el.dataset.glass).toBe("off");
+
+  it("re-applies after a changed role", () => {
+    const root = el();
+    applyTheme(root, active);
+    applyTheme(root, { ...active, roles: { ...roles, accent: "#123456" } });
+    expect(root.style.getPropertyValue("--l-accent")).toBe("#123456");
   });
-  it("forced themes ignore the scheme", () => {
-    expect(resolveScheme({ theme: "frost", glass: 62, scheme: "dark" }, true)).toBe("light");
-    expect(resolveScheme({ theme: "ember", glass: 62, scheme: "light" }, false)).toBe("dark");
-  });
-  it("clamps glass", () => {
-    expect(clampGlass(5)).toBe(GLASS_MIN);
-    expect(clampGlass(200)).toBe(95);
+
+  it("null clears the role vars and falls back to matchMedia", () => {
+    const root = el();
+    applyTheme(root, active);
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    applyTheme(root, null);
+    vi.unstubAllGlobals();
+    for (const r of ROLES) expect(root.style.getPropertyValue(ROLE_VARS[r])).toBe("");
+    expect(root.dataset.scheme).toBe("light");
   });
 });
