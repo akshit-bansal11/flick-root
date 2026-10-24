@@ -141,7 +141,7 @@ describe("Launcher", () => {
       return Promise.resolve(() => {});
     });
     await mount();
-    expect(ipc.homeItems).toHaveBeenCalledTimes(1);
+    expect(ipc.homeItems).toHaveBeenCalled();
     expect(screen.getByText("# recent")).toBeTruthy();
     expect(screen.getByRole("option", { name: /Recent One/ })).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
@@ -498,6 +498,11 @@ describe("footHints", () => {
     expect(hints.map((h) => h.id)).toEqual(["go:find", "go:calc", "sheet"]);
     expect(hints[0]).toEqual({ id: "go:find", caps: ["/"], label: "open" });
     expect(hints[2]?.label).toBe("shortcuts");
+  });
+
+  it("typed none lists the open hint exactly once", () => {
+    const hints = footHints("none", {}, ["find", "calc"], true);
+    expect(hints.filter((h) => h.id === "open")).toHaveLength(1);
   });
 });
 

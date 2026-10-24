@@ -11,6 +11,7 @@ vi.mock("./ipc", () => ({
   cancelAsk: vi.fn(),
   listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null })),
   setThinkingMode: vi.fn(() => Promise.resolve()),
+  homeItems: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   hideLauncher: vi.fn(() => Promise.resolve()),
   resizeLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),

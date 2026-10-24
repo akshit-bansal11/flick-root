@@ -41,13 +41,9 @@ export function footHints(
     const sheet = { id: "sheet", caps: caps("sheet"), label: shortcut("sheet").foot ?? "" };
     return [...prefixes, sheet];
   }
-  const scoped = inScope(mode)
+  return inScope(mode)
     .filter((s) => s.foot && (!s.when || ctx[s.when]))
     .map((s) => ({ id: s.id, caps: caps(s.id), label: s.foot ?? "" }));
-  // Plain text opens the selected row with Enter, which the none scope leaves to enterMode.
-  return mode === "none"
-    ? [{ id: "open", caps: caps("open"), label: shortcut("open").foot ?? "" }, ...scoped]
-    : scoped;
 }
 
 export function Footer({
