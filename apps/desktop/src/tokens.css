@@ -63,53 +63,6 @@
   --l-raw-amber-400: #eab85c;
   --l-raw-amber-800: #6c4600;
 
-  /* frost. */
-  --l-raw-frost-0: #f1f7fd;
-  --l-raw-frost-50: #eef4fb;
-  --l-raw-frost-100: #dde9f6;
-  --l-raw-frost-150: #d0e1f5;
-  --l-raw-frost-200: #c3d5e9;
-  --l-raw-frost-600: #394c5f;
-  --l-raw-frost-700: #324457;
-  --l-raw-frost-900: #0c2036;
-  --l-raw-blue-600: #2563c9;
-  --l-raw-blue-800: #1a4795;
-
-  /* midnight. */
-  --l-raw-navy-990: #021a22;
-  --l-raw-navy-950: #050912;
-  --l-raw-navy-900: #0a1020;
-  --l-raw-navy-850: #131c32;
-  --l-raw-navy-800: #1c2842;
-  --l-raw-navy-700: #10263a;
-  --l-raw-navy-300: #aebad1;
-  --l-raw-navy-100: #e6eefc;
-  --l-raw-cyan-400: #22d3ee;
-
-  /* aurora. */
-  --l-raw-indigo-990: #160a38;
-  --l-raw-indigo-950: #0a0814;
-  --l-raw-indigo-900: #120f24;
-  --l-raw-indigo-850: #1d1838;
-  --l-raw-indigo-800: #2b2450;
-  --l-raw-indigo-750: #251d49;
-  --l-raw-indigo-300: #bfbbd6;
-  --l-raw-indigo-100: #ece9fb;
-  --l-raw-violet-400: #a78bfa;
-  --l-raw-violet-300: #c6b5fc;
-
-  /* ember. */
-  --l-raw-amber-990: #2a1600;
-  --l-raw-amber-500: #f5a524;
-  --l-raw-amber-300: #f6b03e;
-  --l-raw-brown-950: #100a07;
-  --l-raw-brown-900: #1a110c;
-  --l-raw-brown-850: #261913;
-  --l-raw-brown-800: #3a281d;
-  --l-raw-brown-750: #33210f;
-  --l-raw-brown-300: #d1c2b8;
-  --l-raw-brown-100: #f6ece4;
-
   /* Alpha overlays: black and mist-900 (light-scheme ink), for scrims, flat shadows and key edges. */
   --l-raw-black-30: rgb(0 0 0 / 0.3);
   --l-raw-black-35: rgb(0 0 0 / 0.35);
@@ -211,10 +164,8 @@
 }
 
 /* Roles, dark (base). Theme and scheme rules also match plain elements (not only :root) so Settings can preview a
-   theme on a swatch. data-scheme is the resolved dark/light, data-theme the named theme (theme.ts). */
-:root,
-[data-theme="glass"],
-[data-theme="solid"] {
+   swatch. data-scheme is the resolved dark/light; named theme colours come from Rust (applyTheme in theme.ts). */
+:root {
   color-scheme: dark;
   --l-bg: var(--l-raw-slate-950);
   --l-panel: var(--l-raw-slate-900);
@@ -242,7 +193,7 @@
   --l-shadow-window: 0 8px 24px var(--l-raw-black-50);
 }
 
-/* Roles, light: the OS-preference fallback (no data-scheme yet), then the resolved light scheme and frost. */
+/* Roles, light: the OS-preference fallback (no data-scheme yet), then the resolved light scheme. */
 @media (prefers-color-scheme: light) {
   :root:not([data-scheme]) {
     color-scheme: light;
@@ -270,8 +221,7 @@
   }
 }
 
-[data-scheme="light"],
-[data-theme="frost"] {
+[data-scheme="light"] {
   color-scheme: light;
   --l-bg: var(--l-raw-mist-50);
   --l-panel: var(--l-raw-white);
@@ -318,69 +268,6 @@
   --l-mica-tint: color-mix(in srgb, var(--l-bg) 40%, transparent);
   --l-border: 1px solid var(--l-line);
   --l-border-hair: 1px solid var(--l-hairline);
-}
-
-/* Named themes. Each states its target; contrast is measured by the contrast test (D1.2).
-   Tokens not listed keep the scheme values. */
-
-/* frost: light, cool blue-white. Forces the light scheme (theme.ts). Target: dark navy text on near-white tint. */
-[data-theme="frost"] {
-  --l-bg: var(--l-raw-frost-50);
-  --l-panel: var(--l-raw-frost-0);
-  --l-surface: var(--l-raw-frost-100);
-  --l-line: var(--l-raw-frost-200);
-  --l-text: var(--l-raw-frost-900);
-  --l-muted: var(--l-raw-frost-600);
-  --l-muted-strong: var(--l-raw-frost-700);
-  --l-accent: var(--l-raw-blue-600);
-  --l-accent-text: var(--l-raw-blue-800);
-  --l-on-accent: var(--l-raw-white);
-  --l-sel: var(--l-raw-frost-150);
-}
-
-/* midnight: deep navy, cyan accent. Forces dark. Target: pale text on near-black navy. */
-[data-theme="midnight"] {
-  --l-bg: var(--l-raw-navy-950);
-  --l-panel: var(--l-raw-navy-900);
-  --l-surface: var(--l-raw-navy-850);
-  --l-line: var(--l-raw-navy-800);
-  --l-text: var(--l-raw-navy-100);
-  --l-muted: var(--l-raw-navy-300);
-  --l-muted-strong: var(--l-raw-navy-300);
-  --l-accent: var(--l-raw-cyan-400);
-  --l-accent-text: var(--l-raw-cyan-400);
-  --l-on-accent: var(--l-raw-navy-990);
-  --l-sel: var(--l-raw-navy-700);
-}
-
-/* aurora: dark indigo, violet accent. Forces dark. Target: pale text on deep indigo. */
-[data-theme="aurora"] {
-  --l-bg: var(--l-raw-indigo-950);
-  --l-panel: var(--l-raw-indigo-900);
-  --l-surface: var(--l-raw-indigo-850);
-  --l-line: var(--l-raw-indigo-800);
-  --l-text: var(--l-raw-indigo-100);
-  --l-muted: var(--l-raw-indigo-300);
-  --l-muted-strong: var(--l-raw-indigo-300);
-  --l-accent: var(--l-raw-violet-400);
-  --l-accent-text: var(--l-raw-violet-300);
-  --l-on-accent: var(--l-raw-indigo-990);
-  --l-sel: var(--l-raw-indigo-750);
-}
-
-/* ember: dark warm, amber accent. Forces dark. Target: warm off-white text on near-black brown. */
-[data-theme="ember"] {
-  --l-bg: var(--l-raw-brown-950);
-  --l-panel: var(--l-raw-brown-900);
-  --l-surface: var(--l-raw-brown-850);
-  --l-line: var(--l-raw-brown-800);
-  --l-text: var(--l-raw-brown-100);
-  --l-muted: var(--l-raw-brown-300);
-  --l-muted-strong: var(--l-raw-brown-300);
-  --l-accent: var(--l-raw-amber-500);
-  --l-accent-text: var(--l-raw-amber-300);
-  --l-on-accent: var(--l-raw-amber-990);
-  --l-sel: var(--l-raw-brown-750);
 }
 
 @media (prefers-reduced-motion: reduce) {
