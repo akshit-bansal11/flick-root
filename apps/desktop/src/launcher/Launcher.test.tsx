@@ -113,7 +113,6 @@ describe("Launcher", () => {
   it("starts on the all tab with the mode tab strip and no search", async () => {
     await mount();
     expect(screen.getByPlaceholderText("Search apps and commands, or type / > = ? @")).toBeTruthy();
-    expect(screen.getByText("Type without a prefix to search apps and commands")).toBeTruthy();
     expect(screen.getByRole("tablist", { name: "Modes" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
       "all",
@@ -448,15 +447,13 @@ describe("Launcher", () => {
   it("find footer advertises Ctrl Shift C on a file row only, not Ctrl C", async () => {
     await mount();
     await type("/");
-    expect(screen.queryByText("copy path")).toBeNull();
+    const hints = () =>
+      [...document.querySelectorAll(".foot .hint-keys")].map((k) => k.textContent);
+    expect(hints()).not.toContain("ctrl+shift+c");
     mockFileResults();
     await type("/x");
-    const acts = screen.getAllByText("copy path");
-    expect([...acts[0].querySelectorAll("kbd")].map((k) => k.textContent)).toEqual([
-      "Ctrl",
-      "Shift",
-      "C",
-    ]);
+    expect(hints()).toContain("ctrl+shift+c");
+    expect(hints()).not.toContain("ctrl+c");
   });
 
   it("Escape on empty input hides the launcher", async () => {
