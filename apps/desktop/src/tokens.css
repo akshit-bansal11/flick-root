@@ -111,28 +111,22 @@
   --l-r-window: 8px;
   --l-r-pill: 999px;
 
-  --l-row: 48px;
-  --l-input: 60px;
+  --l-row: 34px;
+  --l-input: 56px;
   --l-tile: 20px;
   --l-tile-row: 28px;
   --l-tile-lg: 32px;
-  --l-group-h: 32px;
-  --l-foot-h: 40px;
-  /* Input + 8 rows + action row + 5 group labels (nlfind, Apps, Programs, Files, Folders) + footer + list
-     padding = 706px: a full list is exactly centred. Rust PANEL_MAX_H in window.rs mirrors it. */
-  --l-panel-max: calc(
-    var(--l-input) +
-    var(--l-row) *
-    9 +
-    var(--l-group-h) *
-    5 +
-    var(--l-foot-h) +
-    var(--l-sp-7)
-  );
+  --l-group-h: 28px;
+  --l-foot-h: 32px;
+  --l-tab-h: 32px;
+  /* Tallest panel. Rust PANEL_MAX_H in window.rs mirrors it. */
+  --l-panel-max: 540px;
   --l-tile-settings: 32px;
   --l-nav-w: 200px;
+  /* Left column of the two-column panel. */
+  --l-left-w: 360px;
   /* Panel width; Rust keeps PANEL_W in window.rs equal to this. */
-  --l-panel-w: 640px;
+  --l-panel-w: 820px;
   /* Tray menu size: padding 12 + header 44 + three items 40 + separator 9 + Quit 40. Rust MENU_W/MENU_H mirror it. */
   --l-menu-w: 280px;
   --l-menu-h: 225px;

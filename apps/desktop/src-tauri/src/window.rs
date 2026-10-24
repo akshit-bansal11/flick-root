@@ -13,11 +13,11 @@ use tauri::{
 pub const LABEL: &str = "launcher";
 
 /// Panel width in logical px. Keep equal to `--l-panel-w` in tokens.css.
-const PANEL_W: f64 = 640.0;
+const PANEL_W: f64 = 820.0;
 /// Tallest panel in logical px. Keep equal to `--l-panel-max` in tokens.css.
-const PANEL_MAX_H: f64 = 706.0;
+const PANEL_MAX_H: f64 = 540.0;
 /// Shortest window in logical px (the input row alone). Keep equal to `--l-input` in tokens.css.
-const PANEL_MIN_H: f64 = 60.0;
+const PANEL_MIN_H: f64 = 56.0;
 /// Gap kept between the panel and the work-area edge, in logical px.
 const WORK_MARGIN: f64 = 24.0;
 /// Tray menu width in logical px. Keep equal to `--l-menu-w` in tokens.css.
@@ -505,18 +505,20 @@ mod tests {
     #[test]
     fn layout_centres_at_scale_1() {
         // 1920x1040 work area with a 40px taskbar at the bottom.
+        let (w, h) = (PANEL_W as u32, PANEL_MAX_H as u32);
         assert_eq!(
             layout((0, 0, 1920, 1040), 1.0, PANEL_MAX_H),
-            (640, 167, 640, 706)
+            (((1920 - w) / 2) as i32, ((1040 - h) / 2) as i32, w, h)
         );
     }
 
     #[test]
     fn layout_centres_a_short_panel() {
         // Input row alone: centred on its own height, not a full list's.
+        let (w, h) = (PANEL_W as u32, PANEL_MIN_H as u32);
         assert_eq!(
             layout((0, 0, 1920, 1040), 1.0, PANEL_MIN_H),
-            (640, 490, 640, 60)
+            (((1920 - w) / 2) as i32, ((1040 - h) / 2) as i32, w, h)
         );
     }
 
@@ -524,9 +526,17 @@ mod tests {
     fn layout_scales_and_offsets() {
         // Second monitor to the right, 150%.
         let (x, y, w, h) = layout((1920, 0, 2880, 1500), 1.5, 200.0);
-        assert_eq!((w, h), (960, 300));
-        assert_eq!(x, 1920 + (2880 - 960) / 2);
+        let pw = (PANEL_W * 1.5) as u32;
+        assert_eq!((w, h), (pw, 300));
+        assert_eq!(x, 1920 + ((2880 - pw) / 2) as i32);
         assert_eq!(y, (1500 - 300) / 2);
+    }
+
+    #[test]
+    fn panel_size_mirrors_tokens_css() {
+        // tokens.css --l-panel-w / --l-panel-max mirror these.
+        assert_eq!(PANEL_W, 820.0);
+        assert_eq!(PANEL_MAX_H, 540.0);
     }
 
     #[test]
