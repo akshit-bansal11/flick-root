@@ -89,7 +89,7 @@ describe("Root", () => {
       await new Promise((r) => requestAnimationFrame(r));
     });
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(screen.getAllByRole("option", { name: /^(\/|>|=|\?|@)/ })).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
     expect(ipc.reportShown).toHaveBeenCalledTimes(1);
     expect(ipc.reportShown).toHaveBeenCalledWith(7);
   });

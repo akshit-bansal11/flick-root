@@ -94,6 +94,7 @@ afterEach(() => {
   act(() => root?.unmount());
   document.body.replaceChildren();
   vi.clearAllMocks();
+  vi.mocked(ipc.homeItems).mockResolvedValue({ items: [], pins: [] });
 });
 
 /** Makes the next searches return one file row (id `file:a`). */
@@ -132,7 +133,7 @@ describe("Launcher", () => {
   });
 
   it("shown loads the recent picks and lists them under # recent", async () => {
-    vi.mocked(ipc.homeItems).mockResolvedValueOnce({
+    vi.mocked(ipc.homeItems).mockResolvedValue({
       items: [{ ...item("r1", "Recent One"), payload: { home: "recent" } }],
       pins: [],
     });
