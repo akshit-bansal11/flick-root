@@ -31,7 +31,7 @@ fn bytes(s: &str) -> Option<Vec<u8>> {
 /// Parses `#rgb` or `#rrggbb` (case-insensitive). Anything else is `None`.
 pub fn parse_hex(s: &str) -> Option<Rgb> {
     match bytes(s)?.as_slice() {
-        &[r, g, b] => Some(Rgb(r, g, b)),
+        [r, g, b] => Some(Rgb(*r, *g, *b)),
         _ => None,
     }
 }
@@ -39,8 +39,8 @@ pub fn parse_hex(s: &str) -> Option<Rgb> {
 /// Parses `#rgb`, `#rrggbb` or `#rrggbbaa`; alpha is 255 when absent. `#rgba` is rejected.
 pub fn parse_hex_alpha(s: &str) -> Option<(Rgb, u8)> {
     match bytes(s)?.as_slice() {
-        &[r, g, b] => Some((Rgb(r, g, b), 255)),
-        &[r, g, b, a] => Some((Rgb(r, g, b), a)),
+        [r, g, b] => Some((Rgb(*r, *g, *b), 255)),
+        [r, g, b, a] => Some((Rgb(*r, *g, *b), *a)),
         _ => None,
     }
 }
