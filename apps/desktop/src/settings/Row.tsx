@@ -81,7 +81,9 @@ export function SettingRow({ label, value, hint, preview, children }: RowProps) 
   }, [preview, setPreview]);
   return (
     <div ref={ref} className="sr">
-      <span className="sr-mark" aria-hidden="true">›</span>
+      <span className="sr-mark" aria-hidden="true">
+        ›
+      </span>
       <span>{label}</span>
       {value ? <span className="sr-val">{value}</span> : <span className="sr-hint">{hint}</span>}
       {children}

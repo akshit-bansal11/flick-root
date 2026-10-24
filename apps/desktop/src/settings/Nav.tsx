@@ -54,7 +54,9 @@ export function Nav({ active, onSelect, featuresCount, version }: Props) {
             onFocus={() => onSelect(p.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
-            <span className="s-nav-mark" aria-hidden="true">›</span>
+            <span className="s-nav-mark" aria-hidden="true">
+              ›
+            </span>
             <span>{p.id === "about" && version ? `about · v${version}` : p.label}</span>
             {p.id === "prefixes" && featuresCount && (
               <span className="s-nav-count">{featuresCount}</span>
