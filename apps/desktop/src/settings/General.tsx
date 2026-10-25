@@ -263,7 +263,12 @@ export function General({ settings, onChange, onTour }: Props) {
                   className="btn"
                   aria-label={`Remove ${s}`}
                   disabled={!settings.scanPrograms}
-                  onClick={() => void editSkip("skip", settings.programSkip.filter((x) => x !== s))}
+                  onClick={() =>
+                    void editSkip(
+                      "skip",
+                      settings.programSkip.filter((x) => x !== s),
+                    )
+                  }
                 >
                   remove
                 </button>
