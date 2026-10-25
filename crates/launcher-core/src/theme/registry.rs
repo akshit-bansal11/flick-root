@@ -143,3 +143,62 @@ impl Registry {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const THIRD_PARTY: &str = include_str!("../../../../THIRD-PARTY-THEMES.md");
+    const HEADER: &str =
+        "| id | name | repo URL | theme file URL | SPDX licence | licence file URL | copyright |";
+    const ALLOWED: [&str; 6] = [
+        "MIT",
+        "ISC",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "0BSD",
+        "CC0-1.0",
+    ];
+
+    #[test]
+    fn third_party_entries_cover_every_port() {
+        assert!(THIRD_PARTY.lines().any(|l| l.trim() == HEADER));
+        let rows: Vec<Vec<&str>> = THIRD_PARTY
+            .lines()
+            .skip_while(|l| l.trim() != HEADER)
+            .skip(2)
+            .take_while(|l| l.starts_with('|'))
+            .map(|l| {
+                l.trim()
+                    .trim_matches('|')
+                    .split('|')
+                    .map(str::trim)
+                    .collect()
+            })
+            .collect();
+        let registry = Registry::builtin().unwrap();
+        let ports: Vec<&Seed> = registry
+            .list()
+            .iter()
+            .map(|t| &t.seed)
+            .filter(|s| s.source == Source::Port)
+            .collect();
+        for seed in &ports {
+            let n = rows.iter().filter(|r| r[0] == seed.id).count();
+            assert_eq!(n, 1, "port {} needs exactly one row", seed.id);
+        }
+        for row in &rows {
+            let &[id, _, repo, file, spdx, licence, copyright] = &row[..] else {
+                panic!("row needs 7 cells: {row:?}");
+            };
+            let seed = ports.iter().find(|s| s.id == id);
+            let seed = seed.unwrap_or_else(|| panic!("row {id} has no port seed"));
+            for url in [repo, file, licence] {
+                assert!(url.starts_with("https://"), "{id}: {url} is not https");
+            }
+            assert!(ALLOWED.contains(&spdx), "{id}: {spdx} is not allowed");
+            assert!(!copyright.is_empty(), "{id}: copyright is empty");
+            assert_eq!(seed.upstream.as_deref(), Some(file), "{id}: upstream");
+        }
+    }
+}

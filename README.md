@@ -141,6 +141,8 @@ Measured on the dev machine: launch call 0 to 1 ms (budget 30 ms), command match
 
 MIT. See [LICENSE](LICENSE).
 
+Ported editor themes keep their upstream licences and copyright; see [THIRD-PARTY-THEMES.md](THIRD-PARTY-THEMES.md).
+
 ## Architecture and decisions
 
 Design decisions are recorded in [docs/adr/](docs/adr/):
