@@ -2,7 +2,7 @@
 
 use launcher_core::brand::{DEFAULT_THEME_ID, DEFAULT_THEME_LIGHT_ID};
 use launcher_core::theme::color::{parse_hex, ratio};
-use launcher_core::theme::{Registry, Seed};
+use launcher_core::theme::{Registry, Seed, Source};
 use std::collections::HashSet;
 
 fn seed(id: &str, bg: &str) -> Seed {
@@ -34,8 +34,18 @@ fn is_kebab(id: &str) -> bool {
 }
 
 #[test]
-fn builtin_has_sixteen_themes() {
-    assert_eq!(builtin().list().len(), 16);
+fn builtin_has_sixteen_own_themes_plus_every_port() {
+    let reg = builtin();
+    let own = reg
+        .list()
+        .iter()
+        .filter(|t| t.seed.source == Source::Builtin)
+        .count();
+    assert_eq!(own, 16);
+    // The port count follows ports.json, never a hard-coded number.
+    let ports: Vec<serde_json::Value> =
+        serde_json::from_str(include_str!("../src/theme/seeds/ports.json")).expect("ports json");
+    assert_eq!(reg.list().len(), own + ports.len());
 }
 
 #[test]
