@@ -116,7 +116,12 @@ fn lifted(name: &str, fg: Rgb, bgs: &[Rgb], adjusted: &mut Vec<String>) -> Rgb {
 /// [`TARGET`]. Tries tints toward `text` first, then toward the opposite pole; `None` if neither
 /// pole has a step that satisfies both.
 fn visible_sel(panel: Rgb, text: Rgb) -> Option<Rgb> {
-    let away = if luminance(text) > 0.5 { BLACK } else { WHITE };
+    // Away from the text as seen from the panel: a mid-grey text on a darker panel points to black.
+    let away = if luminance(text) > luminance(panel) {
+        BLACK
+    } else {
+        WHITE
+    };
     [text, away].into_iter().find_map(|pole| {
         (1..=12)
             .map(|i| mix(panel, pole, f64::from(i) * 0.04))
@@ -281,6 +286,13 @@ mod tests {
     #[test]
     fn grey_accent_dark_theme_gets_visible_sel() {
         let s = seed_of("#282c34", "#21252b", "#abb2bf", "#404754", Some("#2c313a"));
+        assert_sel_visible(&resolve(&s).expect("resolves"));
+    }
+
+    #[test]
+    fn mid_grey_text_steps_sel_darker_than_the_panel() {
+        // Solarized Dark: text sits near 4.5:1, so only a darker tint is visible and readable.
+        let s = seed_of("#002b36", "#00212b", "#839496", "#197271", Some("#005a6f"));
         assert_sel_visible(&resolve(&s).expect("resolves"));
     }
 
