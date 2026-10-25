@@ -79,6 +79,12 @@ describe("statusHints", () => {
     ]);
   });
 
+  it("shows the pin hint only for a pinnable row", () => {
+    const pinnable = statusHints("find", { pinnable: true }, counts);
+    expect(labels(pinnable)).toEqual(["move", "open", "pin"]);
+    expect(labels(statusHints("find", {}, counts))).not.toContain("pin");
+  });
+
   it("caps the hints at three", () => {
     const all = { revealable: true, adminAction: true, pathItem: true };
     const s = statusHints("find", all, counts);

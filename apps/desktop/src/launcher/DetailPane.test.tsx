@@ -48,6 +48,7 @@ describe("DetailPane", () => {
       "open",
       "run as administrator",
       "open file location",
+      "pin",
     ]);
     expect(buttons[1]?.querySelector(".detail-keys")?.textContent).toBe("ctrl+shift+enter");
     expect(buttons[0]?.className).toBe("detail-act pri");
@@ -63,6 +64,16 @@ describe("DetailPane", () => {
     rerender(<DetailPane item={cmd} ctx={{}} onPress={onPress} />);
     fireEvent.click(screen.getByRole("button", { name: /^run/ }));
     expect(onPress).toHaveBeenLastCalledWith("Enter");
+  });
+
+  it("an app shows pin or unpin by ctx, with the pinned tag, and pin sends Ctrl+P", () => {
+    const onPress = vi.fn();
+    const { container, rerender } = render(<DetailPane item={app} ctx={{}} onPress={onPress} />);
+    fireEvent.click(screen.getByRole("button", { name: /^pin/ }));
+    expect(onPress).toHaveBeenLastCalledWith("Ctrl+P");
+    rerender(<DetailPane item={app} ctx={{ pinned: true }} onPress={onPress} />);
+    expect(container.querySelector(".tag")?.textContent).toBe("app · pinned");
+    expect(screen.getByRole("button", { name: /^unpin/ })).toBeTruthy();
   });
 
   it("mousedown on an action is default-prevented so the input keeps focus", () => {

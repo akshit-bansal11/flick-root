@@ -3,7 +3,7 @@ import type { AppearancePatch } from "../settings/types";
 import { idFor, type KeyInput } from "../shortcuts";
 import type { ThemeView } from "../theme";
 import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, ThinkingMode } from "../types";
-import { THEME_SOURCE, themeRow } from "./kinds";
+import { isPinnable, THEME_SOURCE, themeRow } from "./kinds";
 
 export type { KeyInput };
 
@@ -71,6 +71,8 @@ export interface State {
   items: Item[];
   /** Recent picks for the blank `all` tab (`home_items`); kept across show and hide. */
   home: Item[];
+  /** Ids of pinned items (`home_items`, `toggle_pin`); kept across show and hide. */
+  pins: string[];
   selected: number;
   query: QueryState;
   /** Thinking modes (provider + model) Tab cycles through; `selected` is null until chosen. */
@@ -134,6 +136,7 @@ export type Effect =
   | { type: "cancelAsk"; token: number }
   | { type: "loadThinkingModes" }
   | { type: "loadHome" }
+  | { type: "togglePin"; itemId: string }
   | { type: "loadThemes" }
   | { type: "previewTheme"; theme: ThemeView }
   | { type: "revertTheme" }
@@ -240,6 +243,7 @@ export const initialState = (
   askToken: 0,
   items: [],
   home: [],
+  pins: [],
   selected: 0,
   query: {
     status: "idle",
@@ -626,6 +630,8 @@ function key(s: State, k: KeyInput): Result {
     }
     case "openSettings":
       return out(s, { type: "openSettings", section: "general" });
+    case "pin":
+      return item && isPinnable(item) ? out(s, { type: "togglePin", itemId: item.id }) : out(s);
     default: {
       const target = ENTERED.find((m) => id === `go:${m}`);
       return target ? goMode(s, target) : out(s);
@@ -781,9 +787,10 @@ function step(s: State, ev: Event): Result {
       return goMode(s, ev.mode);
     case "homeLoaded": {
       const home = ev.items;
-      if (!isHome(s)) return out({ ...s, home });
+      const pins = ev.pins;
+      if (!isHome(s)) return out({ ...s, home, pins });
       const selected = Math.min(s.selected, Math.max(0, home.length - 1));
-      return out({ ...s, home, items: home, selected });
+      return out({ ...s, home, pins, items: home, selected });
     }
     case "themesLoaded": {
       const base: State = { ...s, theme: { ...s.theme, list: ev.themes, loading: false } };
@@ -811,6 +818,7 @@ function step(s: State, ev: Event): Result {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           home: s.home,
+          pins: s.pins,
           items: s.home,
           seq: s.seq,
           askToken: s.askToken,
@@ -832,6 +840,7 @@ function step(s: State, ev: Event): Result {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           home: s.home,
+          pins: s.pins,
           items: s.home,
           seq: s.seq,
           askToken: s.askToken,

@@ -65,6 +65,9 @@ export const listThinkingModes = () => invoke<ThinkingModes>("list_thinking_mode
 
 export const homeItems = () => invoke<HomeView>("home_items");
 
+/** Pins or unpins an item; returns the refreshed home view. Rejects with `pin_failed` when refused. */
+export const togglePin = (itemId: string) => invoke<HomeView>("toggle_pin", { itemId });
+
 export const setThinkingMode = (id: string) => invoke<void>("set_thinking_mode", { id });
 
 export const cancelAsk = (askId: string) => invoke<void>("cancel_ask", { askId });

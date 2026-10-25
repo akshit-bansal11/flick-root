@@ -65,6 +65,17 @@ describe("shortcut table", () => {
     expect(isReserved("Ctrl+Shift+Tab", "settings")).toBe(false);
   });
 
+  it("pin is a launcher shortcut on Ctrl+P, claimed by nothing else, free there only", () => {
+    const pin = SHORTCUTS.find((s) => s.id === "pin");
+    expect(pin).toMatchObject({ keys: "Ctrl+P", scope: "launcher" });
+    expect(pin).toMatchObject({ when: "pinnable", foot: "pin" });
+    expect(SHORTCUTS.filter((s) => s.keys === "Ctrl+P")).toHaveLength(1);
+    expect(isReserved("Ctrl+P", "launcher")).toBe(false);
+    expect(isReserved("Ctrl+P", "settings")).toBe(true);
+    expect(isReserved("Ctrl+P")).toBe(true);
+    expect(idFor("find", key("p", { ctrl: true }))).toBe("pin");
+  });
+
   it("reads Ctrl+digit and Ctrl+/ from the physical key (AZERTY)", () => {
     expect(chordOf(key("&", { ctrl: true, code: "Digit1" }))).toBe("Ctrl+1");
     expect(chordOf(key(":", { ctrl: true, code: "Slash" }))).toBe("Ctrl+/");

@@ -5,7 +5,7 @@ import "../query/attachment.css";
 import { QueryView } from "../query/QueryView";
 import { DetailPane } from "./DetailPane";
 import { InputBar } from "./InputBar";
-import { themeRow } from "./kinds";
+import { isPinnable, themeRow } from "./kinds";
 import { ModeTabs } from "./ModeTabs";
 import { LISTBOX_ID, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
@@ -55,6 +55,8 @@ export function LauncherView({
     copyValue: selected?.actions.some((a) => a.type === "copyResult") ?? false,
     attachment: state.attachment !== null,
     answer: q.text !== "",
+    pinnable: selected ? isPinnable(selected) : false,
+    pinned: selected ? state.pins.includes(selected.id) : false,
   };
   const counts = state.mode === "query" ? [] : countsOf(state.items);
   const pick = themeRow(selected);

@@ -23,9 +23,11 @@ export type Condition =
   | "attachment"
   | "answer"
   | "pathItem"
-  | "revealable";
+  | "revealable"
+  | "pinnable";
 
 export const WHEN_TEXT: Record<Condition, string> = {
+  pinnable: "result is an app, file or folder",
   pathItem: "result is a file or folder",
   revealable: "result has a location",
   adminAction: "result can run as admin",
@@ -128,6 +130,14 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "tabPrev", keys: "Ctrl+Shift+Tab", label: "Previous mode tab", scope: "launcher" },
   { id: "leave", keys: "Backspace", label: "Leave mode (empty input)", scope: "launcher" },
   { id: "back", keys: "Esc", label: "Close, clear or hide", scope: "launcher" },
+  {
+    id: "pin",
+    keys: "Ctrl+P",
+    label: "Pin or unpin",
+    scope: "launcher",
+    when: "pinnable",
+    foot: "pin",
+  },
   { id: "openSettings", keys: "Ctrl+,", label: "Open Settings", scope: "launcher" },
   { id: "sheet", keys: "F1", label: "Shortcut list", scope: "launcher", foot: "shortcuts" },
   { id: "sheetAlt", keys: "Ctrl+/", label: "Shortcut list", scope: "launcher" },
@@ -204,10 +214,10 @@ export const BROWSER_CHORDS: readonly string[] = [
   "Ctrl+Shift+Tab",
 ];
 
-/** Browser chords a scope may claim despite BROWSER_CHORDS (Settings: close, pages; launcher: tabs). */
+/** Browser chords a scope may claim despite BROWSER_CHORDS (Settings: close, pages; launcher: tabs, pin). */
 const OWN_CHORDS: Partial<Record<Scope, readonly string[]>> = {
   settings: ["Ctrl+W", "Ctrl+Tab", "Ctrl+Shift+Tab"],
-  launcher: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
+  launcher: ["Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+P"],
 };
 
 /** True for a chord a scope must never claim: listed above or any Win-key chord. */

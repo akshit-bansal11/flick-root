@@ -88,12 +88,13 @@ describe("detailOf actions", () => {
 
   it("keeps the item's action order with chords as words", () => {
     const d = detailOf(make("app", { actions: all }));
-    expect(d.actions.map((a) => a.id)).toEqual(["open", "location", "admin", "copyPath"]);
+    expect(d.actions.map((a) => a.id)).toEqual(["open", "location", "admin", "copyPath", "pin"]);
     expect(d.actions.map((a) => a.keys)).toEqual([
       "enter",
       "ctrl+enter",
       "ctrl+shift+enter",
       "ctrl+shift+c",
+      "ctrl+p",
     ]);
   });
 
@@ -101,6 +102,31 @@ describe("detailOf actions", () => {
     const d = detailOf(make("app", { actions: all }));
     expect(d.actions[0]).toEqual({ id: "open", label: "open", keys: "enter", primary: true });
     expect(d.actions.filter((a) => a.primary)).toHaveLength(1);
+  });
+
+  it("appends a pin action to apps and files, unpin when pinned, keys from the table", () => {
+    const pin = { id: "pin", label: "pin", keys: "ctrl+p" };
+    expect(detailOf(make("app")).actions).toEqual([pin]);
+    expect(detailOf(make("file")).actions).toEqual([pin]);
+    expect(detailOf(make("file"), { pinned: true }).actions).toEqual([{ ...pin, label: "unpin" }]);
+    expect(detailOf(make("app", { actions: all })).actions.at(-1)).toEqual(pin);
+  });
+
+  it("adds no pin action to other rows, whatever the pinned flag", () => {
+    const primary = [{ type: "primary" } as const];
+    expect(ids(make("command", { actions: primary }), { pinned: true })).toEqual(["run"]);
+    expect(ids(make("process", { actions: primary }), { pinned: true })).toEqual(["open"]);
+    expect(ids(make("command"), { pinned: true })).toEqual([]);
+  });
+
+  it("tags a pinned app or file '<kind> · pinned', and only those", () => {
+    expect(detailOf(make("file"), { pinned: true }).tag).toBe("file · pinned");
+    expect(detailOf(make("app"), { pinned: true }).tag).toBe("app · pinned");
+    expect(detailOf(make("app", { payload: { program: true } }), { pinned: true }).tag).toBe(
+      "program · pinned",
+    );
+    expect(detailOf(make("app"), { pinned: false }).tag).toBe("app");
+    expect(detailOf(make("command"), { pinned: true }).tag).toBe("command");
   });
 
   it("labels a command's primary action run", () => {
@@ -112,12 +138,12 @@ describe("detailOf actions", () => {
 
   it("labels a custom primary action run", () => {
     const d = detailOf(make("app", { actions: [{ type: "custom", value: "x" }] }));
-    expect(d.actions).toEqual([{ id: "run", label: "run", keys: "enter", primary: true }]);
+    expect(d.actions[0]).toEqual({ id: "run", label: "run", keys: "enter", primary: true });
   });
 
   it("drops a non-first custom action", () => {
     const item = make("app", { actions: [{ type: "primary" }, { type: "custom", value: "x" }] });
-    expect(ids(item)).toEqual(["open"]);
+    expect(ids(item)).toEqual(["open", "pin"]);
   });
 
   it("hides kill until the process is armed", () => {
@@ -129,13 +155,12 @@ describe("detailOf actions", () => {
   });
 
   it("lists no actions for an item with none", () => {
-    expect(detailOf(make("app")).actions).toEqual([]);
+    expect(detailOf(make("command")).actions).toEqual([]);
   });
 
   it("does not list a later primary action", () => {
-    expect(ids(make("app", { actions: [{ type: "location" }, { type: "primary" }] }))).toEqual([
-      "location",
-    ]);
+    const item = make("app", { actions: [{ type: "location" }, { type: "primary" }] });
+    expect(ids(item)).toEqual(["location", "pin"]);
   });
 });
 

@@ -1,9 +1,10 @@
 import { type Condition, keyWords, shortcut } from "../shortcuts";
 import type { ThemeRole, ThemeView } from "../theme";
 import type { ActionKind, Item } from "../types";
-import { isProgram, themeRow } from "./kinds";
+import { isPinnable, isProgram, themeRow } from "./kinds";
 
-export type DetailCtx = Partial<Record<Condition, boolean>>;
+/** Runtime facts for the pane; `pinned` is whether the row's id is in `state.pins`. */
+export type DetailCtx = Partial<Record<Condition, boolean>> & { pinned?: boolean };
 
 export interface DetailFact {
   label: string;
@@ -142,13 +143,18 @@ function actionOf(a: ActionKind, first: boolean, item: Item, ctx: DetailCtx): De
 export function detailOf(item: Item, ctx: DetailCtx = {}): Detail {
   const pick = themeRow(item);
   if (pick) return themeDetail(pick.theme, pick.current);
+  const pinnable = isPinnable(item);
+  const kind = isProgram(item) ? "program" : item.kind;
   return {
     title: item.title,
-    tag: isProgram(item) ? "program" : item.kind,
+    tag: pinnable && ctx.pinned ? `${kind} · pinned` : kind,
     facts: factsOf(item),
-    actions: item.actions.flatMap((a, i) => {
-      const row = actionOf(a, i === 0, item, ctx);
-      return row ? [row] : [];
-    }),
+    actions: [
+      ...item.actions.flatMap((a, i) => {
+        const row = actionOf(a, i === 0, item, ctx);
+        return row ? [row] : [];
+      }),
+      ...(pinnable ? [row("pin", ctx.pinned ? "unpin" : "pin")] : []),
+    ],
   };
 }

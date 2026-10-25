@@ -17,6 +17,7 @@ vi.mock("../ipc", () => ({
   cancelAsk: vi.fn(),
   listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null })),
   homeItems: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
+  togglePin: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   setThinkingMode: vi.fn(() => Promise.resolve()),
   hideLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
@@ -144,6 +145,62 @@ describe("Launcher", () => {
     expect(screen.getByText("# recent")).toBeTruthy();
     expect(screen.getByRole("option", { name: /Recent One/ })).toBeTruthy();
     expect(ipc.search).not.toHaveBeenCalled();
+  });
+
+  describe("pins", () => {
+    const rowsOf = (cls: string) => [...document.querySelectorAll(cls)].map((e) => e.textContent);
+    const showHome = (items: Item[], pins: string[]) => {
+      vi.mocked(ipc.homeItems).mockResolvedValue({ items, pins });
+      vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+        cb({ shownId: 1, reason: "hotkey", sources: ["apps"], appearance: APPEARANCE });
+        return Promise.resolve(() => {});
+      });
+    };
+    const recent = (id: string, title: string): Item => ({
+      ...item(id, title),
+      payload: { home: "recent" },
+    });
+
+    it("Ctrl+P on an app row toggles its pin and relists # pinned before # recent", async () => {
+      showHome([recent("app:r1", "Recent One"), recent("app:r2", "Recent Two")], []);
+      await mount();
+      expect(screen.queryByText("# pinned")).toBeNull();
+      vi.mocked(ipc.togglePin).mockResolvedValueOnce({
+        items: [
+          { ...item("app:r2", "Recent Two"), payload: { home: "pinned" } },
+          recent("app:r1", "Recent One"),
+        ],
+        pins: ["app:r2"],
+      });
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "p", ctrlKey: true });
+      });
+      expect(ipc.togglePin).toHaveBeenCalledWith("app:r1");
+      const headers = rowsOf(".group");
+      expect(headers).toEqual(["# pinned", "# recent"]);
+      expect(rowsOf("[role=option]")[0]).toContain("Recent Two");
+    });
+
+    it("Ctrl+P on a row that cannot be pinned does not call togglePin", async () => {
+      showHome([{ ...recent("cmd:x", "Lock"), kind: "command" }], []);
+      await mount();
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "p", ctrlKey: true });
+      });
+      expect(ipc.togglePin).not.toHaveBeenCalled();
+    });
+
+    it("a rejected togglePin shows its message as the notice", async () => {
+      showHome([recent("app:r1", "Recent One")], []);
+      await mount();
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(ipc.togglePin).mockRejectedValueOnce({ code: "pin_failed", message: "Pin limit" });
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "p", ctrlKey: true });
+      });
+      expect(screen.getByRole("alert").textContent).toBe("Pin limit");
+      err.mockRestore();
+    });
   });
 
   it("the selected tab follows the mode and a tab click switches it", async () => {

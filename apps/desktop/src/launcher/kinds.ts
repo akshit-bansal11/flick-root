@@ -34,15 +34,19 @@ export const isProgram = (item: Item): boolean =>
   "program" in item.payload &&
   item.payload.program === true;
 
-/** True for rows `home_items` produced (payload.home === "recent"). */
-const isHome = (item: Item): boolean =>
-  typeof item.payload === "object" &&
-  item.payload !== null &&
-  "home" in item.payload &&
-  item.payload.home === "recent";
+/** The `payload.home` tag `home_items` put on a row ("pinned" or "recent"), else undefined. */
+const homeTag = (item: Item): unknown =>
+  typeof item.payload === "object" && item.payload !== null && "home" in item.payload
+    ? item.payload.home
+    : undefined;
 
-/** Group label of the blank tab's recent picks; rendering prefixes it with `# `. */
+/** Group labels of the blank tab; rendering prefixes them with `# `. Pinned rows come first. */
 export const HOME_GROUP = "recent";
+export const PINNED_GROUP = "pinned";
+
+/** True for rows Rust can pin: apps and files or folders (the ids frecency records). */
+export const isPinnable = (item: Item): boolean =>
+  item.id.startsWith("app:") || item.id.startsWith("file:");
 
 /** Source of the rows the `> theme` quick pick shows. */
 export const THEME_SOURCE = "ui:theme";
@@ -69,11 +73,13 @@ export const groupLabel = (item: Item): string =>
     ? "Themes"
     : item.source === "ui"
       ? "Search instead"
-      : isHome(item)
-        ? HOME_GROUP
-        : isProgram(item)
-          ? "Programs"
-          : GROUP[item.kind];
+      : homeTag(item) === "pinned"
+        ? PINNED_GROUP
+        : homeTag(item) === "recent"
+          ? HOME_GROUP
+          : isProgram(item)
+            ? "Programs"
+            : GROUP[item.kind];
 
 /** Human name of a kind, used as the subtitle when an item has none. */
 export const kindName = (kind: ItemKind): string => NAME[kind];

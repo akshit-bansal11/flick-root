@@ -121,6 +121,15 @@ export function useLauncher(
             .then((r) => dispatch({ type: "homeLoaded", items: r.items, pins: r.pins }))
             .catch(warn);
           break;
+        case "togglePin":
+          ipc
+            .togglePin(e.itemId)
+            .then((r) => dispatch({ type: "homeLoaded", items: r.items, pins: r.pins }))
+            .catch((err: unknown) => {
+              warn(err);
+              dispatch({ type: "actionFailed", message: errorText(err) });
+            });
+          break;
         case "loadThemes":
           ipc
             .listThemes()

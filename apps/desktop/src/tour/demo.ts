@@ -278,6 +278,7 @@ export function createDemoRunner(host: DemoHost) {
           later(() => host.dispatch({ type: "themesLoaded", themes: [] }), 0);
           break;
         case "loadHome":
+        case "togglePin":
         case "setThinkingMode":
         case "previewTheme":
         case "revertTheme":

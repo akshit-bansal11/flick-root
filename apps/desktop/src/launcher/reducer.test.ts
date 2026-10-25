@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThemeView } from "../theme";
 import type { Item, LaunchMode } from "../types";
-import { groupLabel, themeRow } from "./kinds";
+import { groupLabel, isPinnable, PINNED_GROUP, themeRow } from "./kinds";
 import {
   type Attachment,
   availableModes,
@@ -1133,5 +1133,85 @@ describe("theme quick pick", () => {
   it("shown starts a fresh pick that asks for the list again", () => {
     const r = reduce(loaded(), { type: "shown" });
     expect(r.state.theme).toMatchObject({ list: null, loading: false, activeId: "dracula" });
+  });
+});
+
+describe("pins", () => {
+  const ctrlP = k("p", { ctrl: true });
+  const row = (id: string, home?: string): Item => ({
+    ...item(id),
+    payload: home ? { home } : null,
+  });
+  const selecting = (id: string): State => inMode("find", { items: [item(id)], selected: 0 });
+
+  it("Ctrl+P on an app or file row emits togglePin with its id", () => {
+    for (const id of ["app:a", "file:C:/x/a.txt"]) {
+      expect(reduce(selecting(id), ctrlP).effects).toEqual([{ type: "togglePin", itemId: id }]);
+    }
+  });
+
+  it("Ctrl+P on the selected row, not the first", () => {
+    const s = inMode("find", { items: [item("cmd:x"), item("app:b")], selected: 1 });
+    expect(reduce(s, ctrlP).effects).toEqual([{ type: "togglePin", itemId: "app:b" }]);
+  });
+
+  it("Ctrl+P on other rows or an empty list does nothing and keeps the state", () => {
+    for (const id of ["cmd:x", "ui:find", "theme:dracula"]) {
+      const s = selecting(id);
+      const r = reduce(s, ctrlP);
+      expect(r.effects).toEqual([]);
+      expect(r.state).toEqual(s);
+    }
+    const empty = inMode("find");
+    const r = reduce(empty, ctrlP);
+    expect(r.effects).toEqual([]);
+    expect(r.state).toEqual(empty);
+  });
+
+
+  it("starts with no pins", () => {
+    expect(initialState().pins).toEqual([]);
+  });
+
+  it("homeLoaded stores pins on the home tab and replaces the rows", () => {
+    const items = [row("app:p", "pinned"), row("app:r", "recent")];
+    const r = reduce(initialState(), { type: "homeLoaded", items, pins: ["app:p"] });
+    expect(r.state.pins).toEqual(["app:p"]);
+    expect(r.state.items).toEqual(items);
+    expect(r.state.home).toEqual(items);
+  });
+
+  it("homeLoaded stores pins on other tabs without touching their rows", () => {
+    const away = withItems(inMode("find"));
+    const r = reduce(away, { type: "homeLoaded", items: [row("app:p")], pins: ["app:p"] });
+    expect(r.state.pins).toEqual(["app:p"]);
+    expect(r.state.items).toBe(away.items);
+    const cleared = reduce(r.state, { type: "homeLoaded", items: [], pins: [] }).state;
+    expect(cleared.pins).toEqual([]);
+  });
+
+  it("shown and hidden keep the pins", () => {
+    const s = inMode("find", { pins: ["app:p"], input: "x" });
+    expect(reduce(s, { type: "shown" }).state.pins).toEqual(["app:p"]);
+    expect(reduce(s, { type: "hidden" }).state.pins).toEqual(["app:p"]);
+  });
+});
+
+describe("kinds: pins", () => {
+  it("labels pinned and recent home rows, and falls back to the kind group", () => {
+    const tagged = (home: unknown): Item => ({ ...item("app:a"), payload: { home } });
+    expect(groupLabel(tagged("pinned"))).toBe(PINNED_GROUP);
+    expect(groupLabel(tagged("pinned"))).toBe("pinned");
+    expect(groupLabel(tagged("recent"))).toBe("recent");
+    expect(groupLabel(tagged("other"))).toBe(groupLabel(item("app:a")));
+    expect(groupLabel(tagged("other"))).not.toBe("pinned");
+  });
+
+  it("isPinnable accepts app: and file: ids only", () => {
+    expect(isPinnable(item("app:a"))).toBe(true);
+    expect(isPinnable(item("file:C:/a"))).toBe(true);
+    for (const id of ["cmd:x", "ui:find", "theme:dracula", "proj:p", "app", "xapp:a"]) {
+      expect(isPinnable(item(id)), id).toBe(false);
+    }
   });
 });
