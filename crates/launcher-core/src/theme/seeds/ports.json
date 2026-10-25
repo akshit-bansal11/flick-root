@@ -462,5 +462,43 @@
     "accent": "#ffc799",
     "sel": "#232323",
     "upstream": "https://raw.githubusercontent.com/raunofreiberg/vesper/main/themes/Vesper-dark-color-theme.json"
+  },
+  {
+    "id": "andromeda",
+    "name": "Andromeda",
+    "source": "port",
+    "bg": "#23262e",
+    "panel": "#23262e",
+    "text": "#d5ced9",
+    "muted": "#d5ced9",
+    "accent": "#07c1a7",
+    "sel": "#23262e",
+    "upstream": "https://raw.githubusercontent.com/EliverLara/Andromeda/master/themes/Andromeda-color-theme.json"
+  },
+  {
+    "id": "moonlight-ii",
+    "name": "Moonlight II",
+    "source": "port",
+    "bg": "#1e2030",
+    "panel": "#222436",
+    "text": "#c8d3f5",
+    "muted": "#c8d3f5",
+    "accent": "#3b63cf",
+    "sel": "#2f334d",
+    "line": "#191a2a",
+    "upstream": "https://raw.githubusercontent.com/atomiks/moonlight-vscode-theme/master/src/ui.json"
+  },
+  {
+    "id": "iceberg",
+    "name": "Iceberg",
+    "source": "port",
+    "bg": "#161821",
+    "panel": "#161821",
+    "text": "#c6c8d1",
+    "muted": "#6b7089",
+    "accent": "#c6c8d1",
+    "sel": "#1e2132",
+    "line": "#0e1015",
+    "upstream": "https://raw.githubusercontent.com/cocopon/vscode-iceberg-theme/master/themes/iceberg.color-theme.json"
   }
 ]

@@ -56,6 +56,9 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 | oceanic-next | Oceanic Next | https://github.com/mhartington/vscode-oceanicnext | https://raw.githubusercontent.com/mhartington/vscode-oceanicnext/master/themes/Oceanic%20Next-color-theme.json | MIT | https://raw.githubusercontent.com/mhartington/vscode-oceanicnext/master/LICENSE | Copyright (c) 2026 mhartington |
 | poimandres | Poimandres | https://github.com/drcmda/poimandres-theme | https://raw.githubusercontent.com/drcmda/poimandres-theme/main/themes/poimandres-color-theme.json | MIT | https://raw.githubusercontent.com/drcmda/poimandres-theme/main/LICENSE | Copyright (c) 2023 drcmda |
 | vesper | Vesper | https://github.com/raunofreiberg/vesper | https://raw.githubusercontent.com/raunofreiberg/vesper/main/themes/Vesper-dark-color-theme.json | MIT | https://raw.githubusercontent.com/raunofreiberg/vesper/main/LICENSE.md | Copyright (c) 2023 Rauno Freiberg |
+| andromeda | Andromeda | https://github.com/EliverLara/Andromeda | https://raw.githubusercontent.com/EliverLara/Andromeda/master/themes/Andromeda-color-theme.json | MIT | https://raw.githubusercontent.com/EliverLara/Andromeda/master/LICENSE.md | Copyright (c) 2017 <eliverlara@gmail.com> |
+| moonlight-ii | Moonlight II | https://github.com/atomiks/moonlight-vscode-theme | https://raw.githubusercontent.com/atomiks/moonlight-vscode-theme/master/src/ui.json | MIT | https://raw.githubusercontent.com/atomiks/moonlight-vscode-theme/master/LICENSE | Copyright (c) 2018 atomiks; palette from src/colors.ts in the same repo |
+| iceberg | Iceberg | https://github.com/cocopon/vscode-iceberg-theme | https://raw.githubusercontent.com/cocopon/vscode-iceberg-theme/master/themes/iceberg.color-theme.json | MIT | https://raw.githubusercontent.com/cocopon/vscode-iceberg-theme/master/LICENSE.txt | Copyright (c) 2014 cocopon <cocopon@me.com>; based on cocopon/iceberg.vim, Copyright (c) 2014 cocopon <cocopon@me.com> (MIT, https://raw.githubusercontent.com/cocopon/iceberg.vim/master/LICENSE.txt) |
 
 ## Not included
 
@@ -69,5 +72,6 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 - Shades of Purple: the LICENSE.md is MIT text plus a "With condition" clause ("Any thing you build with this should also be MIT licensed"), so it is not plain MIT; owner rule.
 - SynthWave '84: MIT (Copyright (c) 2019 Robb Owen), but the theme file defines no `editor.foreground`, so the text colour has no source in the mapping and nothing is guessed.
 - Tomorrow Night: the origin chriskempson/tomorrow-theme is MIT (Copyright (C) 2011 Chris Kempson) but ships only TextMate/other-editor files with no VS Code workbench keys (no accent, sidebar, selection list or border to map), and the VS Code port nashokin/Base16-Tomorrow-Night is GPL-3.0; owner rule.
+- Panda Syntax: tinkertrain/panda-syntax-vscode has no LICENSE file (LICENSE, LICENSE.md, LICENSE.txt all 404), no `license` field in package.json and no licence text in the README, so there is no grant to rely on; owner rule.
 
 Paid themes (Monokai Pro, Dracula Pro) are never used.
