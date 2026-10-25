@@ -425,5 +425,42 @@
     "sel": "#193549",
     "line": "#0d3a58",
     "upstream": "https://raw.githubusercontent.com/wesbos/cobalt2-vscode/master/theme/cobalt2.json"
+  },
+  {
+    "id": "oceanic-next",
+    "name": "Oceanic Next",
+    "source": "port",
+    "bg": "#17242c",
+    "panel": "#1b2b34",
+    "text": "#cdd3de",
+    "muted": "#cdd3de",
+    "accent": "#5fb3b3",
+    "sel": "#17242c",
+    "line": "#343d46",
+    "upstream": "https://raw.githubusercontent.com/mhartington/vscode-oceanicnext/master/themes/Oceanic%20Next-color-theme.json"
+  },
+  {
+    "id": "poimandres",
+    "name": "Poimandres",
+    "source": "port",
+    "bg": "#1b1e28",
+    "panel": "#1b1e28",
+    "text": "#a6accd",
+    "muted": "#7d829c",
+    "accent": "#303340",
+    "sel": "#262934",
+    "upstream": "https://raw.githubusercontent.com/drcmda/poimandres-theme/main/themes/poimandres-color-theme.json"
+  },
+  {
+    "id": "vesper",
+    "name": "Vesper",
+    "source": "port",
+    "bg": "#101010",
+    "panel": "#101010",
+    "text": "#ffffff",
+    "muted": "#ffffff",
+    "accent": "#ffc799",
+    "sel": "#232323",
+    "upstream": "https://raw.githubusercontent.com/raunofreiberg/vesper/main/themes/Vesper-dark-color-theme.json"
   }
 ]
