@@ -127,9 +127,9 @@
   --l-left-w: 360px;
   /* Panel width; Rust keeps PANEL_W in window.rs equal to this. */
   --l-panel-w: 820px;
-  /* Tray menu size: padding 12 + header 44 + three items 40 + separator 9 + Quit 40. Rust MENU_W/MENU_H mirror it. */
+  /* Tray menu size: status 38 + list padding 12 + 4 items 32 + separator 9. Rust MENU_W/MENU_H mirror it. */
   --l-menu-w: 280px;
-  --l-menu-h: 225px;
+  --l-menu-h: 187px;
 
   /* Motion. Keystroke-driven animation uses fast/normal only, transform and opacity only, and never delays content. */
   --l-dur-fast: 90ms;

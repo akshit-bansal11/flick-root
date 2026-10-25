@@ -8,17 +8,17 @@ const start = (update: { version: string } | null = null): MenuState => ({
 const key = (state: MenuState, k: string) => reduceMenu(state, { type: "key", key: k });
 
 describe("buildItems", () => {
-  it("lists Open, Settings, update, Quit with caps", () => {
+  it("lists open, settings, update, quit with caps", () => {
     const items = buildItems({ hotkey: "Alt+Space", update: null });
     expect(items.map((i) => i.action)).toEqual(["open", "settings", "update", "quit"]);
     expect(items[0]?.caps).toEqual(["Alt", "Space"]);
     expect(items[1]?.caps).toEqual(["Ctrl", ","]);
-    expect(items[2]).toMatchObject({ label: "Check for updates", caps: [] });
+    expect(items[2]).toMatchObject({ label: "check for updates", caps: [] });
   });
 
   it("names the version when an update is present", () => {
     expect(buildItems({ hotkey: "Alt+Space", update: { version: "0.0.2" } })[2]?.label).toBe(
-      "Install 0.0.2",
+      "install 0.0.2",
     );
   });
 });

@@ -1,4 +1,3 @@
-import { APP_DISPLAY_NAME } from "../brand";
 import { caps } from "../shortcuts";
 import { acceleratorCaps } from "../tour/steps";
 
@@ -25,14 +24,14 @@ export function buildItems(args: {
   update: { version: string } | null;
 }): MenuItem[] {
   return [
-    { action: "open", label: `Open ${APP_DISPLAY_NAME}`, caps: acceleratorCaps(args.hotkey) },
-    { action: "settings", label: "Settings", caps: caps("openSettings") },
+    { action: "open", label: "open", caps: acceleratorCaps(args.hotkey) },
+    { action: "settings", label: "settings", caps: caps("openSettings") },
     {
       action: "update",
-      label: args.update ? `Install ${args.update.version}` : "Check for updates",
+      label: args.update ? `install ${args.update.version}` : "check for updates",
       caps: [],
     },
-    { action: "quit", label: "Quit", caps: [] },
+    { action: "quit", label: "quit", caps: [] },
   ];
 }
 

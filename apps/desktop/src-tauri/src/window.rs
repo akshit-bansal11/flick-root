@@ -23,7 +23,7 @@ const WORK_MARGIN: f64 = 24.0;
 /// Tray menu width in logical px. Keep equal to `--l-menu-w` in tokens.css.
 const MENU_W: f64 = 280.0;
 /// Tray menu height in logical px. Keep equal to `--l-menu-h` in tokens.css.
-const MENU_H: f64 = 225.0;
+const MENU_H: f64 = 187.0;
 /// Gap between the tray click point and the menu, in logical px.
 const MENU_GAP: f64 = 8.0;
 
@@ -583,14 +583,14 @@ mod tests {
         assert!(!scheme_is_dark("light"));
     }
 
-    // Menu is 280x225 with an 8 px gap at scale 1.
+    // Menu is 280x187 with an 8 px gap at scale 1.
 
     #[test]
     fn menu_above_a_bottom_taskbar() {
         // Work area 1920x1040, click on the taskbar at y 1060: above, clamped to the work area.
         assert_eq!(
             menu_layout((0, 0, 1920, 1040), 1.0, (1700.0, 1060.0)),
-            (1560, 815, 280, 225)
+            (1560, 853, 280, 187)
         );
     }
 
@@ -606,7 +606,7 @@ mod tests {
         // Work area starts at y 40; click at y 20.
         assert_eq!(
             menu_layout((0, 40, 1920, 1040), 1.0, (1700.0, 20.0)),
-            (1560, 40, 280, 225)
+            (1560, 40, 280, 187)
         );
         // A click in the upper half (auto-hidden top taskbar) opens below with the gap.
         let (_, y, _, _) = menu_layout((0, 0, 1920, 1080), 1.0, (960.0, 100.0));
@@ -618,7 +618,7 @@ mod tests {
         // Work area starts at x 48; click at x 24, y 900.
         assert_eq!(
             menu_layout((48, 0, 1872, 1080), 1.0, (24.0, 900.0)),
-            (48, 788, 280, 225)
+            (48, 807, 280, 187)
         );
     }
 
@@ -627,7 +627,7 @@ mod tests {
         // Work area 0..1872; click at x 1896, y 1070: left of the click, clamped to the bottom.
         assert_eq!(
             menu_layout((0, 0, 1872, 1080), 1.0, (1896.0, 1070.0)),
-            (1592, 855, 280, 225)
+            (1592, 893, 280, 187)
         );
     }
 
@@ -645,16 +645,16 @@ mod tests {
     fn menu_scales_on_an_offset_monitor() {
         // Monitor left of the primary at 150%: 2880x1560 work area at x -2880.
         let (x, y, w, h) = menu_layout((-2880, 0, 2880, 1560), 1.5, (-1440.0, 1590.0));
-        assert_eq!((w, h), (420, 338));
+        assert_eq!((w, h), (420, 281));
         assert_eq!(x, -1440 - 210);
-        assert_eq!(y, 1560 - 338);
+        assert_eq!(y, 1560 - 281);
     }
 
     #[test]
     fn menu_in_a_tiny_work_area_pins_to_the_origin() {
         assert_eq!(
             menu_layout((100, 50, 200, 100), 1.0, (150.0, 160.0)),
-            (100, 50, 280, 225)
+            (100, 50, 280, 187)
         );
     }
 

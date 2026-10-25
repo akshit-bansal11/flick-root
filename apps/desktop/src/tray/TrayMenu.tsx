@@ -1,8 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { APP_DISPLAY_NAME } from "../brand";
 import type { TrayMenuEvent } from "../ipc";
-import { Keycaps } from "../Keycaps";
-import { Lens, useLens } from "../Lens";
+import { keyWords } from "../shortcuts";
 import { applyTheme } from "../theme";
 import { buildItems, type MenuAction, reduceMenu } from "./menuReducer";
 
@@ -19,13 +18,14 @@ const NAME_ID = "tray-name";
 const ARIA_KEYS: Record<string, string> = { Ctrl: "Control", ",": "Comma" };
 const shortcutOf = (caps: string[]) => caps.map((c) => ARIA_KEYS[c] ?? c).join("+");
 
-/** The tray menu: a glass role=menu with a roving selection lens. Base glass is the window's DWM acrylic. */
+/** Key caps as muted words, "alt space". */
+const keyText = (caps: string[]) => keyWords(caps.join("+")).split("+").join(" ");
+
+/** The tray menu: a flat role=menu under a status line. The window's DWM acrylic is the base. */
 export function TrayMenu({ event, onRun, onClose }: Props) {
   const { hotkey, update, appVersion } = event;
   const items = useMemo(() => buildItems({ hotkey, update }), [hotkey, update]);
   const [selected, setSelected] = useState(0);
-  const list = useRef<HTMLDivElement>(null);
-  const lens = useRef<HTMLDivElement>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
@@ -51,22 +51,19 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
     buttons.current[selected]?.focus();
   }, [selected]);
 
-  const current = items[selected];
-  useLens(list, lens, current ? itemId(current.action) : undefined, [items]);
-
   return (
     <div className="tray-menu">
       <div className="tray-head">
-        <span className="tray-mark" aria-hidden="true">
-          {APP_DISPLAY_NAME.charAt(0)}
+        <span className="tray-dot" aria-hidden="true">
+          ●
         </span>
         <span className="tray-name" id={NAME_ID}>
           {APP_DISPLAY_NAME}
         </span>
         <span className="tray-ver">v{appVersion}</span>
+        {update && <span className="tray-update">update {update.version} available</span>}
       </div>
-      <div className="tray-list" ref={list} role="menu" aria-labelledby={NAME_ID} tabIndex={-1}>
-        <Lens ref={lens} />
+      <div className="tray-list" role="menu" aria-labelledby={NAME_ID} tabIndex={-1}>
         {items.map((item, i) => (
           <Fragment key={item.action}>
             {item.action === "quit" && <hr className="tray-sep" />}
@@ -74,7 +71,7 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
               type="button"
               id={itemId(item.action)}
               role="menuitem"
-              className="tray-item"
+              className={i === selected ? "tray-item sel" : "tray-item"}
               aria-keyshortcuts={item.caps.length > 0 ? shortcutOf(item.caps) : undefined}
               tabIndex={i === selected ? 0 : -1}
               ref={(el) => {
@@ -84,7 +81,11 @@ export function TrayMenu({ event, onRun, onClose }: Props) {
               onClick={() => onRun(item.action)}
             >
               <span className="tray-label">{item.label}</span>
-              {item.caps.length > 0 && <Keycaps caps={item.caps} decorative />}
+              {item.caps.length > 0 && (
+                <span className="tray-key" aria-hidden="true">
+                  {keyText(item.caps)}
+                </span>
+              )}
             </button>
           </Fragment>
         ))}
