@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { MODES } from "../launcher/reducer";
 import * as api from "./api";
 import "./features.css";
+import { OnOff } from "./OnOff";
 import { OTHER_GROUP, PREFIX_GROUPS, type PrefixGroup } from "./prefixGroups";
+import { SettingRow } from "./Row";
 import { SchemaForm } from "./SchemaForm";
-import { Toggle } from "./Toggle";
 import { errorText, type FeatureView, type ModeToggle } from "./types";
 
 /** Settings > Prefixes: one section per launcher prefix, with its mode switch and its modules. Takes no props. */
@@ -73,26 +74,33 @@ export function Prefixes() {
       ? other
       : g.features.flatMap((id) => features.find((f) => f.id === id) ?? []);
 
+  const fail = (k: string) =>
+    errors[k] && (
+      <div className="s-error" role="alert">
+        {errors[k]}
+      </div>
+    );
+
   const modeRow = (label: string, key: ModeToggle) => (
-    <div className="s-row">
-      <div className="s-row-text">
-        <div className="s-row-label">{label}</div>
-        {errors[key] && (
-          <div className="s-error" role="alert">
-            {errors[key]}
-          </div>
-        )}
-      </div>
-      <div className="s-row-control">
-        <Toggle checked={modes[key]} label={label} onChange={(v) => void toggleMode(key, v)} />
-      </div>
-    </div>
+    <>
+      <SettingRow
+        label={label}
+        hint="switches the whole prefix"
+        preview={{
+          title: `# ${label.toLowerCase()}`,
+          body: "Turn it off and the prefix stops completely; with nothing on it is hidden from the launcher.",
+        }}
+      >
+        <OnOff checked={modes[key]} label={label} onChange={(v) => void toggleMode(key, v)} />
+      </SettingRow>
+      {fail(key)}
+    </>
   );
 
   return (
     <section>
       <h1 className="s-title">Prefixes</h1>
-      <p className="s-desc">
+      <p className="s-desc s-prose">
         Each prefix searches its own modules. Turn a module off and it stops completely; a prefix
         with nothing on is hidden from the launcher.
       </p>
@@ -107,52 +115,41 @@ export function Prefixes() {
         const def = g.mode ? MODES[g.mode] : null;
         return (
           <section key={g.id} aria-labelledby={`f-head-${g.id}`}>
-            <div className="f-head">
-              {def && (
-                <span className="f-glyph" aria-hidden="true">
-                  {def.prefix}
-                </span>
-              )}
-              <h2 className="f-title" id={`f-head-${g.id}`}>
-                {def?.label ?? g.title}
-              </h2>
+            <h2 className="sec" id={`f-head-${g.id}`}>
+              {`# ${(def?.label ?? g.title ?? g.id).toLowerCase()}`}
               <span className="f-sub">{def?.desc ?? g.desc}</span>
-            </div>
+            </h2>
             {g.toggle && modeRow(g.toggle.label, g.toggle.key)}
             {items.map((f) => (
-              <div key={f.id} className="s-row f-feature">
-                <span className="f-tile" aria-hidden="true">
-                  {f.title.charAt(0).toUpperCase()}
-                </span>
-                <div className="s-row-text f-grow">
-                  <div className="s-row-label">
-                    {f.title} <span className="f-pill">{f.versionTag}</span>
-                  </div>
-                  <div className="s-help">{f.description}</div>
-                  {errors[f.id] && (
-                    <div className="s-error" role="alert">
-                      {errors[f.id]}
-                    </div>
-                  )}
-                </div>
-                <div className="s-row-control">
-                  {f.schema.fields.length > 0 && (
-                    <button
-                      type="button"
-                      className="s-btn"
-                      aria-expanded={open === f.id}
-                      aria-label={`Options for ${f.title}`}
-                      onClick={() => setOpen(open === f.id ? null : f.id)}
-                    >
-                      Options
-                    </button>
-                  )}
-                  <Toggle
-                    checked={f.enabled}
-                    label={`Enable ${f.title}`}
-                    onChange={(v) => void toggleFeature(f, v)}
-                  />
-                </div>
+              <Fragment key={f.id}>
+                <SettingRow
+                  label={f.title}
+                  hint={f.description}
+                  preview={{
+                    title: `# ${f.title.toLowerCase()}`,
+                    body: `${f.description} ${f.versionTag}`,
+                  }}
+                >
+                  <span className="s-add">
+                    {f.schema.fields.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn"
+                        aria-expanded={open === f.id}
+                        aria-label={`Options for ${f.title}`}
+                        onClick={() => setOpen(open === f.id ? null : f.id)}
+                      >
+                        options
+                      </button>
+                    )}
+                    <OnOff
+                      checked={f.enabled}
+                      label={`Enable ${f.title}`}
+                      onChange={(v) => void toggleFeature(f, v)}
+                    />
+                  </span>
+                </SettingRow>
+                {fail(f.id)}
                 {open === f.id && (
                   <SchemaForm
                     fields={f.schema.fields}
@@ -160,7 +157,7 @@ export function Prefixes() {
                     onSave={(o) => saveOptions(f.id, o)}
                   />
                 )}
-              </div>
+              </Fragment>
             ))}
           </section>
         );

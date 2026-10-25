@@ -1,31 +1,21 @@
-/* Prefixes page. Group heading: glyph, label, one-line description, sentence case. */
-.f-head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--l-sp-4);
-  margin: var(--l-sp-9) 0 var(--l-sp-4) var(--l-sp-2);
-}
-.f-glyph {
-  color: var(--l-accent-text);
-  font-family: var(--l-mono);
-  font-weight: 600;
-}
-.f-title {
-  margin: 0;
-  font-size: var(--l-fs-body);
-  line-height: var(--l-lh-body);
-  font-weight: 600;
+/* Settings pages: section header, inline editors, Prefixes module options. */
+.sec {
+  margin: var(--l-sp-9) 0 var(--l-sp-2) var(--l-sp-5);
+  color: var(--l-muted);
+  font: inherit;
+  font-size: var(--l-fs-caption);
+  font-weight: 400;
 }
 .f-sub {
-  color: var(--l-muted);
-  font-size: var(--l-fs-caption);
+  margin-left: var(--l-sp-4);
   line-height: var(--l-lh-caption);
 }
-.f-feature {
-  flex-wrap: wrap;
+.s-prose {
+  font-family: var(--l-prose);
 }
-.f-grow {
-  flex: 1;
+.s-editor {
+  margin: 0;
+  padding: var(--l-sp-2) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
 }
 .f-tile {
   display: grid;
@@ -38,21 +28,11 @@
   color: var(--l-accent-text);
   font-weight: 600;
 }
-.f-pill {
-  padding: var(--l-sp-1) var(--l-sp-3);
-  border: var(--l-border-hair);
-  border-radius: var(--l-r-pill);
-  color: var(--l-muted);
-  font-family: var(--l-mono);
-  font-size: var(--l-fs-micro);
-  font-weight: 500;
-}
 .f-form {
   display: flex;
-  flex: 1 0 100%;
   flex-direction: column;
   gap: var(--l-sp-6);
-  padding: var(--l-sp-6) 0 var(--l-sp-4) calc(var(--l-tile-settings) + var(--l-sp-8));
+  padding: var(--l-sp-6) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
   border-top: var(--l-border-hair);
 }
 .f-field {
