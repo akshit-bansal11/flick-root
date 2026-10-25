@@ -221,5 +221,82 @@
     "sel": "#363646",
     "line": "#16161d",
     "upstream": "https://raw.githubusercontent.com/paccodes/kanagawa-vscode-theme/main/themes/kanagawa-wave-color-theme.json"
+  },
+  {
+    "id": "kanagawa-lotus",
+    "name": "Kanagawa Lotus",
+    "source": "port",
+    "bg": "#f2ecbc",
+    "panel": "#f2ecbc",
+    "text": "#545464",
+    "muted": "#545464",
+    "accent": "#e7dba0",
+    "sel": "#e4d794",
+    "line": "#d5cea3",
+    "upstream": "https://raw.githubusercontent.com/paccodes/kanagawa-vscode-theme/main/themes/kanagawa-lotus-color-theme.json"
+  },
+  {
+    "id": "nightfox",
+    "name": "Nightfox",
+    "source": "port",
+    "bg": "#131a24",
+    "panel": "#192330",
+    "text": "#cdcecf",
+    "muted": "#9d79d6",
+    "accent": "#63cdcf",
+    "sel": "#29394e",
+    "line": "#131a24",
+    "upstream": "https://raw.githubusercontent.com/keifererikson/vscode-nightfox/master/themes/nightfox-dark-theme.json"
+  },
+  {
+    "id": "github-dark",
+    "name": "GitHub Dark Default",
+    "source": "port",
+    "bg": "#010409",
+    "panel": "#0d1117",
+    "text": "#e6edf3",
+    "muted": "#7d8590",
+    "accent": "#238636",
+    "sel": "#343941",
+    "line": "#30363d",
+    "upstream": "https://unpkg.com/@primer/primitives@7.10.0/dist/json/colors/dark.json"
+  },
+  {
+    "id": "github-dark-dimmed",
+    "name": "GitHub Dark Dimmed",
+    "source": "port",
+    "bg": "#1c2128",
+    "panel": "#22272e",
+    "text": "#adbac7",
+    "muted": "#768390",
+    "accent": "#347d39",
+    "sel": "#3c434d",
+    "line": "#444c56",
+    "upstream": "https://unpkg.com/@primer/primitives@7.10.0/dist/json/colors/dark_dimmed.json"
+  },
+  {
+    "id": "github-light",
+    "name": "GitHub Light Default",
+    "source": "port",
+    "bg": "#f6f8fa",
+    "panel": "#ffffff",
+    "text": "#1f2328",
+    "muted": "#656d76",
+    "accent": "#1f883d",
+    "sel": "#eff1f3",
+    "line": "#d0d7de",
+    "upstream": "https://unpkg.com/@primer/primitives@7.10.0/dist/json/colors/light.json"
+  },
+  {
+    "id": "rose-pine",
+    "name": "Rosé Pine",
+    "source": "port",
+    "bg": "#191724",
+    "panel": "#191724",
+    "text": "#e0def4",
+    "muted": "#908caa",
+    "accent": "#ebbcba",
+    "sel": "#2a2838",
+    "upstream": "https://raw.githubusercontent.com/rose-pine/vscode/main/themes/rose-pine-color-theme.json"
   }
 ]
