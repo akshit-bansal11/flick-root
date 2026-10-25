@@ -235,6 +235,8 @@ describe("FirstRun", () => {
 
   it("hides the step marks from assistive tech", async () => {
     await setup();
+    await click(byText("not now"));
+    await click(byText("continue"));
     const marks = [...host.querySelectorAll(".fr-mark")];
     expect(marks.length).toBeGreaterThan(0);
     for (const m of marks) expect(m.getAttribute("aria-hidden")).toBe("true");

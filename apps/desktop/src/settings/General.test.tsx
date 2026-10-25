@@ -209,7 +209,7 @@ describe("General focus and help", () => {
   it("removing a folder focuses the next remove button, the last one the add input", () => {
     render(<General settings={settings} onChange={() => {}} />);
     openSkipEditor();
-    fireEvent.click(screen.getByLabelText("Remove D:\Games"));
+    fireEvent.click(screen.getByLabelText("Remove D:\\Games"));
     expect(document.activeElement).toBe(screen.getByLabelText("Remove node_modules"));
     fireEvent.click(screen.getByLabelText("Remove node_modules"));
     expect(document.activeElement).toBe(screen.getByLabelText("Exclude"));
