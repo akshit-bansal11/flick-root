@@ -24,16 +24,21 @@ export function LauncherDemo() {
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const engaged = useRef(false);
+  const hovered = useRef(false);
   const items = filter(mode, q);
   const active = Math.min(sel, Math.max(items.length - 1, 0));
   const current: Item | undefined = items[active];
   const chip = Object.keys(PREFIX).find((k) => PREFIX[k] === mode);
 
-  // Autoplay: type scripted examples while idle; stops for good on focus or reduced motion.
+  // Autoplay: type scripted examples while idle; stops for good on focus or reduced motion,
+  // and holds while the pointer is over the demo (WCAG 2.2.2).
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let alive = true;
     const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const idle = async () => {
+      while (alive && hovered.current && !engaged.current) await wait(100);
+    };
     const show = (text: string) => {
       const [m, rest] = parse(text);
       setMode(m);
@@ -45,11 +50,13 @@ export function LauncherDemo() {
       for (let i = 0; alive; i = (i + 1) % SCRIPT.length) {
         const text = SCRIPT[i];
         for (let c = 1; c <= text.length; c++) {
+          await idle();
           if (!alive || engaged.current) return;
           show(text.slice(0, c));
           await wait(90);
         }
         await wait(1400);
+        await idle();
         if (!alive || engaged.current) return;
         show("");
         await wait(500);
@@ -90,7 +97,15 @@ export function LauncherDemo() {
   };
 
   return (
-    <div className="demo">
+    <div
+      className="demo"
+      onPointerEnter={() => {
+        hovered.current = true;
+      }}
+      onPointerLeave={() => {
+        hovered.current = false;
+      }}
+    >
       <div className="demo-bar">
         <span className="demo-prompt" aria-hidden="true">
           {chip ?? "›"}

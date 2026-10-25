@@ -34,13 +34,13 @@ export const ITEMS: Record<Exclude<Mode, "none">, Item[]> = {
     ...APPS,
     {
       title: "report-q3.docx",
-      sub: "C:\Users\you\Documents",
+      sub: "C:\\Users\\you\\Documents",
       group: "files",
       keys: "report q3 docx",
     },
     {
       title: "invoice-march.pdf",
-      sub: "C:\Users\you\Downloads",
+      sub: "C:\\Users\\you\\Downloads",
       group: "files",
       keys: "invoice march pdf",
     },
@@ -60,8 +60,8 @@ export const ITEMS: Record<Exclude<Mode, "none">, Item[]> = {
     },
   ],
   Projects: [
-    { title: "flick", sub: "D:\projects\flick", group: "projects", keys: "flick" },
-    { title: "notes-app", sub: "D:\projects\notes-app", group: "projects", keys: "notes app" },
+    { title: "flick", sub: "D:\\projects\\flick", group: "projects", keys: "flick" },
+    { title: "notes-app", sub: "D:\\projects\\notes-app", group: "projects", keys: "notes app" },
   ],
 };
 
