@@ -1168,7 +1168,6 @@ describe("pins", () => {
     expect(r.state).toEqual(empty);
   });
 
-
   it("starts with no pins", () => {
     expect(initialState().pins).toEqual([]);
   });
