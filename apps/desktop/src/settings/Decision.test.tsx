@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -59,18 +59,22 @@ afterEach(() => {
 describe("Decision", () => {
   it("shows the parser locked on and every engine off", async () => {
     await mount();
-    expect((screen.getByLabelText("Enable Built-in parser") as HTMLInputElement).checked).toBe(
-      true,
-    );
+    const parser = within(screen.getByRole("group", { name: "Enable Built-in parser" }));
+    expect(parser.getByRole("button", { name: "on" }).getAttribute("aria-pressed")).toBe("true");
+    expect(parser.getByRole("button", { name: "on" }).hasAttribute("disabled")).toBe(true);
+    expect(parser.getByRole("button", { name: "off" }).hasAttribute("disabled")).toBe(true);
     for (const t of ["Laya", "Kev", "Your AI provider", "Jev", "Custom"]) {
-      expect((screen.getByLabelText(`Enable ${t}`) as HTMLInputElement).checked).toBe(false);
+      const g = within(screen.getByRole("group", { name: `Enable ${t}` }));
+      expect(g.getByRole("button", { name: "on" }).getAttribute("aria-pressed")).toBe("false");
+      expect(g.getByRole("button", { name: "off" }).getAttribute("aria-pressed")).toBe("true");
     }
   });
 
   it("toggling calls setEngine", async () => {
     await mount();
     await act(async () => {
-      fireEvent.click(screen.getByLabelText("Enable Laya"));
+      const group = screen.getByRole("group", { name: "Enable Laya" });
+      fireEvent.click(within(group).getByRole("button", { name: "on" }));
     });
     expect(api.setEngine).toHaveBeenCalledWith("laya", { enabled: true });
   });
@@ -79,7 +83,7 @@ describe("Decision", () => {
     await mount();
     expect(screen.getByText("no key")).toBeTruthy();
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Add key" })[1] as HTMLElement);
+      fireEvent.click(screen.getByRole("button", { name: "Add key for Jev" }));
     });
     fireEvent.change(screen.getByLabelText("API key"), { target: { value: "jv-test" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /understand/ }));
