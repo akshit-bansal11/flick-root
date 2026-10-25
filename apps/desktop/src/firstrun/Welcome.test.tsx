@@ -16,9 +16,9 @@ describe("Welcome", () => {
     for (const [i, m] of Object.values(MODES).entries()) {
       expect(chips[i]?.querySelector("kbd")?.textContent).toBe(m.prefix);
     }
-    expect(document.activeElement).toBe(screen.getByText("Take the tour"));
-    fireEvent.click(screen.getByText("Take the tour"));
-    fireEvent.click(screen.getByText("Not now"));
+    expect(document.activeElement).toBe(screen.getByText("take the tour"));
+    fireEvent.click(screen.getByText("take the tour"));
+    fireEvent.click(screen.getByText("not now"));
     expect(f.onTour).toHaveBeenCalled();
     expect(f.onSkip).toHaveBeenCalled();
   });
@@ -29,8 +29,8 @@ describe("Welcome", () => {
     expect(screen.getByText(/No problem/).textContent).toContain(
       "Settings > General > Take the tour",
     );
-    expect(document.activeElement).toBe(screen.getByText("Continue"));
-    fireEvent.click(screen.getByText("Continue"));
+    expect(document.activeElement).toBe(screen.getByText("continue"));
+    fireEvent.click(screen.getByText("continue"));
     expect(f.onContinue).toHaveBeenCalled();
   });
 });

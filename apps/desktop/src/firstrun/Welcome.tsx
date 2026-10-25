@@ -20,7 +20,7 @@ function Primary({ onClick, children }: { onClick: () => void; children: string 
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => ref.current?.focus(), []);
   return (
-    <button type="button" ref={ref} className="fr-btn fr-primary" onClick={onClick}>
+    <button type="button" ref={ref} className="btn pri" onClick={onClick}>
       {children}
     </button>
   );
@@ -34,7 +34,7 @@ export function Welcome({ note, onTour, onSkip, onContinue }: Props) {
         <p className="s-title fr-rise">
           No problem. You can take the tour any time from Settings &gt; General &gt; Take the tour.
         </p>
-        <Primary onClick={onContinue}>Continue</Primary>
+        <Primary onClick={onContinue}>continue</Primary>
       </main>
     );
   }
@@ -52,10 +52,10 @@ export function Welcome({ note, onTour, onSkip, onContinue }: Props) {
       </div>
       <p>Take a 2-minute interactive tour?</p>
       <div className="fr-actions">
-        <button type="button" className="fr-btn" onClick={onSkip}>
-          Not now
+        <button type="button" className="btn" onClick={onSkip}>
+          not now
         </button>
-        <Primary onClick={onTour}>Take the tour</Primary>
+        <Primary onClick={onTour}>take the tour</Primary>
       </div>
     </main>
   );

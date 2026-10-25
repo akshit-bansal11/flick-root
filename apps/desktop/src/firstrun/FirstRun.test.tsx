@@ -94,18 +94,34 @@ describe("Hotkey", () => {
 });
 
 describe("Detect", () => {
-  it("lists servers with switches off and enables nothing until clicked", async () => {
+  it("lists servers as radios, skip checked, enables nothing until chosen", async () => {
     vi.mocked(api.probeProviders).mockResolvedValue([
       probe("ollama", true),
       probe("lmstudio", false),
     ]);
     await mount(<Detect />);
-    const sw = host.querySelectorAll('[role="switch"]');
-    expect(sw).toHaveLength(1);
-    expect(sw[0]?.getAttribute("aria-checked")).toBe("false");
+    const radio = (v: string) =>
+      host.querySelector<HTMLInputElement>(`input[type="radio"][value="${v}"]`);
+    expect(host.querySelectorAll('input[type="radio"]')).toHaveLength(2);
+    expect(radio("")?.checked).toBe(true);
+    expect(radio("ollama")?.checked).toBe(false);
+    expect(host.querySelector("legend")?.textContent).toBe("Ask provider");
     expect(api.setProvider).not.toHaveBeenCalled();
-    await click(sw[0]);
+    await click(radio("ollama"));
     expect(api.setProvider).toHaveBeenCalledWith("ollama", { enabled: true });
+    expect(radio("ollama")?.checked).toBe(true);
+    await click(radio(""));
+    expect(api.setProvider).toHaveBeenLastCalledWith("ollama", { enabled: false });
+    expect(radio("")?.checked).toBe(true);
+  });
+
+  it("shows the error text when enabling fails", async () => {
+    vi.mocked(api.probeProviders).mockResolvedValue([probe("ollama", true)]);
+    vi.mocked(api.setProvider).mockRejectedValueOnce({ code: "x", message: "boom" });
+    await mount(<Detect />);
+    await click(host.querySelector('input[value="ollama"]'));
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[value="ollama"]')?.checked).toBe(false);
   });
 
   it("shows the none-found message", async () => {
@@ -133,20 +149,51 @@ describe("FirstRun", () => {
   it("yes: welcome, tour, hotkey, models, finish", async () => {
     await setup();
     expect(host.textContent).toContain("Take a 2-minute interactive tour?");
-    await click(byText("Take the tour"));
+    await click(byText("take the tour"));
     await click(host.querySelector('[data-testid="tour"]'));
-    expect(host.textContent).toContain("Step 1 of 2");
-    await click(host.querySelector(".fr-primary"));
-    expect(host.textContent).toContain("Step 2 of 2");
-    await click(host.querySelector(".fr-primary"));
+    expect(host.textContent).toContain("step 3 of 4");
+    await click(byText("skip"));
+    expect(host.textContent).toContain("step 4 of 4");
+    expect(host.textContent).toContain("How should Ask answer?");
+    await click(byText("finish"));
     expect(core.invoke).toHaveBeenCalledWith("complete_first_run");
   });
 
   it("no: note, then hotkey step", async () => {
     await setup();
-    await click(byText("Not now"));
+    await click(byText("not now"));
     expect(host.textContent).toContain("Settings > General > Take the tour");
-    await click(byText("Continue"));
-    expect(host.textContent).toContain("Step 1 of 2");
+    await click(byText("continue"));
+    expect(host.textContent).toContain("step 3 of 4");
+  });
+
+  it("progress bar and current step follow hotkey then ask", async () => {
+    await setup();
+    await click(byText("not now"));
+    await click(byText("continue"));
+    const bar = () => host.querySelector('[role="progressbar"]');
+    const current = () => host.querySelector('[aria-current="step"]');
+    expect(bar()?.getAttribute("aria-label")).toBe("Setup progress");
+    expect(bar()?.getAttribute("aria-valuemin")).toBe("1");
+    expect(bar()?.getAttribute("aria-valuemax")).toBe("4");
+    expect(bar()?.getAttribute("aria-valuenow")).toBe("3");
+    expect(host.querySelectorAll('[aria-current="step"]')).toHaveLength(1);
+    expect(current()?.textContent).toContain("hotkey");
+    await click(byText("skip"));
+    expect(bar()?.getAttribute("aria-valuenow")).toBe("4");
+    expect(current()?.textContent).toContain("ask");
+  });
+
+  it("marks the tour skipped only when it was skipped", async () => {
+    await setup();
+    await click(byText("not now"));
+    await click(byText("continue"));
+    expect(host.querySelector(".fr-steps")?.textContent).toContain("skipped");
+    act(() => root?.unmount());
+    root = null;
+    await setup();
+    await click(byText("take the tour"));
+    await click(host.querySelector('[data-testid="tour"]'));
+    expect(host.querySelector(".fr-steps")?.textContent).not.toContain("skipped");
   });
 });

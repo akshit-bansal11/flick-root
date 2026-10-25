@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../settings/api";
-import { Toggle } from "../settings/Toggle";
+import { TermRadio } from "../settings/TermRadio";
 import { errorText, type ProbeResult } from "../settings/types";
 
 export const NONE_FOUND =
@@ -12,10 +12,13 @@ const TITLES: Record<string, string> = {
   llamacpp: "llama.cpp server",
 };
 
-/** Step 2 body: offer running local servers, every switch starts off. */
+/** Radio value for "no provider"; no server id can equal it. */
+const SKIP = "";
+
+/** Ask step body: offer running local servers as radios, nothing enabled until one is picked. */
 export function Detect() {
   const [found, setFound] = useState<ProbeResult[] | null>(null);
-  const [on, setOn] = useState<Record<string, boolean>>({});
+  const [chosen, setChosen] = useState(SKIP);
   const [err, setErr] = useState<string | null>(null);
 
   const probe = useCallback(() => {
@@ -31,11 +34,16 @@ export function Detect() {
   }, []);
   useEffect(probe, [probe]);
 
-  const toggle = (id: string, enabled: boolean) => {
-    api.setProvider(id, { enabled }).then(
-      () => setOn((o) => ({ ...o, [id]: enabled })),
-      (e: unknown) => setErr(errorText(e)),
-    );
+  /** Select one server (or `SKIP`): enable the new choice, then turn the previous one off. */
+  const choose = (id: string) => {
+    const prev = chosen;
+    const enable = id === SKIP ? Promise.resolve({}) : api.setProvider(id, { enabled: true });
+    enable
+      .then(() => {
+        setChosen(id);
+        return prev === SKIP ? undefined : api.setProvider(prev, { enabled: false });
+      })
+      .catch((e: unknown) => setErr(errorText(e)));
   };
 
   return (
@@ -47,29 +55,28 @@ export function Detect() {
       ) : found.length === 0 ? (
         <p className="s-help">{NONE_FOUND}</p>
       ) : (
-        <ul className="fr-servers">
-          {found.map((p) => (
-            <li key={p.id} className="fr-server">
-              <div>
-                <div>{TITLES[p.id] ?? p.id}</div>
-                <div className="s-help">{p.models.join(", ") || "No models listed"}</div>
-              </div>
-              <Toggle
-                checked={on[p.id] ?? false}
-                onChange={(v) => toggle(p.id, v)}
-                label={`Use ${TITLES[p.id] ?? p.id}`}
-              />
-            </li>
-          ))}
-        </ul>
+        <TermRadio
+          legend="Ask provider"
+          name="ask-provider"
+          value={chosen}
+          onChange={choose}
+          options={[
+            ...found.map((p) => ({
+              value: p.id,
+              label: TITLES[p.id] ?? p.id,
+              hint: p.models.join(", ") || "No models listed",
+            })),
+            { value: SKIP, label: "skip, keep ask off", hint: "turn it on later in settings" },
+          ]}
+        />
       )}
       {err && (
         <p className="fr-status" data-kind="error" role="alert">
           {err}
         </p>
       )}
-      <button type="button" className="fr-btn" onClick={probe}>
-        Check again
+      <button type="button" className="btn" onClick={probe}>
+        check again
       </button>
     </div>
   );
