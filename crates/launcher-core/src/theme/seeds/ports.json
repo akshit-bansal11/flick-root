@@ -298,5 +298,80 @@
     "accent": "#ebbcba",
     "sel": "#2a2838",
     "upstream": "https://raw.githubusercontent.com/rose-pine/vscode/main/themes/rose-pine-color-theme.json"
+  },
+  {
+    "id": "rose-pine-moon",
+    "name": "Rosé Pine Moon",
+    "source": "port",
+    "bg": "#232136",
+    "panel": "#232136",
+    "text": "#e0def4",
+    "muted": "#908caa",
+    "accent": "#ea9a97",
+    "sel": "#312f45",
+    "upstream": "https://raw.githubusercontent.com/rose-pine/vscode/main/themes/rose-pine-moon-color-theme.json"
+  },
+  {
+    "id": "rose-pine-dawn",
+    "name": "Rosé Pine Dawn",
+    "source": "port",
+    "bg": "#faf4ed",
+    "panel": "#faf4ed",
+    "text": "#575279",
+    "muted": "#797593",
+    "accent": "#d7827e",
+    "sel": "#efe9e5",
+    "upstream": "https://raw.githubusercontent.com/rose-pine/vscode/main/themes/rose-pine-dawn-color-theme.json"
+  },
+  {
+    "id": "ayu-dark",
+    "name": "Ayu Dark",
+    "source": "port",
+    "bg": "#0d1017",
+    "panel": "#10141c",
+    "text": "#bfbdb6",
+    "muted": "#5a6378",
+    "accent": "#e6b450",
+    "sel": "#1e242f",
+    "line": "#1b1f29",
+    "upstream": "https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/ayu-dark.json"
+  },
+  {
+    "id": "ayu-mirage",
+    "name": "Ayu Mirage",
+    "source": "port",
+    "bg": "#1f2430",
+    "panel": "#242936",
+    "text": "#cccac2",
+    "muted": "#707a8c",
+    "accent": "#ffcc66",
+    "sel": "#2d3445",
+    "line": "#171b24",
+    "upstream": "https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/ayu-mirage.json"
+  },
+  {
+    "id": "ayu-light",
+    "name": "Ayu Light",
+    "source": "port",
+    "bg": "#f8f9fa",
+    "panel": "#fcfcfc",
+    "text": "#5c6166",
+    "muted": "#828e9f",
+    "accent": "#f29718",
+    "sel": "#e8eaed",
+    "line": "#eaedef",
+    "upstream": "https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/ayu-light.json"
+  },
+  {
+    "id": "dark-modern",
+    "name": "Dark Modern",
+    "source": "port",
+    "bg": "#181818",
+    "panel": "#1f1f1f",
+    "text": "#cccccc",
+    "muted": "#9d9d9d",
+    "accent": "#0078d4",
+    "line": "#2b2b2b",
+    "upstream": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/themes/dark_modern.json"
   }
 ]
