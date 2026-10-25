@@ -16,6 +16,7 @@ export function About() {
     ["Source code", about.links.repo, "The source code of every release."],
     ["Docs", about.links.docs, "Setup guides and reference."],
     ["Changelog", about.links.changelog, "What changed in each release."],
+    ["Theme credits", about.links.themes, "Authors and licences of the bundled theme ports."],
   ];
   return (
     <section aria-label="About">
@@ -36,6 +37,7 @@ export function About() {
         }}
       />
       <h2 className="sec"># links</h2>
+      <p className="s-desc s-prose">Some themes are ports of editor themes; see the credits.</p>
       {links.map(([label, url, body]) => (
         <SettingRow
           key={label}

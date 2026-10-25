@@ -48,7 +48,7 @@ export type ModeToggle = "find" | "query";
 export interface About {
   version: string;
   license: string;
-  links: { repo: string; docs: string; changelog: string; releases: string };
+  links: { repo: string; docs: string; changelog: string; themes: string; releases: string };
   logDir: string | null;
 }
 

@@ -463,6 +463,8 @@ pub struct Links {
     pub docs: String,
     /// Changelog.
     pub changelog: String,
+    /// Credits for bundled theme ports.
+    pub themes: String,
     /// Releases page.
     pub releases: String,
 }
@@ -484,6 +486,7 @@ pub async fn get_about(app: AppHandle) -> Result<About, CommandError> {
             repo: repo.clone(),
             docs: format!("https://{APP_NAME}.akshitbansal.dev/docs"),
             changelog: format!("{repo}/blob/main/CHANGELOG.md"),
+            themes: format!("{repo}/blob/main/THIRD-PARTY-THEMES.md"),
             releases: format!("{repo}/releases"),
         },
         log_dir,
