@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MSG_NO_MODIFIER } from "../firstrun/hotkeyRules";
 import * as api from "./api";
@@ -35,11 +35,16 @@ const settings: SettingsView = {
   programsCapped: false,
 };
 
+const onOff = (label: string, state: "on" | "off") =>
+  within(screen.getByRole("group", { name: label })).getByRole("button", { name: state });
+const skipEdit = () => screen.getByRole("button", { name: "Edit excluded folders" });
+const openSkipEditor = () => fireEvent.click(skipEdit());
+
 describe("General hotkey capture", () => {
   afterEach(cleanup);
   it("rejects a bare key without calling Rust", () => {
     render(<General settings={settings} onChange={() => {}} />);
-    fireEvent.click(screen.getByText("Change"));
+    fireEvent.click(screen.getByText("change"));
     fireEvent.keyDown(screen.getByText(/Press keys/), { key: "Tab", code: "Tab" });
     expect(screen.getByRole("alert").textContent).toBe(MSG_NO_MODIFIER);
     expect(api.setGeneral).not.toHaveBeenCalled();
@@ -47,7 +52,7 @@ describe("General hotkey capture", () => {
 
   it("sends a valid combo", () => {
     render(<General settings={settings} onChange={() => {}} />);
-    fireEvent.click(screen.getByText("Change"));
+    fireEvent.click(screen.getByText("change"));
     fireEvent.keyDown(screen.getByText(/Press keys/), {
       key: "k",
       code: "KeyK",
@@ -63,7 +68,7 @@ describe("General index all drives", () => {
     vi.mocked(api.setIncludeDrives).mockRejectedValueOnce({ code: "x", message: "scan failed" });
     const onChange = vi.fn();
     render(<General settings={settings} onChange={onChange} />);
-    fireEvent.click(screen.getByRole("switch", { name: "Index all drives" }));
+    fireEvent.click(onOff("index all drives", "off"));
     expect(api.setIncludeDrives).toHaveBeenCalledWith(false);
     expect(onChange).toHaveBeenNthCalledWith(1, { ...settings, includeDrives: false });
     expect((await screen.findByRole("alert")).textContent).toBe("scan failed");
@@ -76,7 +81,7 @@ describe("General take the tour", () => {
   it("asks the window to open the tour", () => {
     const onTour = vi.fn();
     render(<General settings={settings} onChange={() => {}} onTour={onTour} />);
-    fireEvent.click(screen.getByText("Take the tour"));
+    fireEvent.click(screen.getByText("take the tour"));
     expect(onTour).toHaveBeenCalled();
   });
 });
@@ -90,9 +95,23 @@ describe("program exclusions", () => {
       "checked",
       false,
     );
+    openSkipEditor();
     expect(screen.getByLabelText("Remove D:\\Games")).toBeTruthy();
     expect(screen.getByLabelText("Remove node_modules")).toBeTruthy();
     expect(screen.queryByLabelText("Remove F:\\")).toBeNull();
+  });
+
+  it("the edit button toggles the excluded-folders editor", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    const edit = skipEdit();
+    expect(edit.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText("Exclude")).toBeNull();
+    fireEvent.click(edit);
+    expect(edit.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByLabelText("Exclude")).toBeTruthy();
+    fireEvent.click(edit);
+    expect(edit.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText("Exclude")).toBeNull();
   });
 
   it("unchecking a drive adds it to the skip list", () => {
@@ -103,12 +122,14 @@ describe("program exclusions", () => {
 
   it("removes an entry", () => {
     render(<General settings={settings} onChange={() => {}} />);
+    openSkipEditor();
     fireEvent.click(screen.getByLabelText("Remove D:\\Games"));
     expect(api.setProgramSkip).toHaveBeenCalledWith(["F:\\", "node_modules"]);
   });
 
   it("adds an entry on Enter", () => {
     render(<General settings={settings} onChange={() => {}} />);
+    openSkipEditor();
     const input = screen.getByLabelText("Exclude");
     fireEvent.change(input, { target: { value: ".*" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -122,6 +143,7 @@ describe("program exclusions", () => {
     });
     const onChange = vi.fn();
     render(<General settings={settings} onChange={onChange} />);
+    openSkipEditor();
     const input = screen.getByLabelText("Exclude");
     fireEvent.change(input, { target: { value: "[" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -132,11 +154,34 @@ describe("program exclusions", () => {
 
 describe("General switches", () => {
   afterEach(cleanup);
-  it("uses the one Toggle component for every switch", () => {
+  it("uses the one OnOff component for every switch", () => {
     render(<General settings={settings} onChange={() => {}} />);
-    expect(screen.getByRole("switch", { name: "Launch at startup" })).toBeTruthy();
-    expect(screen.getByRole("switch", { name: "Check for updates" })).toBeTruthy();
-    expect(document.querySelectorAll('button[role="switch"]:not(.s-switch)')).toHaveLength(0);
+    expect(screen.getByRole("group", { name: "launch at startup" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "check for updates" })).toBeTruthy();
+    expect(document.querySelectorAll('[role="switch"]')).toHaveLength(0);
+  });
+});
+
+describe("General history", () => {
+  afterEach(cleanup);
+  it("cancel returns to clear without clearing", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    fireEvent.click(screen.getByText("clear"));
+    expect(screen.getByText("confirm clear")).toBeTruthy();
+    fireEvent.click(screen.getByText("cancel"));
+    expect(screen.getByText("clear")).toBeTruthy();
+    expect(screen.queryByText("confirm clear")).toBeNull();
+    expect(api.clearHistory).not.toHaveBeenCalled();
+  });
+
+  it("confirm clear clears once and says so", async () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    fireEvent.click(screen.getByText("clear"));
+    fireEvent.click(screen.getByText("confirm clear"));
+    expect(await screen.findByText("history cleared")).toBeTruthy();
+    expect(api.clearHistory).toHaveBeenCalledTimes(1);
+    expect(api.clearHistory).toHaveBeenCalledWith("all");
+    expect(screen.getByText("clear")).toBeTruthy();
   });
 });
 
@@ -144,7 +189,7 @@ describe("programs scan toggle", () => {
   afterEach(cleanup);
   it("sends scanPrograms", () => {
     render(<General settings={settings} onChange={() => {}} />);
-    fireEvent.click(screen.getByRole("switch", { name: "Find programs on all drives" }));
+    fireEvent.click(onOff("find programs on all drives", "off"));
     expect(api.setGeneral).toHaveBeenCalledWith({ scanPrograms: false });
   });
 });
