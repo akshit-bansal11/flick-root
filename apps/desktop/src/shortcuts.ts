@@ -134,7 +134,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     id: "pin",
     keys: "Ctrl+P",
     label: "Pin or unpin",
-    scope: "launcher",
+    scope: ["none", "find"],
     when: "pinnable",
     foot: "pin",
   },
@@ -217,7 +217,10 @@ export const BROWSER_CHORDS: readonly string[] = [
 /** Browser chords a scope may claim despite BROWSER_CHORDS (Settings: close, pages; launcher: tabs, pin). */
 const OWN_CHORDS: Partial<Record<Scope, readonly string[]>> = {
   settings: ["Ctrl+W", "Ctrl+Tab", "Ctrl+Shift+Tab"],
-  launcher: ["Ctrl+Tab", "Ctrl+Shift+Tab", "Ctrl+P"],
+  launcher: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
+  // Pin lives where app and file rows are listed.
+  none: ["Ctrl+P"],
+  find: ["Ctrl+P"],
 };
 
 /** True for a chord a scope must never claim: listed above or any Win-key chord. */

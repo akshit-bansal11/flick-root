@@ -105,7 +105,7 @@ describe("detailOf actions", () => {
   });
 
   it("appends a pin action to apps and files, unpin when pinned, keys from the table", () => {
-    const pin = { id: "pin", label: "pin", keys: "ctrl+p" };
+    const pin = { id: "pin", label: "pin", keys: "ctrl+p", primary: false };
     expect(detailOf(make("app")).actions).toEqual([pin]);
     expect(detailOf(make("file")).actions).toEqual([pin]);
     expect(detailOf(make("file"), { pinned: true }).actions).toEqual([{ ...pin, label: "unpin" }]);
