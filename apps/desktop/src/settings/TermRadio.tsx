@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 export interface TermOption {
   value: string;
   label: string;
@@ -14,10 +16,11 @@ interface Props {
 
 /** Terminal radio group: native radios inside a fieldset, drawn as (•) / ( ) by firstrun.css. */
 export function TermRadio({ legend, name, value, options, onChange }: Props) {
+  const id = useId();
   return (
     <fieldset className="tr">
       <legend className="tr-legend">{legend}</legend>
-      {options.map((o) => (
+      {options.map((o, i) => (
         <label key={o.value} className="tr-opt">
           <input
             type="radio"
@@ -25,10 +28,15 @@ export function TermRadio({ legend, name, value, options, onChange }: Props) {
             value={o.value}
             checked={value === o.value}
             onChange={() => onChange(o.value)}
+            aria-describedby={o.hint ? `${id}-${i}` : undefined}
           />
           <span className="tr-mark" aria-hidden="true" />
           <span>{o.label}</span>
-          {o.hint && <span className="tr-hint"> {o.hint}</span>}
+          {o.hint && (
+            <span id={`${id}-${i}`} className="tr-hint" aria-hidden="true">
+              {o.hint}
+            </span>
+          )}
         </label>
       ))}
     </fieldset>

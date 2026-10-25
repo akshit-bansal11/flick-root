@@ -33,9 +33,11 @@ describe("TermRadio", () => {
     expect(screen.getByRole<HTMLInputElement>("radio", { name: /^Beta/ }).checked).toBe(true);
   });
 
-  it("includes the hint in the accessible name", () => {
+  it("names a radio by its label and describes it with the hint", () => {
     mount("a");
-    expect(screen.getByRole("radio", { name: "Alpha first" })).toBeTruthy();
+    const radio = screen.getByRole("radio", { name: "Alpha" });
+    const hint = document.getElementById(radio.getAttribute("aria-describedby") ?? "");
+    expect(hint?.textContent).toBe("first");
   });
 
   it("calls onChange with the clicked radio's value", () => {
