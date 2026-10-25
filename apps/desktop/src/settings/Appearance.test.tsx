@@ -1,4 +1,12 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ActiveTheme, applyTheme, ROLE_VARS, type ThemeRoles, type ThemeView } from "../theme";
 import { Appearance } from "./Appearance";
@@ -175,6 +183,34 @@ describe("theme picker", () => {
     expect(bg()).toBe("#0a0b0c");
     expect(screen.queryByRole("combobox", { name: "Filter themes" })).toBeNull();
     expect(api.setAppearance).not.toHaveBeenCalled();
+  });
+
+  it("closing the picker with the change button drops an unapplied preview", async () => {
+    render(<Appearance />);
+    const input = await openDark();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(bg()).toBe("#010203");
+    fireEvent.click(changeButtons()[0]);
+    expect(screen.queryByRole("combobox", { name: "Filter themes" })).toBeNull();
+    expect(bg()).toBe("#0a0b0c");
+    expect(api.setAppearance).not.toHaveBeenCalled();
+  });
+
+  it("unmounting mid-preview restores the saved colours", async () => {
+    const { unmount } = render(<Appearance />);
+    fireEvent.keyDown(await openDark(), { key: "ArrowDown" });
+    expect(bg()).toBe("#010203");
+    unmount();
+    expect(bg()).toBe("#0a0b0c");
+  });
+
+  it("mousedown on an option is default-prevented so the filter keeps focus", async () => {
+    render(<Appearance />);
+    await openDark();
+    const opt = screen.getByRole("option", { name: /Harbor/ });
+    const down = createEvent.mouseDown(opt);
+    fireEvent(opt, down);
+    expect(down.defaultPrevented).toBe(true);
   });
 
   it("clicking an option previews it without saving", async () => {

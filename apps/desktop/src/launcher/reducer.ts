@@ -247,7 +247,10 @@ function search(s: State, mode: LaunchMode, input: string): Result {
     pending: false,
   };
   if (mode === "query") return out({ ...next, items: [] });
-  if (isHome(next)) return out({ ...next, items: next.home });
+  if (isHome(next)) {
+    const state = { ...next, items: next.home };
+    return isHome(s) ? out(state) : out(state, { type: "loadHome" });
+  }
   const { wire, sources } = mode === "none" ? PLAIN_SEARCH : MODES[mode];
   const seq = s.seq + 1;
   // Plain text shows the fallback rows at once, under the previous results until new ones land.

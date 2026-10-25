@@ -444,7 +444,7 @@ describe("Launcher", () => {
     err.mockRestore();
   });
 
-  it("find footer advertises Ctrl Shift C on a file row only, not Ctrl C", async () => {
+  it("find footer advertises ctrl+shift+c on a file row only, not Ctrl C", async () => {
     await mount();
     await type("/");
     const hints = () =>

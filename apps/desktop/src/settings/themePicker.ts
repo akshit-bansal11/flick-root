@@ -16,6 +16,9 @@ export const PICKER_CHIPS: readonly PickerChip[] = [
 /** Appearance field a picked theme is saved to: its own variant's slot. */
 export type ThemeSlot = "darkTheme" | "lightTheme";
 
+/** The slot a theme is saved to: its own variant's. */
+export const slotOf = (t: ThemeView): ThemeSlot => (t.dark ? "darkTheme" : "lightTheme");
+
 export type PickerKey = "ArrowUp" | "ArrowDown" | "Home" | "End" | "Enter" | "Escape";
 
 export interface PickerState {
@@ -130,7 +133,7 @@ export function reducePicker(state: PickerState, event: PickerEvent): Step {
           if (!t) return { state, effects: [] };
           return {
             state,
-            effects: [{ type: "apply", id: t.id, slot: t.dark ? "darkTheme" : "lightTheme" }],
+            effects: [{ type: "apply", id: t.id, slot: slotOf(t) }],
           };
         }
         case "Escape":

@@ -121,6 +121,13 @@ describe("QueryView", () => {
     expect(btn()?.textContent).toBe("thinkctrl+t");
   });
 
+  it("mousedown on the effort row is default-prevented so the input keeps focus", () => {
+    const c = render({});
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    act(() => c.querySelector("button.row.effort")?.dispatchEvent(down));
+    expect(down.defaultPrevented).toBe(true);
+  });
+
   it("hides the effort row when reasoning is false", () => {
     expect(render({ reasoning: false }).querySelector(".effort")).toBeNull();
   });

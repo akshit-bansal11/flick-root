@@ -164,7 +164,7 @@ describe("keyWords and capsOf", () => {
     expect(capsOf("Backspace")).toEqual(["backspace"]);
     expect(capsOf("Up")).toEqual(["up"]);
     expect(capsOf("Down")).toEqual(["down"]);
-    expect(capsOf("Ctrl+Shift+Enter")).toEqual(["Ctrl", "Shift", "enter"]);
+    expect(capsOf("Ctrl+Shift+Enter")).toEqual(["ctrl", "shift", "enter"]);
   });
 
   it("joins caps into the same words as the chord", () => {

@@ -30,6 +30,12 @@ describe("countsOf", () => {
   it("is empty for no items", () => {
     expect(countsOf([])).toEqual([]);
   });
+
+  it("skips ui rows (fallbacks, hints) in counts and text", () => {
+    const ui: Item = { ...make("result"), source: "ui" };
+    expect(countsOf([make("app"), ui, ui])).toEqual([{ kind: "app", n: 1 }]);
+    expect(countText(countsOf([ui]))).toBe("");
+  });
 });
 
 describe("countText", () => {

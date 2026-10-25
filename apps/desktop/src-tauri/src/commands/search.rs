@@ -8,6 +8,7 @@ use features::search::{
 };
 use launcher_core::{IconRef, Input, Item, Mode};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
@@ -101,9 +102,24 @@ pub async fn search(
     if state.latest_seq.load(Ordering::SeqCst) > seq {
         return Ok(reply(seq, Vec::new()));
     }
-    *state.last_results.lock() = items.iter().map(|i| (i.id.0.clone(), i.clone())).collect();
+    {
+        let mut last = state.last_results.lock();
+        *last = replace_keeping_home(&last, &items);
+    }
     *state.last_input.lock() = Some(input);
     Ok(reply(seq, items))
+}
+
+/// The new `last_results` for a search: its `items`, plus the home rows (marked by `home_items`,
+/// at most a handful) already in `last`, so the blank launcher's cached list stays actionable
+/// after Esc or Backspace. A new item wins over a home row with the same id.
+fn replace_keeping_home(last: &HashMap<String, Item>, items: &[Item]) -> HashMap<String, Item> {
+    let mut next: HashMap<String, Item> =
+        items.iter().map(|i| (i.id.0.clone(), i.clone())).collect();
+    for (k, i) in last.iter().filter(|(_, i)| i.payload.get("home").is_some()) {
+        next.entry(k.clone()).or_insert_with(|| i.clone());
+    }
+    next
 }
 
 /// Apps and features run inline (2 ms budget); the programs index is matched on the blocking pool.
@@ -171,4 +187,62 @@ async fn command(
         tauri::async_runtime::spawn_blocking(move || st.icons.extract_and_memo(&missing, ICON_PX));
     }
     Ok(items)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use launcher_core::{ItemId, ItemKind};
+
+    fn item(id: &str, payload: serde_json::Value) -> Item {
+        Item {
+            id: ItemId(id.into()),
+            kind: ItemKind::App,
+            title: id.into(),
+            subtitle: String::new(),
+            icon: None,
+            score: 1.0,
+            source: "apps".into(),
+            actions: Vec::new(),
+            payload,
+        }
+    }
+
+    fn map(items: Vec<Item>) -> HashMap<String, Item> {
+        items.into_iter().map(|i| (i.id.0.clone(), i)).collect()
+    }
+
+    fn home() -> serde_json::Value {
+        serde_json::json!({ "home": "recent" })
+    }
+
+    fn sorted_keys(m: &HashMap<String, Item>) -> Vec<&str> {
+        let mut k: Vec<&str> = m.keys().map(String::as_str).collect();
+        k.sort_unstable();
+        k
+    }
+
+    #[test]
+    fn keeps_home_rows_and_drops_other_old_rows() {
+        let last = map(vec![
+            item("h", home()),
+            item("old", serde_json::Value::Null),
+        ]);
+        let next = replace_keeping_home(&last, &[item("n", serde_json::Value::Null)]);
+        assert_eq!(sorted_keys(&next), ["h", "n"]);
+    }
+
+    #[test]
+    fn a_new_item_wins_an_id_clash() {
+        let last = map(vec![item("a", home())]);
+        let fresh = item("a", serde_json::json!({ "fresh": true }));
+        let next = replace_keeping_home(&last, &[fresh]);
+        assert_eq!(next["a"].payload, serde_json::json!({ "fresh": true }));
+    }
+
+    #[test]
+    fn empty_last_yields_just_the_new_items() {
+        let next = replace_keeping_home(&HashMap::new(), &[item("n", serde_json::Value::Null)]);
+        assert_eq!(sorted_keys(&next), ["n"]);
+    }
 }

@@ -81,9 +81,7 @@ pub async fn home_items(state: State<'_, Arc<AppState>>) -> Result<HomeView, Com
             .filter_map(|(key, is_dir)| resolve(&s, key, is_dir))
             .take(SHOWN)
             .collect();
-        for it in &mut items {
-            it.payload["home"] = serde_json::json!("recent");
-        }
+        items.iter_mut().for_each(mark_home);
         Ok(items)
     })
     .await?;
@@ -95,6 +93,17 @@ pub async fn home_items(state: State<'_, Arc<AppState>>) -> Result<HomeView, Com
         items,
         pins: Vec::new(),
     })
+}
+
+/// Marks a row as a home row (`payload.home = "recent"`). A null payload becomes an object; any
+/// other non-object payload is left as it is, never panicking on it.
+fn mark_home(it: &mut Item) {
+    if it.payload.is_null() {
+        it.payload = serde_json::json!({});
+    }
+    if let Some(obj) = it.payload.as_object_mut() {
+        obj.insert("home".into(), serde_json::json!("recent"));
+    }
 }
 
 #[cfg(test)]
@@ -160,5 +169,50 @@ mod tests {
             recent_ids(&rows, 8),
             [("file:C:/d", true), ("file:C:/f.txt", false)]
         );
+    }
+
+    fn item_with(payload: serde_json::Value) -> Item {
+        use launcher_core::{ItemId, ItemKind};
+        Item {
+            id: ItemId("app:x".into()),
+            kind: ItemKind::App,
+            title: "x".into(),
+            subtitle: String::new(),
+            icon: None,
+            score: 1.0,
+            source: "apps".into(),
+            actions: Vec::new(),
+            payload,
+        }
+    }
+
+    #[test]
+    fn mark_home_turns_null_into_an_object() {
+        let mut it = item_with(serde_json::Value::Null);
+        mark_home(&mut it);
+        assert_eq!(it.payload, serde_json::json!({ "home": "recent" }));
+    }
+
+    #[test]
+    fn mark_home_inserts_into_an_object_and_keeps_its_keys() {
+        let mut it = item_with(serde_json::json!({ "path": "C:/a" }));
+        mark_home(&mut it);
+        assert_eq!(
+            it.payload,
+            serde_json::json!({ "path": "C:/a", "home": "recent" })
+        );
+    }
+
+    #[test]
+    fn mark_home_leaves_other_payloads_unchanged() {
+        for p in [
+            serde_json::json!("s"),
+            serde_json::json!([1, 2]),
+            serde_json::json!(7),
+        ] {
+            let mut it = item_with(p.clone());
+            mark_home(&mut it);
+            assert_eq!(it.payload, p);
+        }
     }
 }

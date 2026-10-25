@@ -38,7 +38,8 @@ const MAX_HINTS = 3;
 /** Per-kind counts in order of first appearance, so the text follows the ranking. */
 export function countsOf(items: readonly Item[]): KindCount[] {
   const out: KindCount[] = [];
-  for (const { kind } of items) {
+  for (const { kind, source } of items) {
+    if (source === "ui") continue;
     const hit = out.find((c) => c.kind === kind);
     if (hit) hit.n += 1;
     else out.push({ kind, n: 1 });

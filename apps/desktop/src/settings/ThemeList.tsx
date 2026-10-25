@@ -11,6 +11,7 @@ import {
   type PickerKey,
   type PickerState,
   reducePicker,
+  slotOf,
   type ThemeSlot,
   visibleThemes,
 } from "./themePicker";
@@ -34,7 +35,6 @@ const SOURCE_TAG: Record<ThemeView["source"], string> = {
 const INPUT_KEYS: readonly string[] = ["ArrowUp", "ArrowDown", "Enter"];
 
 const ratio = (n: number) => `${n.toFixed(1)}:1`;
-const slotOf = (t: ThemeView): ThemeSlot => (t.dark ? "darkTheme" : "lightTheme");
 const asKey = (key: string): PickerKey | null =>
   key === "ArrowUp" || key === "ArrowDown" || key === "Enter" || key === "Escape" ? key : null;
 
@@ -181,6 +181,7 @@ export function ThemeList({ themes, slot, darkId, lightId, saved, onSave, onClos
                 tabIndex={-1}
                 className="tp-opt"
                 style={themeVars(t.roles)}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => dispatch({ type: "pick", id: t.id })}
                 onDoubleClick={() => dispatch({ type: "key", key: "Enter" })}
                 onKeyDown={(e) => {

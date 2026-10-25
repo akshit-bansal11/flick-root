@@ -162,72 +162,8 @@ body,
   padding-right: var(--l-sp-4);
 }
 
-.hints {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--l-sp-1);
-  padding: var(--l-sp-3);
-}
-
-.hint-row {
-  display: flex;
-  align-items: center;
-  gap: var(--l-sp-6);
-  min-height: var(--l-row);
-  padding: 0 var(--l-sp-5);
-  border: 0;
-  border-radius: var(--l-r-control);
-  background: none;
-  color: var(--l-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  z-index: 1;
-}
-
-/* Background fades only on hover; the selection is the lens. */
-.hint-row {
-  transition: transform var(--l-dur-fast) var(--l-ease-out);
-}
-
-.hint-row:active,
 .detail-act:active {
   transform: scale(0.98);
-}
-
-.hint-row:hover {
-  background: var(--l-raise-hover);
-  transition:
-    background var(--l-dur-fast) var(--l-ease-out),
-    transform var(--l-dur-fast) var(--l-ease-out);
-}
-
-/* Without a placed lens (not measurable yet) the selected row paints its own glass. */
-.hint-row.sel {
-  background: var(--l-lens);
-}
-
-.hints[data-lens] .hint-row.sel {
-  background: none;
-}
-
-.hint-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.hint-label {
-  font-weight: 500;
-}
-
-.hint-desc {
-  min-width: 0;
-  color: var(--l-muted);
-  font-size: var(--l-fs-caption);
-  line-height: var(--l-lh-caption);
 }
 
 .split {

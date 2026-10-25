@@ -503,6 +503,17 @@ describe("reducer", () => {
     expect(r.effects).toContainEqual(expect.objectContaining({ type: "search", text: "ab" }));
   });
 
+  it("entering home from a non-home state requests loadHome; staying on home does not", () => {
+    const typed = inMode("none", { input: "ab" });
+    expect(reduce(typed, { type: "text", text: "" }).effects).toContainEqual({ type: "loadHome" });
+    expect(reduce(inMode("find"), { type: "tab", mode: "none" }).effects).toContainEqual({
+      type: "loadHome",
+    });
+    expect(reduce(initialState(), { type: "text", text: " " }).effects).not.toContainEqual({
+      type: "loadHome",
+    });
+  });
+
   it("the tab event accepts none, restoring home on a blank field", () => {
     const home = [item("h0")];
     const s = inMode("find", { home });

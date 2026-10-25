@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { applyTheme, type Scheme, type ThemeView } from "../theme";
+import { type ActiveTheme, applyTheme, type Scheme, type ThemeView } from "../theme";
 import * as api from "./api";
 import { SettingRow } from "./Row";
 import { ThemeList } from "./ThemeList";
@@ -32,6 +32,15 @@ export function Appearance() {
       })
       .catch((e: unknown) => setError(errorText(e)));
   }, []);
+
+  // Whenever the picker closes or changes slot (Esc, unmount, `change` toggled off, a save),
+  // the saved theme is what stays painted: an unapplied preview never outlives its picker.
+  const saved = useRef<ActiveTheme | null>(null);
+  saved.current = a?.active ?? null;
+  useEffect(() => {
+    if (!picking) return;
+    return () => applyTheme(document.documentElement, saved.current);
+  }, [picking]);
 
   if (!a) {
     return (

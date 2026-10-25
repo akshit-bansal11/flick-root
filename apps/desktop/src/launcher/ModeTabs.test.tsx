@@ -15,6 +15,14 @@ describe("ModeTabs", () => {
     expect(names).toEqual(["all", "/open", "=calc"]);
   });
 
+  it("the note shows the chord range of the enabled modes", () => {
+    const note = () => document.querySelector(".tabs-note")?.textContent;
+    const { rerender } = render(<ModeTabs modes={modes} mode="none" onSelect={noop} />);
+    expect(note()).toBe("ctrl+1…3");
+    rerender(<ModeTabs modes={["calc"]} mode="none" onSelect={noop} />);
+    expect(note()).toBe("ctrl+3");
+  });
+
   it("aria-selected follows the mode", () => {
     const { rerender } = render(<ModeTabs modes={modes} mode="none" onSelect={noop} />);
     const selected = () =>

@@ -33,6 +33,7 @@ export function DetailPane({ item, ctx, onPress }: Props) {
             key={a.id}
             type="button"
             className={a.primary ? "detail-act pri" : "detail-act"}
+            onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPress(shortcut(a.id === "run" ? "open" : a.id).keys)}
           >
             {a.label}

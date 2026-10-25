@@ -78,7 +78,7 @@ describe("tour steps", () => {
   });
   it("step text reads its shortcuts from the table", () => {
     const body = (id: string) => TOUR_STEPS[at(id)]?.body ?? "";
-    expect(body("calc")).toContain("Ctrl Shift C");
+    expect(body("calc")).toContain("ctrl shift c");
     expect(body("around")).toContain("F1");
     expect(body("around")).toContain("backspace");
     expect(TOUR_STEPS[at("ask")]?.keys).toContain("Tab");

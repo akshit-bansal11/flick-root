@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ActionKind, Item, ItemKind } from "../types";
 import { DetailPane } from "./DetailPane";
@@ -63,6 +63,14 @@ describe("DetailPane", () => {
     rerender(<DetailPane item={cmd} ctx={{}} onPress={onPress} />);
     fireEvent.click(screen.getByRole("button", { name: /^run/ }));
     expect(onPress).toHaveBeenLastCalledWith("Enter");
+  });
+
+  it("mousedown on an action is default-prevented so the input keeps focus", () => {
+    render(<DetailPane item={app} ctx={{}} onPress={() => {}} />);
+    const btn = screen.getByRole("button", { name: /run as administrator/i });
+    const down = createEvent.mouseDown(btn);
+    fireEvent(btn, down);
+    expect(down.defaultPrevented).toBe(true);
   });
 
   it("renders no facts section when there are none", () => {

@@ -1,3 +1,4 @@
+import { keyWords, shortcut } from "../shortcuts";
 import type { Effort, ThinkingMode } from "../types";
 import { EmptyState } from "./EmptyState";
 import { Markdown } from "./Markdown";
@@ -71,11 +72,12 @@ export function QueryView(p: Props) {
               type="button"
               className="row effort"
               aria-pressed={p.effort === "think"}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={p.onToggleEffort}
             >
               <span className="row-mark" aria-hidden="true" />
               <span className="row-title">{p.effort === "think" ? "think" : "fast"}</span>
-              <span className="tag">ctrl+t</span>
+              <span className="tag">{keyWords(shortcut("effort").keys)}</span>
             </button>
           </>
         )}
