@@ -1,6 +1,6 @@
 # ADR-013: Tray menu
 
-Status: Accepted (2026-10-23)
+Status: Accepted (2026-10-23). Superseded in part by ADR-015 (the glass parts).
 
 ## Context
 

@@ -1,21 +1,58 @@
 # Appearance
 
-The launcher is a rounded panel with an acrylic backdrop. Its height follows the results. When Windows transparency effects are off, the panel is opaque.
+The launcher and Settings are flat and opaque: no acrylic, Mica, blur, gradients or glass. The
+launcher is an 820px panel with a 1px line edge. Its height follows the results. Text is set in
+IBM Plex Mono for the interface and IBM Plex Sans for longer prose.
 
 ## The launcher
 
-The panel is acrylic glass. The input bar, the keycaps, the prefix chip and the selection are raised glass pieces on top of it, and the selection is one lens that glides between rows. In Ask, every generated answer carries the line "AI answer · provider · model" above it, and a floating glass bar at the bottom shows the model, the Fast or Think switch and the Tab hint when more than one model is set up.
+- A mode tab strip sits at the top: Open, Commands, Calc, Ask and Projects. `ctrl+tab` and
+  `ctrl+shift+tab` move between tabs.
+- Two panes: the result list on the left, with `#` group headers, and a detail pane on the right
+  that lists every action for the selected row.
+- A status line at the bottom shows the state and the keys that apply.
+- In Ask, models and effort are on the left and the answer is on the right. The answer scrolls.
+
+## Themes
+
+A theme is a set of colours resolved in Rust (`crates/launcher-core/src/theme/`). The seed gives
+the background, panel, text, muted text and accent, with an optional selection, line and surface
+colour. Flick derives the rest and lifts any text colour that does not reach 4.5:1 contrast. A
+seed that cannot reach 4.5:1 is refused, not shown. The derivation and its corrections are in
+[ADR-015](../adr/ADR-015-flat-ui-and-themes.md).
+
+- **Built in:** the Flick Default themes (dark and light), and frost, midnight, aurora, ember, sage,
+  paper, harbor, lagoon and rose, with light variants for sage, paper, harbor, lagoon and rose.
+- **Ported editor themes:** 40 at this commit, each under an MIT, ISC, BSD or CC0 licence. The
+  upstream repo, licence and copyright for each are in
+  [THIRD-PARTY-THEMES.md](../../THIRD-PARTY-THEMES.md).
+- **Import a VS Code theme:** the parser exists and reads a theme file as untrusted input. It caps the
+  file size, reads JSONC, never follows `include` and makes safe names. **The import screen is not
+  built yet.** Choosing a file needs a new dependency, `tauri-plugin-dialog`, or a paste-a-path box
+  instead. That choice is pending the owner's decision.
 
 ## Settings, Appearance
 
-A small live preview of the launcher sits at the top of the page: a glass panel with a `= Calc` chip over a decorative wallpaper. It uses the theme and glass strength you are picking, so it changes while you drag the slider.
+- **Scheme:** System, Dark or Light. System follows Windows.
+- **Dark theme** and **Light theme:** one slot each. Change opens a filterable list with a live
+  preview. Saving a theme in one slot applies it when the scheme matches that slot.
 
-- **Theme:** Glass, Frost, Midnight, Aurora, Ember or Solid, shown as swatch cards. Default Glass.
-- **Glass strength:** tint opacity, 80 to 95 percent. Default 90. The value shows next to the slider, and it saves when you release the slider. The floor exists so text stays readable over a white or black desktop.
-- **Scheme:** System, Dark or Light, a segmented control with a glass lens that slides to the choice. Default System. Frost is always light and Midnight, Aurora and Ember are always dark, so the control is disabled for them.
+The choice is stored under `[appearance]` in `config.toml` as `scheme`, `dark_theme` and
+`light_theme`. An absent slot uses the Flick default for that scheme. The old `theme` key is
+migrated once on load: `frost` becomes the light theme, and `midnight`, `aurora` and `ember` become
+the dark theme. `glass` and the glass strength are no longer used and are removed on the next save.
+
+## Theme quick pick
+
+In Commands, type `theme` to list every theme. Arrowing through the list previews each theme on the
+launcher. Enter saves the theme to its slot and sets the scheme to match it. `ctrl+enter` saves it to
+its slot only and leaves the scheme as it is. The first Escape puts the saved look back.
 
 ## Contrast
 
-`apps/desktop/src/tokens.contrast.test.ts` reads `tokens.css` and checks every theme and scheme: text roles at 4.5:1 and control edges at 3:1 against the panel tint over a white and a black backdrop at the glass floor, and over the opaque panel.
+`apps/desktop/src/tokens.contrast.test.ts` checks the CSS roles. `crates/launcher-core/src/theme/`
+checks every built-in and imported theme at 4.5:1 for text, muted text, accent text, the selected
+row and the text on accent. `apps/desktop/src/tokens.hygiene.test.ts` fails on gradients, blur,
+inset highlights and glass leftovers.
 
-The choice is applied to the launcher every time it is shown. It is stored under `[appearance]` in `config.toml`.
+The choice is applied to the launcher every time it is shown.

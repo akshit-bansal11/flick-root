@@ -14,8 +14,8 @@ Flick is at v0.0.1. Features:
 - Features: frecency, inline math and units, system commands, web shortcuts, project launcher.
 - Settings window (General, Appearance, Prefixes, AI providers, Decision engine, Integrations, About), first run with a welcome screen, and an interactive tour.
 - Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
-- Programs on all drives, thinking modes, and a liquid glass launcher with six themes.
-- A glass tray menu (Open, Settings, updates, Quit) that opens from a right-click on the tray icon, in the same window as the launcher.
+- Programs on all drives, thinking modes, and a flat launcher with mode tabs, two panes and a status line.
+- A flat tray menu (Open, Settings, updates, Quit) that opens from a right-click on the tray icon, in the same window as the launcher.
 - One shortcut table for the launcher and Settings (below), an interactive tour in its own window, and a tutorial.
 
 ## Install
@@ -26,7 +26,7 @@ The installer is unsigned, so Windows SmartScreen shows "Windows protected your 
 
 ## Hotkeys and modes
 
-A prefix typed first in the empty bar narrows the search to one set of results; there is no Tab switcher. Plain text with no prefix searches apps, programs and every enabled feature (not files), and ends with up to three "Search instead" rows: Find files named your text (enters `/`), search the web with your first web shortcut, and Ask. A prefix is offered only while a feature it needs is on. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode. With `@` and nothing after it, Flick lists your projects, most used first (the order comes from Frecency ranking; with Frecency off it is scan order).
+A prefix typed first in the empty bar narrows the search to one set of results; `ctrl+tab` and `ctrl+shift+tab` move between mode tabs. Plain text with no prefix searches apps, programs and every enabled feature (not files), and ends with up to three "Search instead" rows: Find files named your text (enters `/`), search the web with your first web shortcut, and Ask. A prefix is offered only while a feature it needs is on. Backspace on an empty input leaves the mode. Pasting text that starts with a prefix enters that mode. With `@` and nothing after it, Flick lists your projects, most used first (the order comes from Frecency ranking; with Frecency off it is scan order).
 
 | Prefix | Mode | Sources |
 | --- | --- | --- |
@@ -66,7 +66,8 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 - **Programs:** `/` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
 - **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); file search matches letters in order. [Details](docs/features/search.md).
 - **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
-- **Themes:** Glass, Frost, Midnight, Aurora, Ember and Solid, in Settings, Appearance. [Details](docs/features/appearance.md).
+- **Themes:** Flick's own themes and ported editor themes (MIT, ISC, BSD or CC0 licences), each checked for contrast. Pick one for dark and one for light in Settings, Appearance. Importing a VS Code theme is not built yet. [Details](docs/features/appearance.md).
+- **Pins:** `ctrl+p` pins or unpins an app or file in Home and Open; pinned items sit at the top. [Details](docs/features/search.md). [Details](docs/features/appearance.md).
 - **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).
 - **Frecency:** ranks items you use often and recently higher, with a 7-day half-life. You can turn on prefix learning, change the half-life, clear history, or turn ranking off to get pure match order.
 - **Math and units:** type arithmetic, units, currency, time zones or number bases after `=`, for example `2.5 kg to lb`, `250 usd in inr`, `5pm ist in pst`, `255 to hex` or `0xff to decimal`. Enter copies the result. Currency uses the ECB daily reference rates, fetched at most once a day and cached. When offline, Flick uses the last cached rate and shows its age. The rates are published by the European Central Bank.
@@ -161,3 +162,4 @@ Design decisions are recorded in [docs/adr/](docs/adr/):
 - [ADR-012](docs/adr/ADR-012-prefixes-and-plain-text.md) Prefixes and plain text
 - [ADR-013](docs/adr/ADR-013-tray-menu.md) Tray menu
 - [ADR-014](docs/adr/ADR-014-settings-backdrop.md) Settings backdrop
+- [ADR-015](docs/adr/ADR-015-flat-ui-and-themes.md) Flat UI and themes (supersedes the glass parts of ADR-013 and ADR-014)

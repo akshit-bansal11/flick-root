@@ -39,3 +39,13 @@ Math (`=`, including number bases such as `255 to hex`), time zones and natural-
 ## Ranking
 
 Exact and prefix matches rank above fuzzy-only hits. Fuzzy-only hits need at least 3 characters in the query.
+
+## Home: pins and recent picks
+
+An empty bar shows your pinned items first, in the order you pinned them, then up to 8 recent apps,
+files and folders, newest first. Recent picks come from Frecency, so only items you opened from
+Flick are listed.
+
+- `ctrl+p` pins or unpins the selected app or file, in Home and in Open.
+- Up to 24 pins are kept under `[home] pins` in `config.toml`. Each is an `app:` or `file:` id.
+- Commands, calculator results and answers are never recalled, so they cannot be pinned.

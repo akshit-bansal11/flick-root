@@ -1,6 +1,6 @@
 # ADR-014: Settings backdrop
 
-Status: Accepted (2026-10-23)
+Status: Accepted (2026-10-23). Superseded in part by ADR-015 (the glass parts).
 
 ## Context
 
