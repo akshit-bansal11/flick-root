@@ -1,7 +1,7 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { filter, type Item, type Mode, parse, PREFIX, PRIMARY, SCRIPT, TABS } from "./demoData";
+import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { filter, type Item, type Mode, PREFIX, PRIMARY, parse, SCRIPT, TABS } from "./demoData";
 
 interface Group {
   name: string;
@@ -130,7 +130,7 @@ export function LauncherDemo() {
       <div className="demo-split">
         <div id="demo-list" role="listbox" aria-label="Results" className="demo-left">
           {groupItems(items).map((g) => (
-            <div key={g.name} role="group" aria-label={g.name}>
+            <Fragment key={g.name}>
               <div className="demo-group" aria-hidden="true">
                 # {g.name}
               </div>
@@ -139,6 +139,7 @@ export function LauncherDemo() {
                   key={item.title}
                   id={`demo-opt-${index}`}
                   role="option"
+                  tabIndex={-1}
                   aria-selected={index === active}
                   className="demo-row"
                 >
@@ -148,7 +149,7 @@ export function LauncherDemo() {
                   <span className="demo-title">{item.title}</span>
                 </div>
               ))}
-            </div>
+            </Fragment>
           ))}
         </div>
         <div className="demo-right">
