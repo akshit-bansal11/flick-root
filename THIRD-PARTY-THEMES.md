@@ -19,6 +19,12 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 
 | id | name | repo URL | theme file URL | SPDX licence | licence file URL | copyright |
 | --- | --- | --- | --- | --- | --- | --- |
+| one-dark-pro | One Dark Pro | https://github.com/Binaryify/OneDark-Pro | https://raw.githubusercontent.com/Binaryify/OneDark-Pro/master/themes/OneDark-Pro.json | MIT | https://raw.githubusercontent.com/Binaryify/OneDark-Pro/master/LICENSE.txt | Copyright (c) 2013-2022 Binaryify |
+| one-light | One Light | https://github.com/akamud/vscode-theme-onelight | https://raw.githubusercontent.com/akamud/vscode-theme-onelight/master/themes/OneLight.json | MIT | https://raw.githubusercontent.com/akamud/vscode-theme-onelight/master/LICENSE | Copyright (c) 2015 Mahmoud Ali |
+| dracula | Dracula | https://github.com/dracula/visual-studio-code | https://raw.githubusercontent.com/dracula/visual-studio-code/main/src/dracula.yml | MIT | https://raw.githubusercontent.com/dracula/visual-studio-code/main/LICENSE | Copyright (c) 2016 Dracula Theme |
+| nord | Nord | https://github.com/nordtheme/visual-studio-code | https://raw.githubusercontent.com/nordtheme/visual-studio-code/develop/themes/nord-color-theme.json | MIT | https://raw.githubusercontent.com/nordtheme/visual-studio-code/develop/license | Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de) |
+| gruvbox-dark | Gruvbox Dark | https://github.com/jdinhify/vscode-theme-gruvbox | https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/src/colors/base.ts | MIT | https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/LICENSE | Copyright © 2017 JD |
+| gruvbox-light | Gruvbox Light | https://github.com/jdinhify/vscode-theme-gruvbox | https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/src/colors/base.ts | MIT | https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/LICENSE | Copyright © 2017 JD |
 
 ## Not included
 

@@ -1,1 +1,77 @@
-[]
+[
+  {
+    "id": "one-dark-pro",
+    "name": "One Dark Pro",
+    "source": "port",
+    "bg": "#21252b",
+    "panel": "#282c34",
+    "text": "#abb2bf",
+    "muted": "#abb2bf",
+    "accent": "#404754",
+    "sel": "#2c313a",
+    "upstream": "https://raw.githubusercontent.com/Binaryify/OneDark-Pro/master/themes/OneDark-Pro.json"
+  },
+  {
+    "id": "one-light",
+    "name": "One Light",
+    "source": "port",
+    "bg": "#eaeaeb",
+    "panel": "#fafafa",
+    "text": "#383a42",
+    "muted": "#383a42",
+    "accent": "#5871ef",
+    "sel": "#dbdbdc",
+    "upstream": "https://raw.githubusercontent.com/akamud/vscode-theme-onelight/master/themes/OneLight.json"
+  },
+  {
+    "id": "dracula",
+    "name": "Dracula",
+    "source": "port",
+    "bg": "#21222c",
+    "panel": "#282a36",
+    "text": "#f8f8f2",
+    "muted": "#f8f8f2",
+    "accent": "#44475a",
+    "sel": "#44475a",
+    "upstream": "https://raw.githubusercontent.com/dracula/visual-studio-code/main/src/dracula.yml"
+  },
+  {
+    "id": "nord",
+    "name": "Nord",
+    "source": "port",
+    "bg": "#2e3440",
+    "panel": "#2e3440",
+    "text": "#d8dee9",
+    "muted": "#c7cdd8",
+    "accent": "#82b7c6",
+    "sel": "#88c0d0",
+    "line": "#3b4252",
+    "upstream": "https://raw.githubusercontent.com/nordtheme/visual-studio-code/develop/themes/nord-color-theme.json"
+  },
+  {
+    "id": "gruvbox-dark",
+    "name": "Gruvbox Dark",
+    "source": "port",
+    "bg": "#282828",
+    "panel": "#282828",
+    "text": "#ebdbb2",
+    "muted": "#ebdbb2",
+    "accent": "#375758",
+    "sel": "#32302f",
+    "line": "#3c3836",
+    "upstream": "https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/src/colors/base.ts"
+  },
+  {
+    "id": "gruvbox-light",
+    "name": "Gruvbox Light",
+    "source": "port",
+    "bg": "#fbf1c7",
+    "panel": "#fbf1c7",
+    "text": "#3c3836",
+    "muted": "#3c3836",
+    "accent": "#a0bba7",
+    "sel": "#f3e6bc",
+    "line": "#ebdbb2",
+    "upstream": "https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/src/colors/base.ts"
+  }
+]
