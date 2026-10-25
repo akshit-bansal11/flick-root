@@ -74,12 +74,7 @@ export function MaskedKey({ title, info, onReplace, onDeleted }: Props) {
         }}
       >
         <span className="s-add">
-          <button
-            type="button"
-            className="btn"
-            aria-label={`Test key for ${title}`}
-            onClick={test}
-          >
+          <button type="button" className="btn" aria-label={`Test key for ${title}`} onClick={test}>
             test
           </button>
           <button
