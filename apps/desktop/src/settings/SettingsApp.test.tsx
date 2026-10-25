@@ -181,7 +181,7 @@ describe("SettingsApp", () => {
       { key: "Tab", ctrlKey: true },
     ]) {
       act(() => {
-        fireEvent.click(screen.getByText("Change"));
+        fireEvent.click(screen.getByText("change"));
       });
       act(() => {
         fireEvent.keyDown(screen.getByText(/Press keys/), o);
@@ -217,14 +217,14 @@ describe("SettingsApp", () => {
   it("clear history needs a second confirming click", async () => {
     await mount();
     act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "Clear history" }));
+      fireEvent.click(screen.getByRole("button", { name: "clear" }));
     });
     expect(api.clearHistory).not.toHaveBeenCalled();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Confirm clear" }));
+      fireEvent.click(screen.getByRole("button", { name: "confirm clear" }));
     });
     expect(api.clearHistory).toHaveBeenCalledWith("all");
-    expect(screen.queryByRole("button", { name: "Confirm clear" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "confirm clear" })).toBeNull();
   });
 });
 
