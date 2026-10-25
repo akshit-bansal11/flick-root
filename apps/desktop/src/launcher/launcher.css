@@ -18,13 +18,14 @@ body,
   background: var(--l-panel);
   border-radius: var(--l-r-window);
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px var(--l-line);
+  outline: 1px solid var(--l-line);
+  outline-offset: -1px;
 }
 
 .launch-error {
   margin: 0;
   padding: var(--l-sp-5) var(--l-sp-8);
-  border-top: var(--l-border-hair);
+  border-top: var(--l-border);
   font-size: var(--l-fs-caption);
   color: var(--l-err);
 }
@@ -67,7 +68,7 @@ body,
   padding: 0 var(--l-sp-8);
   min-width: 0;
   color: var(--l-muted);
-  border-bottom: var(--l-border-hair);
+  border-bottom: var(--l-border);
 }
 
 .prompt {
@@ -384,7 +385,7 @@ body,
 }
 
 .detail-act:hover {
-  background: var(--l-raise-hover);
+  background: var(--l-surface);
 }
 
 .detail-act:focus-visible {

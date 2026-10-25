@@ -1,16 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { measureRow, useExit } from "./useMotion";
-
-describe("measureRow", () => {
-  it("returns top and height", () => {
-    expect(measureRow({ offsetTop: 12, offsetHeight: 44 })).toEqual({ top: 12, height: 44 });
-  });
-  it("is null when missing or not laid out", () => {
-    expect(measureRow(null)).toBeNull();
-    expect(measureRow({ offsetTop: 0, offsetHeight: 0 })).toBeNull();
-  });
-});
+import { useExit } from "./useMotion";
 
 describe("useExit", () => {
   it("holds the last value while leaving until onEnd", () => {

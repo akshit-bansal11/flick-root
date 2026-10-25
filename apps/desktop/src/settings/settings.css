@@ -211,15 +211,7 @@ body,
   }
 }
 
-/* Legacy rules, flat, kept until each page moves to SettingRow (C1 deletes leftovers). */
-.s-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--l-sp-8);
-  padding: var(--l-sp-5) var(--l-sp-5);
-  border-bottom: var(--l-border);
-}
+/* Shared form rules used by the settings pages. */
 .s-row-label {
   font-weight: 500;
 }
@@ -233,18 +225,6 @@ body,
   font-size: var(--l-fs-caption);
   line-height: var(--l-lh-caption);
 }
-.s-row-control {
-  display: flex;
-  align-items: center;
-  gap: var(--l-sp-4);
-}
-.s-kbd {
-  padding: var(--l-sp-1) var(--l-sp-4);
-  border: var(--l-border);
-  border-radius: var(--l-r-key);
-  font-family: var(--l-mono);
-  font-size: var(--l-fs-caption);
-}
 .s-btn,
 .s-select,
 .s-input {
@@ -255,21 +235,11 @@ body,
   color: var(--l-text);
   font: inherit;
 }
-.s-btn-primary,
-.pv-shell button.s-btn-primary {
-  border-color: var(--l-accent);
-  background: var(--l-accent);
-  color: var(--l-on-accent);
-  font-weight: 500;
-}
 .s-btn {
   cursor: pointer;
 }
 .s-btn:hover:not(:disabled) {
   background: var(--l-hover);
-}
-.s-btn-primary:hover:not(:disabled) {
-  background: var(--l-accent);
 }
 .s-btn:disabled {
   color: var(--l-muted);
@@ -315,230 +285,4 @@ body,
 .s-input:focus-visible {
   outline: 2px solid var(--l-focus);
   outline-offset: 2px;
-}
-
-/* Appearance page */
-.s-swatch {
-  /* Re-declared here: the :root value was resolved against the root's own panel colour. */
-  --l-glass-tint: color-mix(in srgb, var(--l-panel) var(--l-glass-alpha), transparent);
-  display: flex;
-  flex-direction: column;
-  gap: var(--l-sp-3);
-  min-height: calc(var(--l-tile-lg) * 2);
-  padding: var(--l-sp-5);
-  border-radius: var(--l-r-control);
-  background: var(--l-glass-tint);
-  box-shadow:
-    inset 0 0 0 1px var(--l-hairline),
-    inset 0 1px 0 var(--l-spec);
-  transition: box-shadow var(--l-dur) var(--l-ease-out);
-}
-.s-swatch[data-theme="solid"] {
-  --l-glass-tint: var(--l-panel);
-}
-.s-swatch-dot {
-  width: var(--l-sp-6);
-  height: var(--l-sp-6);
-  border-radius: var(--l-r-pill);
-  background: var(--l-accent);
-}
-.s-swatch-line {
-  height: var(--l-sp-3);
-  border-radius: var(--l-r-pill);
-  background: var(--l-text);
-}
-.s-swatch-line-short {
-  width: 60%;
-  background: var(--l-muted);
-}
-.s-themes {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: var(--l-sp-6);
-  margin-bottom: var(--l-sp-8);
-}
-.s-theme-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--l-sp-3);
-  position: relative;
-  cursor: pointer;
-}
-.s-theme-card:has(input:checked) .s-swatch {
-  box-shadow:
-    0 0 0 2px var(--l-accent),
-    inset 0 0 0 1px var(--l-hairline);
-}
-.s-theme-card:has(input:focus-visible) .s-swatch {
-  outline: 2px solid var(--l-focus);
-  outline-offset: 4px;
-}
-.s-theme-card input,
-.s-seg-item input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.s-theme-name {
-  font-size: var(--l-fs-caption);
-  line-height: var(--l-lh-caption);
-  font-weight: 500;
-}
-
-/* Segmented control: --n items, --i checked index; the shared lens slides by whole item widths. */
-.s-seg {
-  position: relative;
-  display: inline-grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  padding: var(--l-sp-1);
-  border-radius: var(--l-r-control);
-  background: var(--l-raise);
-  box-shadow: inset 0 0 0 1px var(--l-hairline);
-}
-.s-seg .lens {
-  top: var(--l-sp-1);
-  left: var(--l-sp-1);
-  right: auto;
-  width: calc((100% - var(--l-sp-2)) / var(--n));
-  height: calc(100% - var(--l-sp-2));
-  transform: translateX(calc(var(--i) * 100%));
-  transition: transform var(--l-dur-slow) var(--l-ease-liquid);
-}
-.s-seg-item {
-  position: relative;
-  z-index: 1;
-  padding: var(--l-sp-3) var(--l-sp-8);
-  border-radius: var(--l-r-control);
-  font-size: var(--l-fs-caption);
-  line-height: var(--l-lh-caption);
-  text-align: center;
-  cursor: pointer;
-}
-.s-seg-item:has(input:checked) {
-  font-weight: 500;
-}
-.s-seg-item:has(input:focus-visible) {
-  outline: 2px solid var(--l-focus);
-  outline-offset: -2px;
-}
-.s-seg-item:has(input:disabled) {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Glass slider: accent fill up to --val, droplet thumb. */
-.s-range {
-  appearance: none;
-  width: 220px;
-  height: 22px;
-  margin: 0;
-  background: none;
-  cursor: pointer;
-}
-.s-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: var(--l-r-pill);
-  background: linear-gradient(90deg, var(--l-accent) var(--val), var(--l-line) var(--val));
-}
-.s-range::-webkit-slider-thumb {
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -9px;
-  border-radius: var(--l-r-pill);
-  background: var(--l-droplet);
-  box-shadow:
-    0 1px 3px var(--l-key-bottom),
-    inset 0 0 0 1px var(--l-hairline);
-}
-.s-range:focus-visible {
-  outline: 2px solid var(--l-focus);
-  outline-offset: 4px;
-  border-radius: var(--l-r-key);
-}
-.s-range:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.s-val {
-  width: var(--l-sp-12);
-  text-align: right;
-  font: 500 var(--l-fs-caption) / 1 var(--l-mono);
-  font-variant-numeric: tabular-nums;
-}
-
-/* Live mini launcher: a decorative panel over a wallpaper, drawn from the live tokens. */
-.s-pv {
-  position: relative;
-  height: 172px;
-  margin-bottom: var(--l-sp-8);
-  overflow: hidden;
-  border-radius: var(--l-r-card);
-  background: var(--l-preview-wall);
-  box-shadow: inset 0 0 0 1px var(--l-hairline);
-}
-.s-pv-panel {
-  position: absolute;
-  top: var(--l-sp-11);
-  left: 50%;
-  width: min(440px, 88%);
-  transform: translateX(-50%);
-  border-radius: var(--l-r-window);
-  background: var(--l-glass-tint);
-  box-shadow:
-    inset 0 1px 0 var(--l-spec),
-    inset 0 0 0 1px var(--l-hairline),
-    var(--l-shadow-overlay);
-}
-.s-pv-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--l-sp-5);
-  height: var(--l-input);
-  padding: 0 var(--l-sp-7);
-}
-.s-pv-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--l-sp-2);
-  height: var(--l-tile-row);
-  padding: 0 var(--l-sp-4);
-  border-radius: var(--l-r-control);
-  background: var(--l-raise);
-  box-shadow:
-    inset 0 1px 0 var(--l-spec),
-    inset 0 0 0 1px var(--l-hairline);
-  font-size: var(--l-fs-caption);
-  font-weight: 500;
-}
-.s-pv-glyph {
-  color: var(--l-accent-text);
-  font-family: var(--l-mono);
-}
-.s-pv-query {
-  flex: 1;
-  font-size: var(--l-fs-input);
-  line-height: var(--l-lh-input);
-}
-.s-pv-list {
-  position: relative;
-  padding: var(--l-sp-3);
-  border-top: var(--l-border-hair);
-}
-.s-pv-list .lens {
-  top: var(--l-sp-3);
-  height: var(--l-row);
-}
-.s-pv-row {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: var(--l-row);
-  padding: 0 var(--l-sp-6);
-}
-.s-pv-name {
-  font-weight: 500;
 }

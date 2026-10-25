@@ -62,10 +62,8 @@
 
   /* Alpha overlays: black and mist-900 (light-scheme ink), for scrims, flat shadows and key edges. */
   --l-raw-black-30: rgb(0 0 0 / 0.3);
-  --l-raw-black-35: rgb(0 0 0 / 0.35);
   --l-raw-black-50: rgb(0 0 0 / 0.5);
   --l-raw-mist-900-12: rgb(15 35 51 / 0.12);
-  --l-raw-mist-900-16: rgb(15 35 51 / 0.16);
   --l-raw-mist-900-22: rgb(15 35 51 / 0.22);
 }
 
@@ -113,15 +111,12 @@
 
   --l-row: 34px;
   --l-input: 56px;
-  --l-tile: 20px;
-  --l-tile-row: 28px;
   --l-tile-lg: 32px;
   --l-group-h: 28px;
   --l-foot-h: 32px;
   --l-tab-h: 32px;
   /* Tallest panel. Rust PANEL_MAX_H in window.rs mirrors it. */
   --l-panel-max: 540px;
-  --l-tile-settings: 32px;
   --l-nav-w: 200px;
   /* Left column of the two-column panel. */
   --l-left-w: 360px;
@@ -138,19 +133,10 @@
   --l-dur-caret: 1s;
   --l-stagger: 12ms;
   --l-ease-out: cubic-bezier(0.2, 0, 0, 1);
-  /* Alias until C1 removes the glass consumers; there is no spring any more. */
-  --l-ease-liquid: var(--l-ease-out);
 
   --l-sel-mix: 14%;
   --l-kbd-mix: 8%;
   --l-hover-mix: 7%;
-  --l-mask: var(--l-raw-black);
-  --l-blur: none;
-  --l-glass-alpha: 90%;
-  --l-tile-hue-default: 220;
-  --l-tile-hue-s: 48%;
-  --l-tile-hue-l: 38%;
-  --l-tile-text: var(--l-raw-white);
 }
 
 /* Roles, dark (base). Theme and scheme rules also match plain elements (not only :root) so Settings can preview a
@@ -170,8 +156,6 @@
   --l-ok: var(--l-raw-green-400);
   --l-err: var(--l-raw-red-400);
   --l-warn: var(--l-raw-amber-400);
-  --l-key-bottom: var(--l-raw-black-35);
-  --l-warn-wash: color-mix(in oklab, var(--l-warn) 14%, transparent);
   --l-shadow-raised: 0 1px 2px var(--l-raw-black-30);
   --l-shadow-overlay: 0 8px 24px var(--l-raw-black-50);
   --l-shadow-window: 0 8px 24px var(--l-raw-black-50);
@@ -194,8 +178,6 @@
     --l-ok: var(--l-raw-green-800);
     --l-err: var(--l-raw-red-700);
     --l-warn: var(--l-raw-amber-800);
-    --l-key-bottom: var(--l-raw-mist-900-16);
-    --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
     --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
     --l-shadow-overlay: 0 8px 24px var(--l-raw-mist-900-22);
     --l-shadow-window: 0 8px 24px var(--l-raw-mist-900-22);
@@ -217,17 +199,14 @@
   --l-ok: var(--l-raw-green-800);
   --l-err: var(--l-raw-red-700);
   --l-warn: var(--l-raw-amber-800);
-  --l-key-bottom: var(--l-raw-mist-900-16);
-  --l-warn-wash: color-mix(in oklab, var(--l-warn) 10%, transparent);
   --l-shadow-raised: 0 1px 2px var(--l-raw-mist-900-12);
   --l-shadow-overlay: 0 8px 24px var(--l-raw-mist-900-22);
   --l-shadow-window: 0 8px 24px var(--l-raw-mist-900-22);
 }
 
-/* Derived roles, plus flat aliases for the retired glass tokens. Declared on the element so a themed child
-   (the Settings swatch, the tour demo) recomputes them. Card C1 deletes the glass aliases with their last consumer. */
+/* Derived roles: Rust writes the role colours; everything else is computed from them. Declared on the element so a
+   themed child (the tour demo) recomputes them. */
 :root,
-[data-theme],
 [data-scheme] {
   --l-muted-strong: var(--l-muted);
   --l-ok-text: var(--l-ok);
@@ -235,22 +214,7 @@
   --l-focus: var(--l-accent-text);
   --l-control-edge: var(--l-muted);
   --l-hover: var(--l-surface);
-  --l-hairline: var(--l-line);
-  --l-rim-top: transparent;
-  --l-rim-low: transparent;
-  --l-spec: transparent;
-  --l-sheen: transparent;
-  --l-raise: var(--l-surface);
-  --l-raise-hover: var(--l-surface);
-  --l-droplet: none;
-  --l-lens: var(--l-sel);
-  --l-lens-ring: var(--l-line);
-  --l-rim: none;
-  --l-sheen-bg: none;
-  --l-glass-tint: var(--l-panel);
-  --l-preview-wall: var(--l-bg);
   --l-border: 1px solid var(--l-line);
-  --l-border-hair: 1px solid var(--l-hairline);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -260,9 +224,4 @@
     --l-dur-slow: 0ms;
     --l-stagger: 0ms;
   }
-}
-
-/* Declared on the element so var(--h) resolves per tile, not at :root. */
-.tile-letter {
-  --l-tile-bg: hsl(var(--h, var(--l-tile-hue-default)) var(--l-tile-hue-s) var(--l-tile-hue-l));
 }

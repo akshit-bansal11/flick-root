@@ -93,7 +93,7 @@
 .tour-sample {
   margin: 0;
   padding: var(--l-sp-6) var(--l-sp-7);
-  border: var(--l-border-hair);
+  border: var(--l-border);
   border-radius: var(--l-r-card);
   background: var(--l-panel);
   user-select: text;

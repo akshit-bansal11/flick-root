@@ -17,23 +17,12 @@
   margin: 0;
   padding: var(--l-sp-2) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
 }
-.f-tile {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: var(--l-tile-settings);
-  height: var(--l-tile-settings);
-  border-radius: var(--l-r-control);
-  background: var(--l-sel);
-  color: var(--l-accent-text);
-  font-weight: 600;
-}
 .f-form {
   display: flex;
   flex-direction: column;
   gap: var(--l-sp-6);
   padding: var(--l-sp-6) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
-  border-top: var(--l-border-hair);
+  border-top: var(--l-border);
 }
 .f-field {
   display: flex;

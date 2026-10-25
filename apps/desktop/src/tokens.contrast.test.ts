@@ -55,7 +55,7 @@ const RULES = parseRules(css);
 
 /** True or false when the selector is in the supported grammar, null when it is not. */
 function applies(selector: string, mode: Mode): boolean | null {
-  if (selector === ":root" || selector === "[data-theme]" || selector === "[data-scheme]") {
+  if (selector === ":root" || selector === "[data-scheme]") {
     return true;
   }
   if (selector === '[data-scheme="light"]') return mode === "light-attr";
@@ -63,8 +63,6 @@ function applies(selector: string, mode: Mode): boolean | null {
   return null;
 }
 
-/** Selectors that are not part of the role cascade. */
-const ALLOWED_UNSUPPORTED = [".tile-letter"];
 
 /** All selectors have equal specificity, so source order is the cascade. */
 function declared(name: string, mode: Mode): string | undefined {
@@ -116,7 +114,7 @@ function ratio(a: Rgb, b: Rgb): number {
 }
 
 // Text roles need 4.5:1 (WCAG AA). Controls and the accent as a fill edge need 3:1 (WCAG 1.4.11).
-// --l-line and --l-hairline are decorative separators and are exempt.
+// --l-line is a decorative separator and is exempt.
 const TEXT_ROLES = ["text", "muted", "muted-strong", "accent-text", "ok-text", "err", "warn"];
 const EDGE_ROLES = ["control-edge", "focus", "accent"];
 // The opaque surfaces text and controls sit on.
@@ -142,16 +140,14 @@ describe("tokens.css contrast", () => {
 
   it("only known selectors take part in the role cascade", () => {
     const unknown = RULES.flatMap((r) => r.selectors)
-      .filter((s) => applies(s, "dark") === null)
-      .filter((s) => !ALLOWED_UNSUPPORTED.includes(s));
+      .filter((s) => applies(s, "dark") === null);
     expect(unknown).toEqual([]);
   });
 
   it("defines every role in dark and in light", () => {
     const roles = [
       "bg panel surface line text muted muted-strong accent accent-text on-accent sel",
-      "ok ok-text err warn scrim focus control-edge hover hairline rim-top rim-low spec",
-      "sheen raise raise-hover key-bottom warn-wash droplet",
+      "ok ok-text err warn scrim focus control-edge hover border",
       "shadow-raised shadow-overlay shadow-window",
     ].flatMap((line) => line.split(" "));
     for (const mode of MODES) {
@@ -169,7 +165,7 @@ describe("tokens.css contrast", () => {
       "--l-control-edge": "var(--l-muted)",
       "--l-hover": "var(--l-surface)",
     };
-    const shared = [":root", "[data-theme]", "[data-scheme]"];
+    const shared = [":root", "[data-scheme]"];
     for (const [name, value] of Object.entries(expected)) {
       const owners = RULES.filter((r) => r.decls.has(name));
       expect(owners.length, `${name} is declared once`).toBe(1);
@@ -189,6 +185,5 @@ describe("tokens.css contrast", () => {
     for (const s of ["raised", "overlay", "window"]) {
       expect(get(`--l-shadow-${s}`)).not.toMatch(/inset|gradient/);
     }
-    expect(get("--l-hairline")).toBe("var(--l-line)");
   });
 });

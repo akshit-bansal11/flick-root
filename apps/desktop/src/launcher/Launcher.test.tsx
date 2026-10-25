@@ -298,11 +298,10 @@ describe("Launcher", () => {
     expect(marks().filter((m) => m === "›")).toHaveLength(1);
   });
 
-  it("the group header reads # apps and the list has no lens", async () => {
+  it("the group header reads # apps", async () => {
     await mount();
     await type("abc");
     expect(screen.getByText("# apps")).toBeTruthy();
-    expect(document.querySelector(".lens")).toBeNull();
   });
 
   it("aria-activedescendant follows the selection", async () => {

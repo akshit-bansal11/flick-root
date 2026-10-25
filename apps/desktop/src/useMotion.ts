@@ -1,11 +1,5 @@
 import { useState } from "react";
 
-/** Top and height of a row inside its offset parent, or null when it is not laid out. */
-export function measureRow(el: { offsetTop: number; offsetHeight: number } | null | undefined) {
-  if (!el || el.offsetHeight <= 0) return null;
-  return { top: el.offsetTop, height: el.offsetHeight };
-}
-
 /**
  * Keeps the last non-null value around after `value` becomes null so an exit animation can play.
  * Call `onEnd` from onAnimationEnd of the leaving element to drop it.

@@ -86,4 +86,16 @@ describe("token hygiene", () => {
   it("reads raw palette values only inside tokens.css", () => {
     expect(hits(others, /--l-raw-/)).toEqual([]);
   });
+
+  it("styles flat: no gradient, blur, mask compositing or inset shadow", () => {
+    expect(hits(all, /gradient\(/)).toEqual([]);
+    expect(hits(all, /backdrop-filter/)).toEqual([]);
+    expect(hits(all, /mask-composite/)).toEqual([]);
+    expect(hits(all, /box-shadow:[^;]*\binset\b/)).toEqual([]);
+  });
+
+  it("keeps no selection-pill, liquid filter or glass attribute leftovers", () => {
+    expect(hits(all, /\bL[e]ns\b|\bLiquidFilter\b/)).toEqual([]);
+    expect(hits(all, /data-gl[a]ss/)).toEqual([]);
+  });
 });

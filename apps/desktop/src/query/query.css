@@ -54,12 +54,6 @@
   transform: scale(0.98);
 }
 
-@keyframes chip-swap {
-  from {
-    opacity: 0;
-  }
-}
-
 /* Rounded accent caret after the streamed text; the text itself is never animated. */
 [data-answer][aria-busy="true"] > :last-child::after {
   content: "";
