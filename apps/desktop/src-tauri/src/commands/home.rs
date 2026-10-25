@@ -62,13 +62,18 @@ fn resolve(state: &AppState, key: &str, is_dir: bool) -> Option<Item> {
 }
 
 /// Keys for the home list, pinned first (in pin order, `payload.home = "pinned"`), then the recents
-/// that are not pinned (`"recent"`). A pinned key counts as a folder when the history says so.
+/// that are not pinned (`"recent"`). A pinned key counts as a folder when the history says so; a
+/// pinned `file:` key absent from the history (history off, or too old) asks `is_dir` with its path.
 fn home_keys<'a>(
     pins: &'a [String],
     recents: &[(&'a str, bool)],
+    is_dir: impl Fn(&str) -> bool,
 ) -> Vec<(&'a str, bool, &'static str)> {
     let pinned = pins.iter().map(|p| {
-        let dir = recents.iter().any(|&(k, d)| d && k == p.as_str());
+        let dir = match recents.iter().find(|&&(k, _)| k == p.as_str()) {
+            Some(&(_, d)) => d,
+            None => p.strip_prefix("file:").is_some_and(&is_dir),
+        };
         (p.as_str(), dir, "pinned")
     });
     let rest = recents
@@ -95,7 +100,8 @@ async fn view(state: &Arc<AppState>) -> Result<HomeView, CommandError> {
         let recents = recent_ids(&rows, CANDIDATES);
         let mut items: Vec<Item> = Vec::new();
         let mut recent_shown = 0;
-        for (key, is_dir, tag) in home_keys(&pins, &recents) {
+        let on_disk_dir = |p: &str| std::path::Path::new(p).is_dir();
+        for (key, is_dir, tag) in home_keys(&pins, &recents, on_disk_dir) {
             if tag == "recent" && recent_shown >= SHOWN {
                 break;
             }
@@ -275,7 +281,7 @@ mod tests {
         let pins = ["file:C:/d".to_owned(), "app:z".to_owned()];
         let recents = [("app:a", false), ("file:C:/d", true), ("app:z", false)];
         assert_eq!(
-            home_keys(&pins, &recents),
+            home_keys(&pins, &recents, |_| false),
             [
                 ("file:C:/d", true, "pinned"),
                 ("app:z", false, "pinned"),
@@ -285,10 +291,36 @@ mod tests {
     }
 
     #[test]
+    fn home_keys_probes_pinned_files_missing_from_history() {
+        let pins = [
+            "file:C:/gone".to_owned(),
+            "file:C:/known.txt".to_owned(),
+            "app:x".to_owned(),
+        ];
+        // History says known.txt is a file; the probe would say dir, so it must not be asked.
+        let recents = [("file:C:/known.txt", false)];
+        let probe = |p: &str| p == "C:/gone" || p == "C:/known.txt" || p == "x";
+        assert_eq!(
+            home_keys(&pins, &recents, probe),
+            [
+                ("file:C:/gone", true, "pinned"),
+                ("file:C:/known.txt", false, "pinned"),
+                ("app:x", false, "pinned"),
+            ]
+        );
+    }
+
+    #[test]
     fn home_keys_without_pins_is_the_recents_and_without_recents_the_pins() {
         let recents = [("app:a", false)];
-        assert_eq!(home_keys(&[], &recents), [("app:a", false, "recent")]);
+        assert_eq!(
+            home_keys(&[], &recents, |_| false),
+            [("app:a", false, "recent")]
+        );
         let pins = ["app:p".to_owned()];
-        assert_eq!(home_keys(&pins, &[]), [("app:p", false, "pinned")]);
+        assert_eq!(
+            home_keys(&pins, &[], |_| false),
+            [("app:p", false, "pinned")]
+        );
     }
 }

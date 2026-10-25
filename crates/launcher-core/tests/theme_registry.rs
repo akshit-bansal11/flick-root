@@ -2,6 +2,7 @@
 
 use launcher_core::brand::{DEFAULT_THEME_ID, DEFAULT_THEME_LIGHT_ID};
 use launcher_core::theme::color::{parse_hex, ratio};
+use launcher_core::theme::derive::MIN_SEL_CONTRAST;
 use launcher_core::theme::{Registry, Seed, Source};
 use std::collections::HashSet;
 
@@ -59,6 +60,11 @@ fn every_theme_meets_contrast() {
         let panel = parse_hex(&roles.panel).expect("panel hex");
         assert!(ratio(text, panel) >= 4.5, "{id}: text on panel");
         assert!(ratio(text, bg) >= 4.5, "{id}: text on bg");
+        let sel = parse_hex(&roles.sel).expect("sel hex");
+        assert!(
+            ratio(sel, panel) >= MIN_SEL_CONTRAST,
+            "{id}: sel is not distinguishable from panel"
+        );
         for (name, v) in [
             ("text", r.text),
             ("muted", r.muted),

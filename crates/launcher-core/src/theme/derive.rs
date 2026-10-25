@@ -11,6 +11,12 @@ use super::color::{
 use super::{Seed, ThemeError};
 
 const TARGET: f64 = 4.5;
+
+/// Least contrast ratio a selected-row colour needs against the panel to be visible. A seed `sel`
+/// below it (including one equal to the panel, ratio 1.0) is ignored and `sel` is derived instead.
+/// 1.1 is the smallest step that is still a visible tint; the derived mix clears it for every
+/// built-in theme.
+pub const MIN_SEL_CONTRAST: f64 = 1.1;
 const DARK_STATUS: [Rgb; 3] = [
     Rgb(0x4c, 0xc3, 0x8a),
     Rgb(0xea, 0xb8, 0x5c),
@@ -121,10 +127,9 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
         &mut adjusted,
     );
 
-    let mut sel = match opt("sel", seed.sel.as_ref())? {
-        Some(c) => c,
-        None => mix(panel, accent, if dark { 0.22 } else { 0.16 }),
-    };
+    // A seed `sel` too close to the panel would hide the selected row, so it counts as absent.
+    let given = opt("sel", seed.sel.as_ref())?.filter(|&c| ratio(c, panel) >= MIN_SEL_CONTRAST);
+    let mut sel = given.unwrap_or_else(|| mix(panel, accent, if dark { 0.22 } else { 0.16 }));
     for _ in 0..20 {
         if ratio(text, sel) >= TARGET {
             break;
@@ -200,4 +205,42 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
         },
         adjusted,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn seed_with_sel(sel: &str) -> Seed {
+        serde_json::from_value(serde_json::json!({
+            "id": "t",
+            "name": "T",
+            "source": "imported",
+            "bg": "#0b0f14",
+            "panel": "#11161c",
+            "text": "#e6edf3",
+            "muted": "#9aa7b4",
+            "accent": "#5fa8ff",
+            "sel": sel,
+        }))
+        .expect("seed json")
+    }
+
+    #[test]
+    fn sel_equal_to_panel_is_derived_instead() {
+        let r = resolve(&seed_with_sel("#11161c")).expect("resolves");
+        let (sel, panel) = (
+            parse_hex(&r.roles.sel).expect("sel hex"),
+            parse_hex(&r.roles.panel).expect("panel hex"),
+        );
+        assert_ne!(r.roles.sel, r.roles.panel);
+        assert!(ratio(sel, panel) >= MIN_SEL_CONTRAST);
+        assert!(r.ratios.sel_text >= TARGET);
+    }
+
+    #[test]
+    fn distinct_sel_is_kept() {
+        let r = resolve(&seed_with_sel("#1d2a33")).expect("resolves");
+        assert_eq!(r.roles.sel, "#1d2a33");
+    }
 }
