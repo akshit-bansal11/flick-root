@@ -35,6 +35,74 @@ pub struct Config {
     pub integrations: Integrations,
     /// Installed-app and program search.
     pub apps: AppsConfig,
+    /// Home list: pinned items.
+    pub home: HomeConfig,
+}
+
+/// Most ids `[home] pins` may hold.
+pub const MAX_PINS: usize = 24;
+/// Longest pin id, in characters.
+pub const MAX_PIN_LEN: usize = 1024;
+
+/// `[home]`
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HomeConfig {
+    /// Pinned item ids (`app:` or `file:` keys), in pin order.
+    pub pins: Vec<String>,
+}
+
+/// Why a pin change was refused. The text is shown to the user.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinError {
+    /// Only apps and files can be pinned, and the id must fit [`MAX_PIN_LEN`].
+    #[error("only apps and files can be pinned")]
+    Invalid,
+    /// The item is not in the current results, so it cannot be pinned.
+    #[error("that result is no longer available to pin")]
+    Unavailable,
+    /// [`MAX_PINS`] items are already pinned.
+    #[error("you can pin at most {max} items; unpin one first", max = MAX_PINS)]
+    Full,
+}
+
+/// Whether `id` may be pinned: an `app:` or `file:` key of at most [`MAX_PIN_LEN`] characters.
+fn valid_pin(id: &str) -> bool {
+    (id.starts_with("app:") || id.starts_with("file:")) && id.chars().count() <= MAX_PIN_LEN
+}
+
+/// Drops invalid and repeated ids and cuts the list to [`MAX_PINS`], keeping order. Used on load so
+/// an old or hand-edited config still opens.
+fn sanitize_pins(pins: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for p in pins {
+        if valid_pin(&p) && !out.contains(&p) && out.len() < MAX_PINS {
+            out.push(p);
+        }
+    }
+    out
+}
+
+impl HomeConfig {
+    /// Unpins `id` when pinned, else pins it. `known` says whether `id` is in the current results;
+    /// an unknown id can only be unpinned. Returns `true` when it is now pinned.
+    pub fn toggle(&mut self, id: &str, known: bool) -> Result<bool, PinError> {
+        if let Some(i) = self.pins.iter().position(|p| p == id) {
+            self.pins.remove(i);
+            return Ok(false);
+        }
+        if !valid_pin(id) {
+            return Err(PinError::Invalid);
+        }
+        if !known {
+            return Err(PinError::Unavailable);
+        }
+        if self.pins.len() >= MAX_PINS {
+            return Err(PinError::Full);
+        }
+        self.pins.push(id.to_owned());
+        Ok(true)
+    }
 }
 
 /// `[apps]`
@@ -772,6 +840,7 @@ impl Default for Config {
             decision: Decision::default(),
             features: default_features(),
             integrations: Integrations::default(),
+            home: HomeConfig::default(),
         }
     }
 }
@@ -794,6 +863,7 @@ impl Config {
             source,
         })?;
         c.apps.skip = sanitize_skip(std::mem::take(&mut c.apps.skip));
+        c.home.pins = sanitize_pins(std::mem::take(&mut c.home.pins));
         // Configs written before the Custom engine existed lack it in the order.
         if !c.decision.order.iter().any(|i| i == "custom") {
             c.decision.order.push("custom".into());
@@ -920,6 +990,63 @@ threshold = 0.7
         .unwrap();
         assert_eq!(c.integrations.webhooks[0].host, "");
         assert_eq!(c.integrations.markdown_file, "");
+    }
+
+    fn pins(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    #[test]
+    fn sanitize_pins_drops_invalid_repeats_and_caps() {
+        let long = format!("app:{}", "x".repeat(MAX_PIN_LEN));
+        let ok = format!("file:{}", "y".repeat(MAX_PIN_LEN - 5));
+        let input = pins(&["cmd:lock", "app:a", "app:a", "file:b", "", &long, &ok]);
+        assert_eq!(sanitize_pins(input), ["app:a", "file:b", ok.as_str()]);
+        let many: Vec<String> = (0..40).map(|i| format!("app:{i}")).collect();
+        let got = sanitize_pins(many);
+        assert_eq!(got.len(), MAX_PINS);
+        assert_eq!(got[0], "app:0");
+    }
+
+    #[test]
+    fn toggle_pins_then_unpins() {
+        let mut h = HomeConfig::default();
+        assert_eq!(h.toggle("app:a", true), Ok(true));
+        assert_eq!(h.toggle("file:b", true), Ok(true));
+        assert_eq!(h.pins, ["app:a", "file:b"]);
+        // Unpinning needs no cache entry.
+        assert_eq!(h.toggle("app:a", false), Ok(false));
+        assert_eq!(h.pins, ["file:b"]);
+    }
+
+    #[test]
+    fn toggle_refuses_bad_unknown_and_the_25th() {
+        let mut h = HomeConfig::default();
+        assert_eq!(h.toggle("cmd:lock", true), Err(PinError::Invalid));
+        assert_eq!(h.toggle("app:a", false), Err(PinError::Unavailable));
+        for i in 0..MAX_PINS {
+            assert_eq!(h.toggle(&format!("app:{i}"), true), Ok(true));
+        }
+        let e = h.toggle("app:extra", true).unwrap_err();
+        assert_eq!(e, PinError::Full);
+        assert!(e.to_string().contains("24"));
+        assert_eq!(h.pins.len(), MAX_PINS);
+        // A full list can still be unpinned from.
+        assert_eq!(h.toggle("app:0", false), Ok(false));
+    }
+
+    #[test]
+    fn pins_round_trip_and_old_config_has_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("config.toml");
+        let mut c = Config::default();
+        c.home.pins = pins(&["app:a", "file:C:/x.txt"]);
+        c.save(&p).unwrap();
+        assert_eq!(Config::load(&p).unwrap(), c);
+        let old: Config = toml::from_str("[general]\nfirst_run_done = true\n").unwrap();
+        assert!(old.home.pins.is_empty());
+        fs::write(&p, "[home]\npins = [\"bogus\", \"app:a\", \"app:a\"]\n").unwrap();
+        assert_eq!(Config::load(&p).unwrap().home.pins, ["app:a"]);
     }
 
     #[test]

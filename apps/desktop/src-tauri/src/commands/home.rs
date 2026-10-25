@@ -1,4 +1,5 @@
-//! The `home_items` command: recent app and file picks for the blank launcher.
+//! The `home_items` and `toggle_pin` commands: pinned and recent app and file picks for the blank
+//! launcher.
 use crate::error::CommandError;
 use crate::state::AppState;
 use features::search::{app_row, program_entry, recent_file_row};
@@ -17,9 +18,9 @@ const ICON_PX: u32 = 32;
 /// Reply to `home_items`.
 #[derive(Debug, Serialize)]
 pub struct HomeView {
-    /// Recent picks, newest first.
+    /// Pinned rows (`payload.home = "pinned"`) in pin order, then recent picks, newest first.
     pub items: Vec<Item>,
-    /// Pinned item ids (empty until pins exist).
+    /// Every pinned item id from the config, including ones that no longer resolve to a row.
     pub pins: Vec<String>,
 }
 
@@ -60,49 +61,102 @@ fn resolve(state: &AppState, key: &str, is_dir: bool) -> Option<Item> {
         .map(|p| recent_file_row(p, is_dir))
 }
 
-/// Recent picks for the blank launcher. Empty while history (the `frecency` feature) is off.
+/// Keys for the home list, pinned first (in pin order, `payload.home = "pinned"`), then the recents
+/// that are not pinned (`"recent"`). A pinned key counts as a folder when the history says so.
+fn home_keys<'a>(
+    pins: &'a [String],
+    recents: &[(&'a str, bool)],
+) -> Vec<(&'a str, bool, &'static str)> {
+    let pinned = pins.iter().map(|p| {
+        let dir = recents.iter().any(|&(k, d)| d && k == p.as_str());
+        (p.as_str(), dir, "pinned")
+    });
+    let rest = recents
+        .iter()
+        .filter(|&&(k, _)| !pins.iter().any(|p| p.as_str() == k))
+        .map(|&(k, d)| (k, d, "recent"));
+    pinned.chain(rest).collect()
+}
+
+/// Builds the home list: pinned rows first (even while history is off), then up to [`SHOWN`]
+/// recents. A pinned id that no longer resolves is skipped here and kept in the config.
 /// The rows join `last_results`, so `launch` can resolve them; an in-flight search keeps its rows.
-#[tauri::command]
-pub async fn home_items(state: State<'_, Arc<AppState>>) -> Result<HomeView, CommandError> {
-    if !state.registry.running_ids().contains(&"frecency") {
-        return Ok(HomeView {
-            items: Vec::new(),
-            pins: Vec::new(),
-        });
-    }
-    let s = Arc::clone(&state);
-    let items = super::blocking(move || {
-        let rows = s
-            .store
-            .load_frecency()
-            .map_err(|e| CommandError::new("internal", e.to_string()))?;
-        let mut items: Vec<Item> = recent_ids(&rows, CANDIDATES)
-            .into_iter()
-            .filter_map(|(key, is_dir)| resolve(&s, key, is_dir))
-            .take(SHOWN)
-            .collect();
-        items.iter_mut().for_each(mark_home);
-        Ok(items)
+async fn view(state: &Arc<AppState>) -> Result<HomeView, CommandError> {
+    let s = Arc::clone(state);
+    let (items, pins) = super::blocking(move || {
+        let pins = s.config.load().home.pins.clone();
+        let rows = if s.registry.running_ids().contains(&"frecency") {
+            s.store
+                .load_frecency()
+                .map_err(|e| CommandError::new("internal", e.to_string()))?
+        } else {
+            Vec::new()
+        };
+        let recents = recent_ids(&rows, CANDIDATES);
+        let mut items: Vec<Item> = Vec::new();
+        let mut recent_shown = 0;
+        for (key, is_dir, tag) in home_keys(&pins, &recents) {
+            if tag == "recent" && recent_shown >= SHOWN {
+                break;
+            }
+            // A pinned row just pinned from a search is cached with its real kind and icon.
+            let cached = if tag == "pinned" {
+                s.last_results.lock().get(key).cloned()
+            } else {
+                None
+            };
+            let Some(mut it) = cached.or_else(|| resolve(&s, key, is_dir)) else {
+                continue;
+            };
+            mark_home(&mut it, tag);
+            recent_shown += usize::from(tag == "recent");
+            items.push(it);
+        }
+        Ok((items, pins))
     })
     .await?;
     state
         .last_results
         .lock()
         .extend(items.iter().map(|i| (i.id.0.clone(), i.clone())));
-    Ok(HomeView {
-        items,
-        pins: Vec::new(),
-    })
+    Ok(HomeView { items, pins })
 }
 
-/// Marks a row as a home row (`payload.home = "recent"`). A null payload becomes an object; any
+/// Pinned and recent picks for the blank launcher.
+#[tauri::command]
+pub async fn home_items(state: State<'_, Arc<AppState>>) -> Result<HomeView, CommandError> {
+    view(&state).await
+}
+
+/// Pins `item_id` (an `app:` or `file:` row of the current results), or unpins it when pinned, then
+/// returns the fresh home list. At most 24 pins; refusals carry a user-readable message.
+#[tauri::command]
+pub async fn toggle_pin(
+    state: State<'_, Arc<AppState>>,
+    item_id: String,
+) -> Result<HomeView, CommandError> {
+    let known = state.last_results.lock().contains_key(&item_id);
+    let s = Arc::clone(&state);
+    super::blocking(move || {
+        s.update_config(|c| {
+            c.home
+                .toggle(&item_id, known)
+                .map(|_| ())
+                .map_err(|e| CommandError::new("pin_failed", e.to_string()))
+        })
+    })
+    .await?;
+    view(&state).await
+}
+
+/// Marks a row as a home row (`payload.home = tag`). A null payload becomes an object; any
 /// other non-object payload is left as it is, never panicking on it.
-fn mark_home(it: &mut Item) {
+fn mark_home(it: &mut Item, tag: &str) {
     if it.payload.is_null() {
         it.payload = serde_json::json!({});
     }
     if let Some(obj) = it.payload.as_object_mut() {
-        obj.insert("home".into(), serde_json::json!("recent"));
+        obj.insert("home".into(), serde_json::json!(tag));
     }
 }
 
@@ -189,17 +243,17 @@ mod tests {
     #[test]
     fn mark_home_turns_null_into_an_object() {
         let mut it = item_with(serde_json::Value::Null);
-        mark_home(&mut it);
+        mark_home(&mut it, "recent");
         assert_eq!(it.payload, serde_json::json!({ "home": "recent" }));
     }
 
     #[test]
     fn mark_home_inserts_into_an_object_and_keeps_its_keys() {
         let mut it = item_with(serde_json::json!({ "path": "C:/a" }));
-        mark_home(&mut it);
+        mark_home(&mut it, "pinned");
         assert_eq!(
             it.payload,
-            serde_json::json!({ "path": "C:/a", "home": "recent" })
+            serde_json::json!({ "path": "C:/a", "home": "pinned" })
         );
     }
 
@@ -211,8 +265,30 @@ mod tests {
             serde_json::json!(7),
         ] {
             let mut it = item_with(p.clone());
-            mark_home(&mut it);
+            mark_home(&mut it, "recent");
             assert_eq!(it.payload, p);
         }
+    }
+
+    #[test]
+    fn home_keys_puts_pins_first_and_dedupes_recents() {
+        let pins = ["file:C:/d".to_owned(), "app:z".to_owned()];
+        let recents = [("app:a", false), ("file:C:/d", true), ("app:z", false)];
+        assert_eq!(
+            home_keys(&pins, &recents),
+            [
+                ("file:C:/d", true, "pinned"),
+                ("app:z", false, "pinned"),
+                ("app:a", false, "recent"),
+            ]
+        );
+    }
+
+    #[test]
+    fn home_keys_without_pins_is_the_recents_and_without_recents_the_pins() {
+        let recents = [("app:a", false)];
+        assert_eq!(home_keys(&[], &recents), [("app:a", false, "recent")]);
+        let pins = ["app:p".to_owned()];
+        assert_eq!(home_keys(&pins, &[]), [("app:p", false, "pinned")]);
     }
 }

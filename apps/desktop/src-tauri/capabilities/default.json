@@ -13,6 +13,7 @@
     "allow-tray-action",
     "allow-search",
     "allow-home-items",
+    "allow-toggle-pin",
     "allow-launch",
     "allow-reveal",
     "allow-copy-path",

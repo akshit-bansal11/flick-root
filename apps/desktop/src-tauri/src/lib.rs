@@ -93,6 +93,7 @@ pub fn run() {
             commands::ask::ask_stream,
             commands::ask::cancel_ask,
             commands::home::home_items,
+            commands::home::toggle_pin,
             commands::launch::launch,
             commands::launch::reveal,
             commands::launch::copy_path,

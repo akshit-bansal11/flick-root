@@ -7,6 +7,7 @@ fn main() {
         "tray_action",
         "search",
         "home_items",
+        "toggle_pin",
         "launch",
         "reveal",
         "copy_path",

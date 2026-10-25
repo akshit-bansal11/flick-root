@@ -69,6 +69,7 @@ fn settings_lacks_launcher_commands() {
         "web-search",
         "tray-action",
         "home-items",
+        "toggle-pin",
     ] {
         assert!(!p.contains(&format!("allow-{c}")), "settings has {c}");
     }
