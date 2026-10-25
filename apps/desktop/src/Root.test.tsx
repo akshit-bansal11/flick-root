@@ -97,7 +97,7 @@ describe("Root", () => {
   it("runs the chosen action through the tray_action command", async () => {
     const m = await mount();
     m.showMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: /Settings/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "settings" }));
     expect(ipc.trayAction).toHaveBeenCalledWith("settings");
   });
 
