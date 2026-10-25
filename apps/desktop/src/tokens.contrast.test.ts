@@ -63,7 +63,6 @@ function applies(selector: string, mode: Mode): boolean | null {
   return null;
 }
 
-
 /** All selectors have equal specificity, so source order is the cascade. */
 function declared(name: string, mode: Mode): string | undefined {
   let value: string | undefined;
@@ -139,8 +138,7 @@ describe("tokens.css contrast", () => {
   });
 
   it("only known selectors take part in the role cascade", () => {
-    const unknown = RULES.flatMap((r) => r.selectors)
-      .filter((s) => applies(s, "dark") === null);
+    const unknown = RULES.flatMap((r) => r.selectors).filter((s) => applies(s, "dark") === null);
     expect(unknown).toEqual([]);
   });
 
