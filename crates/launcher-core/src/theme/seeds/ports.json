@@ -147,5 +147,79 @@
     "sel": "#2c324a",
     "line": "#1b1e2e",
     "upstream": "https://raw.githubusercontent.com/enkia/tokyo-night-vscode-theme/master/themes/tokyo-night-storm-color-theme.json"
+  },
+  {
+    "id": "tokyo-night-day",
+    "name": "Tokyo Night Day",
+    "source": "port",
+    "bg": "#d6d8df",
+    "panel": "#e6e7ed",
+    "text": "#343b59",
+    "muted": "#707280",
+    "accent": "#426cb3",
+    "sel": "#e6e7ed",
+    "line": "#c1c2c7",
+    "upstream": "https://raw.githubusercontent.com/enkia/tokyo-night-vscode-theme/master/themes/tokyo-night-light-color-theme.json"
+  },
+  {
+    "id": "catppuccin-mocha",
+    "name": "Catppuccin Mocha",
+    "source": "port",
+    "bg": "#181825",
+    "panel": "#1e1e2e",
+    "text": "#cdd6f4",
+    "muted": "#cdd6f4",
+    "accent": "#cba6f7",
+    "sel": "#313244",
+    "upstream": "https://raw.githubusercontent.com/catppuccin/vscode/main/packages/catppuccin-vsc/src/theme/uiColors.ts"
+  },
+  {
+    "id": "catppuccin-macchiato",
+    "name": "Catppuccin Macchiato",
+    "source": "port",
+    "bg": "#1e2030",
+    "panel": "#24273a",
+    "text": "#cad3f5",
+    "muted": "#cad3f5",
+    "accent": "#c6a0f6",
+    "sel": "#363a4f",
+    "upstream": "https://raw.githubusercontent.com/catppuccin/vscode/main/packages/catppuccin-vsc/src/theme/uiColors.ts"
+  },
+  {
+    "id": "catppuccin-frappe",
+    "name": "Catppuccin Frappe",
+    "source": "port",
+    "bg": "#292c3c",
+    "panel": "#303446",
+    "text": "#c6d0f5",
+    "muted": "#c6d0f5",
+    "accent": "#ca9ee6",
+    "sel": "#414559",
+    "upstream": "https://raw.githubusercontent.com/catppuccin/vscode/main/packages/catppuccin-vsc/src/theme/uiColors.ts"
+  },
+  {
+    "id": "catppuccin-latte",
+    "name": "Catppuccin Latte",
+    "source": "port",
+    "bg": "#e6e9ef",
+    "panel": "#eff1f5",
+    "text": "#4c4f69",
+    "muted": "#4c4f69",
+    "accent": "#8839ef",
+    "sel": "#ccd0da",
+    "upstream": "https://raw.githubusercontent.com/catppuccin/vscode/main/packages/catppuccin-vsc/src/theme/uiColors.ts"
+  },
+  {
+    "id": "kanagawa-wave",
+    "name": "Kanagawa Wave",
+    "source": "port",
+    "bg": "#1f1f28",
+    "panel": "#1f1f28",
+    "text": "#dcd7ba",
+    "muted": "#dcd7ba",
+    "accent": "#2a2a37",
+    "sel": "#363646",
+    "line": "#16161d",
+    "upstream": "https://raw.githubusercontent.com/paccodes/kanagawa-vscode-theme/main/themes/kanagawa-wave-color-theme.json"
   }
 ]
