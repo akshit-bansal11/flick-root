@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { AddKeyDialog } from "./AddKeyDialog";
 import * as api from "./api";
+import { OnOff } from "./OnOff";
+import { SettingRow } from "./Row";
 import {
   errorText,
   type IntegrationPatch,
@@ -29,49 +31,63 @@ interface FieldProps {
   help?: string;
 }
 
-/** Text field with its own Save button, shown only once the value differs. */
+/** Text field with its own save button, shown only once the value differs. */
 function Field({ label, value, save, help }: FieldProps) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
-    <div className="pv-opts">
-      <label>
+    <div className="f-form">
+      <label className="f-field">
         {label}
-        <input value={v} onChange={(ev) => setV(ev.target.value)} />
+        <input className="s-input" value={v} onChange={(ev) => setV(ev.target.value)} />
       </label>
       {v !== value && (
-        <button type="button" onClick={() => save(v)}>
-          {`Save ${label.toLowerCase()}`}
-        </button>
+        <div className="s-add">
+          <button
+            type="button"
+            className="btn"
+            aria-label={`Save ${label.toLowerCase()}`}
+            onClick={() => save(v)}
+          >
+            save
+          </button>
+        </div>
       )}
-      {help && <p className="s-help">{help}</p>}
+      {help && <p className="s-prose">{help}</p>}
     </div>
   );
 }
 
-function KeyRow({
-  present,
-  host,
-  onAdd,
-  onDelete,
-}: {
+interface KeyButtonsProps {
+  title: string;
   present: boolean;
-  host: string;
   onAdd: () => void;
   onDelete: () => void;
-}) {
+}
+
+/** Add or replace, plus delete when a key is stored. Buttons only; the row shows the status. */
+function KeyButtons({ title, present, onAdd, onDelete }: KeyButtonsProps) {
   return (
-    <div className="pv-head">
-      <span className="s-help">{present ? `Stored for ${host}` : "Not set"}</span>
-      <button type="button" onClick={onAdd}>
-        {present ? "Replace key" : "Add key"}
+    <>
+      <button
+        type="button"
+        className="btn"
+        aria-label={`${present ? "Replace" : "Add"} key for ${title}`}
+        onClick={onAdd}
+      >
+        {present ? "replace" : "add key"}
       </button>
       {present && (
-        <button type="button" onClick={onDelete}>
-          Delete key
+        <button
+          type="button"
+          className="btn"
+          aria-label={`Delete key for ${title}`}
+          onClick={onDelete}
+        >
+          delete
         </button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -90,16 +106,22 @@ function TestButton({ id, label, name }: { id: string; label: string; name: stri
     }
   };
   return (
-    <div className="pv-head">
-      <button type="button" aria-label={`${label} ${name}`} disabled={busy} onClick={run}>
-        {label}
+    <>
+      <button
+        type="button"
+        className="btn"
+        aria-label={`${label} ${name}`}
+        disabled={busy}
+        onClick={run}
+      >
+        {label.toLowerCase()}
       </button>
       {res && (
         <span className={res.ok ? "s-help" : "s-error"} role={res.ok ? "status" : "alert"}>
           {res.text}
         </span>
       )}
-    </div>
+    </>
   );
 }
 
@@ -141,22 +163,44 @@ function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply })
       (e) => setErr(errorText(e)),
     );
   return (
-    <li className="pv-row">
-      <div className="pv-head">
-        <span className="pv-title">Spotify</span>
-        <span className="pv-stat" data-ok={connected}>
-          {connected ? (name ? `Connected as ${name}` : "connected") : "not connected"}
+    <>
+      <SettingRow
+        label="Spotify"
+        value={connected ? (name ? `Connected as ${name}` : "connected") : undefined}
+        hint="not connected"
+        preview={{
+          title: "# spotify",
+          body: 'Works without connecting: "play X on spotify" opens the Spotify app. Connecting is optional and unlocks more Spotify features, using your own Spotify developer app. Playing, queueing and moving playback need Spotify Premium.',
+        }}
+      >
+        <span className="s-add">
+          {connected ? (
+            <button
+              type="button"
+              className="btn"
+              aria-label="Disconnect Spotify"
+              onClick={disconnect}
+            >
+              disconnect
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn"
+              aria-label={busy ? undefined : "Connect Spotify"}
+              disabled={!v.client_id || busy}
+              onClick={connect}
+            >
+              {busy ? "waiting for the browser…" : "connect"}
+            </button>
+          )}
         </span>
-      </div>
-      <p className="s-help">
-        Works without connecting: "play X on spotify" opens the Spotify app. Connecting is optional
-        and unlocks more Spotify features, using your own Spotify developer app. Playing, queueing
-        and moving playback need Spotify Premium.
-      </p>
-      <ol className="s-help">
+      </SettingRow>
+      <ol className="s-prose">
         <li>Open the Spotify developer dashboard and create an app.</li>
         <li>
-          Add this redirect URI: <code>{v.redirect_uri}</code>
+          Add this redirect URI:{" "}
+          <code>{v.redirect_uri}</code>
         </li>
         <li>Copy the app's Client ID and paste it below.</li>
       </ol>
@@ -165,23 +209,12 @@ function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply })
         value={v.client_id}
         save={(x) => apply("spotify", { clientId: x })}
       />
-      <div className="pv-head">
-        {connected ? (
-          <button type="button" onClick={disconnect}>
-            Disconnect Spotify
-          </button>
-        ) : (
-          <button type="button" disabled={!v.client_id || busy} onClick={connect}>
-            {busy ? "Waiting for the browser…" : "Connect Spotify"}
-          </button>
-        )}
-      </div>
       {err && (
         <p className="s-error" role="alert">
           {err}
         </p>
       )}
-    </li>
+    </>
   );
 }
 
@@ -213,9 +246,9 @@ export function Integrations() {
 
   if (!v) {
     return (
-      <section className="pv-shell" aria-label="Integrations">
+      <section aria-label="Integrations">
         <h1 className="s-title">Integrations</h1>
-        <p className="s-help" role={err ? "alert" : undefined}>
+        <p className="s-prose" role={err ? "alert" : undefined}>
           {err ?? "Loading…"}
         </p>
       </section>
@@ -226,9 +259,9 @@ export function Integrations() {
   const hookName = (name: string, host: string) => `integration.webhook.${name}@${host}`;
 
   return (
-    <section className="pv-shell" aria-label="Integrations">
+    <section aria-label="Integrations">
       <h1 className="s-title">Integrations</h1>
-      <p className="s-desc">
+      <p className="s-desc s-prose">
         Nothing here is required. Each integration uses your own account and credentials, which are
         stored in Windows Credential Manager and sent only to their own host.
       </p>
@@ -238,26 +271,21 @@ export function Integrations() {
         </p>
       )}
 
-      <h2 className="pv-group">Media</h2>
-      <ul>
-        <Spotify v={v.spotify} apply={apply} />
-        <li className="pv-row">
-          <div className="pv-head">
-            <input
-              type="checkbox"
-              aria-label="Use the YouTube API"
-              checked={v.youtube_use_api}
-              onChange={(ev) => apply("youtube", { enabled: ev.target.checked })}
-            />
-            <span className="pv-title">YouTube</span>
-          </div>
-          <p className="s-help">
-            Optional. With your own YouTube Data API key, "play X on youtube" opens the first result
-            instead of the search page.
-          </p>
-          <KeyRow
+      <h2 className="sec"># media</h2>
+      <Spotify v={v.spotify} apply={apply} />
+      <SettingRow
+        label="YouTube"
+        value={v.youtube_key_present ? `Stored for ${YOUTUBE_HOST}` : undefined}
+        hint="no key"
+        preview={{
+          title: "# youtube",
+          body: 'Optional. With your own YouTube Data API key, "play X on youtube" opens the first result instead of the search page.',
+        }}
+      >
+        <span className="s-add">
+          <KeyButtons
+            title="YouTube"
             present={v.youtube_key_present}
-            host={YOUTUBE_HOST}
             onAdd={() =>
               setDialog({
                 title: "YouTube",
@@ -268,51 +296,81 @@ export function Integrations() {
             }
             onDelete={() => del(youtube)}
           />
-        </li>
-      </ul>
+          <OnOff
+            checked={v.youtube_use_api}
+            label="Use the YouTube API"
+            onChange={(on) => void apply("youtube", { enabled: on })}
+          />
+        </span>
+      </SettingRow>
 
-      <h2 className="pv-group">Quick capture</h2>
-      <ul>
-        <li className="pv-row">
-          <span className="pv-title">Obsidian</span>
-          <Field
-            label="Vault folder"
-            value={v.obsidian_vault}
-            save={(x) => apply("obsidian", { vault: x })}
-            help="An existing folder on this PC."
-          />
-          <Field
-            label="Daily note folder"
-            value={v.obsidian_daily_folder}
-            save={(x) => apply("obsidian", { dailyFolder: x })}
-            help="Relative to the vault. Leave empty for the vault root."
-          />
-          <Field
-            label="Daily note format"
-            value={v.obsidian_daily_format}
-            save={(x) => apply("obsidian", { dailyFormat: x })}
-          />
-          {v.obsidian_vault && <TestButton id="obsidian" label="Test" name="Obsidian" />}
-        </li>
-        <li className="pv-row">
-          <span className="pv-title">Markdown file</span>
-          <Field
-            label="Markdown file"
-            value={v.markdown_file}
-            save={(x) => apply("markdown", { file: x })}
-            help="Notes are appended here. The file's folder must exist."
-          />
-          {v.markdown_file && <TestButton id="markdown" label="Test" name="Markdown file" />}
-        </li>
-        <li className="pv-row">
-          <span className="pv-title">Notion</span>
-          <p className="s-help">
-            Create an internal integration in Notion, share your database with it, then add its
-            token here.
-          </p>
-          <KeyRow
+      <h2 className="sec"># quick capture</h2>
+      <SettingRow
+        label="Obsidian"
+        value={v.obsidian_vault || undefined}
+        hint="no vault"
+        preview={{
+          title: "# obsidian",
+          body: "Appends quick-capture notes to the daily note in your vault.",
+        }}
+      >
+        {v.obsidian_vault && (
+          <span className="s-add">
+            <TestButton id="obsidian" label="Test" name="Obsidian" />
+          </span>
+        )}
+      </SettingRow>
+      <Field
+        label="Vault folder"
+        value={v.obsidian_vault}
+        save={(x) => apply("obsidian", { vault: x })}
+        help="An existing folder on this PC."
+      />
+      <Field
+        label="Daily note folder"
+        value={v.obsidian_daily_folder}
+        save={(x) => apply("obsidian", { dailyFolder: x })}
+        help="Relative to the vault. Leave empty for the vault root."
+      />
+      <Field
+        label="Daily note format"
+        value={v.obsidian_daily_format}
+        save={(x) => apply("obsidian", { dailyFormat: x })}
+      />
+      <SettingRow
+        label="Markdown file"
+        value={v.markdown_file || undefined}
+        hint="no file"
+        preview={{
+          title: "# markdown file",
+          body: "Notes are appended here. The file's folder must exist.",
+        }}
+      >
+        {v.markdown_file && (
+          <span className="s-add">
+            <TestButton id="markdown" label="Test" name="Markdown file" />
+          </span>
+        )}
+      </SettingRow>
+      <Field
+        label="Markdown file"
+        value={v.markdown_file}
+        save={(x) => apply("markdown", { file: x })}
+        help="Notes are appended here. The file's folder must exist."
+      />
+      <SettingRow
+        label="Notion"
+        value={v.notion_token_present ? `Stored for ${NOTION_HOST}` : undefined}
+        hint="no token"
+        preview={{
+          title: "# notion",
+          body: "Create an internal integration in Notion, share your database with it, then add its token here.",
+        }}
+      >
+        <span className="s-add">
+          <KeyButtons
+            title="Notion"
             present={v.notion_token_present}
-            host={NOTION_HOST}
             onAdd={() =>
               setDialog({
                 title: "Notion",
@@ -323,90 +381,100 @@ export function Integrations() {
             }
             onDelete={() => del(notion)}
           />
-          <Field
-            label="Notion database ID"
-            value={v.notion_database_id}
-            save={(x) => apply("notion", { databaseId: x })}
-          />
           {v.notion_token_present && v.notion_database_id && (
             <TestButton id="notion" label="Test" name="Notion" />
           )}
-        </li>
-        <li className="pv-row">
-          <span className="pv-title">Webhooks</span>
-          <p className="s-help">
-            The webhook URL is a secret, so it is stored like a key. Enter the host first, then add
-            the URL. "Send test" posts one test message to it.
-          </p>
-          <ul>
-            {v.webhooks.map((w) => (
-              <li key={w.name} className="pv-head">
-                <input
-                  type="checkbox"
-                  aria-label={`Enable webhook ${w.name}`}
-                  checked={w.enabled}
-                  onChange={(ev) => apply("webhook", { name: w.name, enabled: ev.target.checked })}
-                />
-                <span className="pv-title">{w.name}</span>
-                <span className="pv-stat" data-ok={w.url_present}>
-                  {w.url_present ? `URL stored for ${w.host}` : `no URL (${w.host})`}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`${w.url_present ? "Replace" : "Add"} URL for ${w.name}`}
-                  onClick={() =>
-                    setDialog({
-                      title: `webhook ${w.name}`,
-                      host: w.host,
-                      name: hookName(w.name, w.host),
-                      replace: w.url_present,
-                    })
-                  }
-                >
-                  {w.url_present ? "Replace URL" : "Add URL"}
-                </button>
-                {w.url_present && w.enabled && (
-                  <TestButton id={`webhook.${w.name}`} label="Send test" name={w.name} />
-                )}
-                <button
-                  type="button"
-                  aria-label={`Remove webhook ${w.name}`}
-                  onClick={() => apply("webhook", { name: w.name, remove: true })}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-          <div className="pv-opts">
-            <label>
-              Webhook name
-              <input
-                value={hook.name}
-                onChange={(ev) => setHook({ ...hook, name: ev.target.value })}
-              />
-            </label>
-            <label>
-              Webhook host
-              <input
-                value={hook.host}
-                placeholder="hooks.example.com"
-                onChange={(ev) => setHook({ ...hook, host: ev.target.value })}
-              />
-            </label>
+        </span>
+      </SettingRow>
+      <Field
+        label="Notion database ID"
+        value={v.notion_database_id}
+        save={(x) => apply("notion", { databaseId: x })}
+      />
+
+      <h2 className="sec"># webhooks</h2>
+      <p className="s-prose">
+        The webhook URL is a secret, so it is stored like a key. Enter the host first, then add the
+        URL. "Send test" posts one test message to it.
+      </p>
+      {v.webhooks.map((w) => (
+        <SettingRow
+          key={w.name}
+          label={w.name}
+          value={w.url_present ? `URL stored for ${w.host}` : undefined}
+          hint={`no URL (${w.host})`}
+          preview={{
+            title: `# webhook ${w.name}`,
+            body: `Posts quick-capture notes to ${w.host}. The URL is stored like a key and never shown.`,
+          }}
+        >
+          <span className="s-add">
             <button
               type="button"
-              disabled={!hook.name || !hook.host}
-              onClick={async () => {
-                await apply("webhook", hook);
-                setHook({ name: "", host: "" });
-              }}
+              className="btn"
+              aria-label={`${w.url_present ? "Replace" : "Add"} URL for ${w.name}`}
+              onClick={() =>
+                setDialog({
+                  title: `webhook ${w.name}`,
+                  host: w.host,
+                  name: hookName(w.name, w.host),
+                  replace: w.url_present,
+                })
+              }
             >
-              Add webhook
+              {w.url_present ? "replace url" : "add url"}
             </button>
-          </div>
-        </li>
-      </ul>
+            {w.url_present && w.enabled && (
+              <TestButton id={`webhook.${w.name}`} label="Send test" name={w.name} />
+            )}
+            <button
+              type="button"
+              className="btn"
+              aria-label={`Remove webhook ${w.name}`}
+              onClick={() => apply("webhook", { name: w.name, remove: true })}
+            >
+              remove
+            </button>
+            <OnOff
+              checked={w.enabled}
+              label={`Enable webhook ${w.name}`}
+              onChange={(on) => void apply("webhook", { name: w.name, enabled: on })}
+            />
+          </span>
+        </SettingRow>
+      ))}
+      <div className="f-form">
+        <label className="f-field">
+          Webhook name
+          <input
+            className="s-input"
+            value={hook.name}
+            onChange={(ev) => setHook({ ...hook, name: ev.target.value })}
+          />
+        </label>
+        <label className="f-field">
+          Webhook host
+          <input
+            className="s-input"
+            value={hook.host}
+            placeholder="hooks.example.com"
+            onChange={(ev) => setHook({ ...hook, host: ev.target.value })}
+          />
+        </label>
+        <div className="s-add">
+          <button
+            type="button"
+            className="btn pri"
+            disabled={!hook.name || !hook.host}
+            onClick={async () => {
+              await apply("webhook", hook);
+              setHook({ name: "", host: "" });
+            }}
+          >
+            add webhook
+          </button>
+        </div>
+      </div>
 
       {dialog && (
         <AddKeyDialog

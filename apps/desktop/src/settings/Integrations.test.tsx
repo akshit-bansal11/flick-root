@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -48,9 +48,10 @@ afterEach(() => {
 describe("Integrations", () => {
   it("renders every section and the redirect URI", async () => {
     await mount();
-    for (const t of ["Spotify", "YouTube", "Obsidian", "Markdown file", "Notion", "Webhooks"]) {
+    for (const t of ["Spotify", "YouTube", "Obsidian", "Markdown file", "Notion"]) {
       expect(screen.getAllByText(t).length).toBeGreaterThan(0);
     }
+    expect(screen.getByRole("heading", { name: "# webhooks" })).toBeTruthy();
     expect(screen.getByText("http://127.0.0.1:43919/callback")).toBeTruthy();
     const connect = screen.getByRole("button", { name: "Connect Spotify" }) as HTMLButtonElement;
     expect(connect.disabled).toBe(true);
@@ -68,7 +69,7 @@ describe("Integrations", () => {
   it("Notion Add key opens the dialog and saves under the bound name", async () => {
     await mount();
     await act(async () => {
-      fireEvent.click(screen.getAllByRole("button", { name: "Add key" })[1] as HTMLElement);
+      fireEvent.click(screen.getByRole("button", { name: "Add key for Notion" }));
     });
     fireEvent.change(screen.getByLabelText("API key"), { target: { value: "ntn-test" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /understand/ }));
@@ -87,7 +88,7 @@ describe("Integrations", () => {
     fireEvent.change(screen.getByLabelText("Webhook name"), { target: { value: "deploy" } });
     fireEvent.change(screen.getByLabelText("Webhook host"), { target: { value: "x.test" } });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Add webhook" }));
+      fireEvent.click(screen.getByRole("button", { name: "add webhook" }));
     });
     expect(api.setIntegration).toHaveBeenCalledWith("webhook", { name: "deploy", host: "x.test" });
 
@@ -124,6 +125,15 @@ describe("Integrations", () => {
       fireEvent.click(screen.getByRole("button", { name: "Disconnect Spotify" }));
     });
     expect(api.disconnectSpotify).toHaveBeenCalled();
+  });
+
+  it("Use the YouTube API toggle calls setIntegration", async () => {
+    await mount();
+    const group = screen.getByRole("group", { name: "Use the YouTube API" });
+    await act(async () => {
+      fireEvent.click(within(group).getByRole("button", { name: "on" }));
+    });
+    expect(api.setIntegration).toHaveBeenCalledWith("youtube", { enabled: true });
   });
 
   it("explains a busy port", async () => {
