@@ -73,5 +73,79 @@
     "sel": "#f3e6bc",
     "line": "#ebdbb2",
     "upstream": "https://raw.githubusercontent.com/jdinhify/vscode-theme-gruvbox/main/src/colors/base.ts"
+  },
+  {
+    "id": "solarized-dark",
+    "name": "Solarized Dark",
+    "source": "port",
+    "bg": "#00212b",
+    "panel": "#002b36",
+    "text": "#839496",
+    "muted": "#839496",
+    "accent": "#197271",
+    "sel": "#005a6f",
+    "upstream": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-solarized-dark/themes/solarized-dark-color-theme.json"
+  },
+  {
+    "id": "solarized-light",
+    "name": "Solarized Light",
+    "source": "port",
+    "bg": "#eee8d5",
+    "panel": "#fdf6e3",
+    "text": "#657b83",
+    "muted": "#657b83",
+    "accent": "#ac9d57",
+    "sel": "#dfca88",
+    "upstream": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-solarized-light/themes/solarized-light-color-theme.json"
+  },
+  {
+    "id": "everforest-dark",
+    "name": "Everforest Dark",
+    "source": "port",
+    "bg": "#2d353b",
+    "panel": "#2d353b",
+    "text": "#d3c6aa",
+    "muted": "#859289",
+    "accent": "#a7c080",
+    "sel": "#3a444a",
+    "upstream": "https://raw.githubusercontent.com/sainnhe/everforest-vscode/master/themes/everforest-dark.json"
+  },
+  {
+    "id": "everforest-light",
+    "name": "Everforest Light",
+    "source": "port",
+    "bg": "#fdf6e3",
+    "panel": "#fdf6e3",
+    "text": "#5c6a72",
+    "muted": "#939f91",
+    "accent": "#93b259",
+    "sel": "#f1ecd7",
+    "upstream": "https://raw.githubusercontent.com/sainnhe/everforest-vscode/master/themes/everforest-light.json"
+  },
+  {
+    "id": "tokyo-night",
+    "name": "Tokyo Night",
+    "source": "port",
+    "bg": "#16161e",
+    "panel": "#1a1b26",
+    "text": "#a9b1d6",
+    "muted": "#515670",
+    "accent": "#385191",
+    "sel": "#202330",
+    "line": "#101014",
+    "upstream": "https://raw.githubusercontent.com/enkia/tokyo-night-vscode-theme/master/themes/tokyo-night-color-theme.json"
+  },
+  {
+    "id": "tokyo-night-storm",
+    "name": "Tokyo Night Storm",
+    "source": "port",
+    "bg": "#1f2335",
+    "panel": "#24283b",
+    "text": "#a9b1d6",
+    "muted": "#545c7e",
+    "accent": "#3a5293",
+    "sel": "#2c324a",
+    "line": "#1b1e2e",
+    "upstream": "https://raw.githubusercontent.com/enkia/tokyo-night-vscode-theme/master/themes/tokyo-night-storm-color-theme.json"
   }
 ]
