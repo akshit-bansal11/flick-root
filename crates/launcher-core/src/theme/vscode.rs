@@ -109,9 +109,10 @@ pub fn strip_jsonc(src: &str) -> Result<String, ThemeError> {
                 out.push(c);
             }
             State::LineComment => {
-                if c == '\n' {
+                // CR alone also ends a line (classic Mac line endings).
+                if c == '\n' || c == '\r' {
                     state = State::Code;
-                    out.push('\n');
+                    out.push(c);
                 }
             }
             State::BlockComment => {
@@ -136,8 +137,14 @@ pub fn strip_jsonc(src: &str) -> Result<String, ThemeError> {
     }
 }
 
-/// Lowercase `[a-z0-9-]` slug of `name`: at most 40 bytes, never empty, no dots or separators.
+/// Lowercase `[a-z0-9-]` slug of `name`: at most 40 bytes, never empty, no dots or separators,
+/// never a bare Windows device name (`con`, `com1`, ...; those get `-theme` appended).
 pub fn slug(name: &str) -> String {
+    slug_opt(name).unwrap_or_else(|| "theme".to_owned())
+}
+
+/// [`slug`] without the generic fallback: `None` when `name` has no ASCII letters or digits.
+fn slug_opt(name: &str) -> Option<String> {
     let mut out = String::new();
     for c in name.chars() {
         if out.len() >= MAX_SLUG {
@@ -151,15 +158,46 @@ pub fn slug(name: &str) -> String {
     }
     let trimmed = out.trim_end_matches('-');
     if trimmed.is_empty() {
-        "theme".to_owned()
+        None
+    } else if is_device_name(trimmed) {
+        // At most 4 bytes + 6, well under MAX_SLUG.
+        Some(format!("{trimmed}-theme"))
     } else {
-        trimmed.to_owned()
+        Some(trimmed.to_owned())
     }
 }
 
-/// Control characters removed, trimmed, at most 80 characters.
+/// Windows reserved device names, for a lowercase ASCII slug (it never contains a dot, so the
+/// whole slug is the file name part of `<slug>.json`).
+fn is_device_name(s: &str) -> bool {
+    matches!(s, "con" | "prn" | "aux" | "nul")
+        || (s.len() == 4
+            && (s.starts_with("com") || s.starts_with("lpt"))
+            && s.as_bytes()[3].is_ascii_digit())
+}
+
+/// Format and invisible characters that can hide or reorder text (soft hyphen, bidi controls,
+/// zero-width spaces and joiners, BOM).
+fn is_invisible(c: char) -> bool {
+    matches!(
+        c,
+        '\u{ad}'
+            | '\u{61c}'
+            | '\u{180e}'
+            | '\u{200b}'..='\u{200f}'
+            | '\u{2028}'..='\u{202e}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{feff}'
+    )
+}
+
+/// Control and invisible characters removed, trimmed, at most 80 characters.
 fn clean_name(raw: &str) -> String {
-    let kept: String = raw.chars().filter(|c| !c.is_control()).collect();
+    let kept: String = raw
+        .chars()
+        .filter(|&c| !c.is_control() && !is_invisible(c))
+        .collect();
     let short: String = kept.trim().chars().take(MAX_NAME).collect();
     short.trim_end().to_owned()
 }
@@ -245,9 +283,12 @@ pub fn parse(src: &str, file_stem: &str) -> Result<VsImport, ThemeError> {
         .map(clean_name)
         .find(|n| !n.is_empty())
         .unwrap_or_else(|| "Imported theme".to_owned());
+    let id = slug_opt(&name)
+        .or_else(|| slug_opt(file_stem))
+        .unwrap_or_else(|| slug(""));
 
     let seed = Seed {
-        id: format!("imported:{}", slug(&name)),
+        id: format!("imported:{id}"),
         name: format!("{name} (imported)"),
         source: Source::Imported,
         bg: to_hex(bg),
@@ -390,14 +431,19 @@ mod tests {
 
     #[test]
     fn deep_nesting_is_an_error_not_a_crash() {
-        let deep = format!("{}{}", "[".repeat(10_000), "]".repeat(10_000));
-        assert!(matches!(parse(&deep, "f"), Err(ThemeError::Json(_))));
+        // Valid JSON throughout, so only serde_json's recursion limit can reject it.
+        let is_depth = |r: Result<VsImport, ThemeError>| match r {
+            Err(ThemeError::Json(e)) => e.to_string().contains("recursion limit exceeded"),
+            _ => false,
+        };
+        let deep = format!("{}0{}", "[".repeat(10_000), "]".repeat(10_000));
+        assert!(is_depth(parse(&deep, "f")));
         let deep_obj = format!(
-            r#"{{"colors": {{"x": {}{}}}}}"#,
+            r#"{{"colors": {{"x": {}0{}}}}}"#,
             r#"{"a":"#.repeat(10_000),
             "}".repeat(10_000)
         );
-        assert!(matches!(parse(&deep_obj, "f"), Err(ThemeError::Json(_))));
+        assert!(is_depth(parse(&deep_obj, "f")));
     }
 
     #[test]
@@ -433,13 +479,14 @@ mod tests {
     #[test]
     fn alpha_is_blended_onto_panel() {
         let src = theme(
-            r##""editor.background": "#000000", "editor.foreground": "#ffffff80",
+            r##""editor.background": "#202020", "editor.foreground": "#ffffff80",
                 "list.activeSelectionBackground": "#ffffff33""##,
         );
         let imp = parse(&src, "f").unwrap();
-        // 0x80 / 255 of white over black rounds to 128; 0x33 / 255 is exactly 0.2 -> 51.
-        assert_eq!(imp.seed.text, "#808080");
-        assert_eq!(imp.seed.sel.as_deref(), Some("#333333"));
+        // 32 + 223 * 128/255 = 143.94 -> 144 (0x90); 32 + 223 * 0.2 = 76.6 -> 77 (0x4d).
+        // Onto black these would be #808080 and #333333.
+        assert_eq!(imp.seed.text, "#909090");
+        assert_eq!(imp.seed.sel.as_deref(), Some("#4d4d4d"));
         assert!(imp.notes.is_empty());
     }
 
@@ -516,6 +563,70 @@ mod tests {
         assert_eq!(imp.seed.id.len(), "imported:".len() + MAX_SLUG);
         let mixed = format!(r#"{{"name": "Night\nOwl\u001b", "colors": {{{BASE}}}}}"#);
         assert_eq!(parse(&mixed, "f").unwrap().seed.name, "NightOwl (imported)");
+    }
+
+    #[test]
+    fn device_names_never_bare() {
+        for (name, want) in [
+            ("COM1", "com1-theme"),
+            ("con", "con-theme"),
+            ("Lpt9", "lpt9-theme"),
+            ("nul", "nul-theme"),
+            ("aux!", "aux-theme"),
+            ("console", "console"),
+            ("com10", "com10"),
+        ] {
+            assert_eq!(slug(name), want, "{name}");
+        }
+        let src = format!(r#"{{"name": "PRN", "colors": {{{BASE}}}}}"#);
+        assert_eq!(parse(&src, "f").unwrap().seed.id, "imported:prn-theme");
+    }
+
+    #[test]
+    fn invisible_chars_stripped_from_name() {
+        let zw = format!(r#"{{"name": "​", "colors": {{{BASE}}}}}"#);
+        let imp = parse(&zw, "my-theme").unwrap();
+        assert_eq!(imp.seed.name, "my-theme (imported)");
+        let bidi = format!(r#"{{"name": "Nord‮", "colors": {{{BASE}}}}}"#);
+        assert_eq!(parse(&bidi, "f").unwrap().seed.name, "Nord (imported)");
+    }
+
+    #[test]
+    fn non_ascii_name_slugs_from_stem() {
+        let src = format!(r#"{{"name": "東京の夜", "colors": {{{BASE}}}}}"#);
+        let imp = parse(&src, "tokyo-night").unwrap();
+        assert_eq!(imp.seed.id, "imported:tokyo-night");
+        assert_eq!(imp.seed.name, "東京の夜 (imported)");
+        assert_eq!(parse(&src, "東京").unwrap().seed.id, "imported:theme");
+    }
+
+    #[test]
+    fn line_comment_ends_at_cr() {
+        let src = format!("{{\"name\":\"x\"// c\r,\"colors\":{{{BASE}}}}}");
+        assert!(strip_jsonc(&src).unwrap().contains("\r,\"colors\""));
+        assert_eq!(parse(&src, "f").unwrap().seed.panel, "#1a1b26");
+    }
+
+    #[test]
+    fn name_cap_counts_chars_not_bytes() {
+        let named = |n: usize| format!(r#"{{"name": "{}", "colors": {{{BASE}}}}}"#, "é".repeat(n));
+        let want = format!("{} (imported)", "é".repeat(MAX_NAME));
+        assert_eq!(parse(&named(MAX_NAME), "f").unwrap().seed.name, want);
+        assert_eq!(parse(&named(MAX_NAME + 1), "f").unwrap().seed.name, want);
+    }
+
+    #[test]
+    fn size_cap_counts_bytes_not_chars() {
+        let base = format!(r#"{{"name": "", "colors": {{{BASE}}}}}"#);
+        let fill = MAX_BYTES - base.len();
+        let name = format!("{}{}", "é".repeat(fill / 2), " ".repeat(fill % 2));
+        let exact = format!(r#"{{"name": "{name}", "colors": {{{BASE}}}}}"#);
+        assert_eq!(exact.len(), MAX_BYTES);
+        assert!(parse(&exact, "f").is_ok());
+        let over = format!("{exact} ");
+        assert_eq!(over.len(), MAX_BYTES + 1);
+        assert!(over.chars().count() < MAX_BYTES);
+        assert!(matches!(parse(&over, "f"), Err(ThemeError::TooLarge)));
     }
 
     #[test]
