@@ -91,10 +91,22 @@ const FEATURES: Feature[] = [
   },
   {
     title: "Themes",
-    line: "A glass look with a gliding selection lens. Glass, Frost, Midnight, Aurora, Ember or Solid, with adjustable glass strength.",
-    example: "Settings, Appearance",
+    line: "A flat, monospace look. Dozens of ported editor themes plus its own defaults, with separate dark and light picks.",
+    example: "> theme",
     since: "v0.0.1",
     doc: "appearance",
+  },
+  {
+    title: "Mode tabs",
+    line: "A tab strip above the results: all, or one tab per prefix. Ctrl Tab moves to the next mode.",
+    example: "ctrl tab",
+    since: "v0.0.1",
+  },
+  {
+    title: "Pins and recents",
+    line: "Pin the rows you reach for first; recent picks are one keystroke away.",
+    example: "ctrl p",
+    since: "v0.0.1",
   },
   {
     title: "Tutorial",

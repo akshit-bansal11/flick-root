@@ -9,58 +9,94 @@ export const PREFIX: Record<string, Exclude<Mode, "none">> = {
 
 export interface Item {
   title: string;
+  /** Where it lives or what it does; shown on the right of the row and as a detail fact. */
   sub: string;
+  /** Group header the row sits under. */
+  group: string;
   /** Lowercase search text. */
   keys: string;
 }
 
 const APPS: Item[] = [
-  { title: "Visual Studio Code", sub: "App", keys: "visual studio code vscode" },
-  { title: "Spotify", sub: "App", keys: "spotify spo" },
-  { title: "Windows Terminal", sub: "App", keys: "windows terminal wt" },
+  { title: "Visual Studio Code", sub: "App", group: "apps", keys: "visual studio code vscode" },
+  { title: "Spotify", sub: "App", group: "apps", keys: "spotify spo" },
+  { title: "Windows Terminal", sub: "App", group: "apps", keys: "windows terminal wt" },
 ];
 
 const COMMANDS: Item[] = [
-  { title: "Lock", sub: "System command", keys: "lock" },
-  { title: "Sleep", sub: "System command", keys: "sleep" },
-  { title: "Search Google for cats", sub: "Web shortcut", keys: "g cats" },
+  { title: "Lock", sub: "System command", group: "system", keys: "lock" },
+  { title: "Sleep", sub: "System command", group: "system", keys: "sleep" },
+  { title: "Search Google for cats", sub: "Web shortcut", group: "web", keys: "g cats" },
 ];
 
 export const ITEMS: Record<Exclude<Mode, "none">, Item[]> = {
   Open: [
     ...APPS,
-    { title: "report-q3.docx", sub: "C:\\Users\\you\\Documents", keys: "report q3 docx" },
-    { title: "invoice-march.pdf", sub: "C:\\Users\\you\\Downloads", keys: "invoice march pdf" },
-    { title: "projects", sub: "D:\\", keys: "projects" },
+    {
+      title: "report-q3.docx",
+      sub: "C:\Users\you\Documents",
+      group: "files",
+      keys: "report q3 docx",
+    },
+    {
+      title: "invoice-march.pdf",
+      sub: "C:\Users\you\Downloads",
+      group: "files",
+      keys: "invoice march pdf",
+    },
+    { title: "projects", sub: "D:\\", group: "folders", keys: "projects" },
   ],
   Commands: COMMANDS,
   Calc: [
-    { title: "2.5 kg to lb → 5.51 lb", sub: "Units", keys: "2.5 kg to lb" },
-    { title: "250 usd in inr", sub: "Currency", keys: "250 usd in inr" },
+    { title: "2.5 kg to lb = 5.51 lb", sub: "Units", group: "results", keys: "2.5 kg to lb" },
+    { title: "250 usd in inr", sub: "Currency", group: "results", keys: "250 usd in inr" },
   ],
-  Ask: [{ title: "Ask the provider you chose", sub: "Local or your own key", keys: "" }],
+  Ask: [
+    {
+      title: "Ask the provider you chose",
+      sub: "Local or your own key",
+      group: "ask",
+      keys: "",
+    },
+  ],
   Projects: [
-    { title: "flick", sub: "D:\\projects\\flick", keys: "flick" },
-    { title: "notes-app", sub: "D:\\projects\\notes-app", keys: "notes app" },
+    { title: "flick", sub: "D:\projects\flick", group: "projects", keys: "flick" },
+    { title: "notes-app", sub: "D:\projects\notes-app", group: "projects", keys: "notes app" },
   ],
 };
 
 /** Empty bar with no prefix: the prefix list. */
 const PREFIX_LIST: Item[] = [
-  { title: "/ Open", sub: "Apps, programs, files, folders", keys: "" },
-  { title: "> Commands", sub: "System, web, media, ports, capture", keys: "" },
-  { title: "= Calc", sub: "Math, units, currency, time zones", keys: "" },
-  { title: "? Ask", sub: "Your AI provider", keys: "" },
-  { title: "@ Projects", sub: "Folders you code in", keys: "" },
+  { title: "/ Open", sub: "Apps, programs, files, folders", group: "prefixes", keys: "" },
+  { title: "> Commands", sub: "System, web, media, ports, capture", group: "prefixes", keys: "" },
+  { title: "= Calc", sub: "Math, units, currency, time zones", group: "prefixes", keys: "" },
+  { title: "? Ask", sub: "Your AI provider", group: "prefixes", keys: "" },
+  { title: "@ Projects", sub: "Folders you code in", group: "prefixes", keys: "" },
 ];
 
 const fallbacks = (q: string): Item[] => [
-  { title: `Find files named “${q}”`, sub: "Search instead", keys: "" },
-  { title: `Search Google for “${q}”`, sub: "Search instead", keys: "" },
-  { title: `Ask your AI: “${q}”`, sub: "Search instead", keys: "" },
+  { title: `Find files named “${q}”`, sub: "Search instead", group: "fallback", keys: "" },
+  { title: `Search Google for “${q}”`, sub: "Search instead", group: "fallback", keys: "" },
+  { title: `Ask your AI: “${q}”`, sub: "Search instead", group: "fallback", keys: "" },
 ];
 
 export const SCRIPT = ["spo", "/ report", "= 2.5 kg to lb", "> lock", "@ flick"];
+
+/** Tab strip order: `all` first, then one tab per prefix. */
+export const TABS: { mode: Mode; label: string; key: string }[] = [
+  { mode: "none", label: "all", key: "" },
+  ...Object.entries(PREFIX).map(([key, mode]) => ({ mode, label: mode.toLowerCase(), key })),
+];
+
+/** Primary action word per mode. Every row also offers pin. */
+export const PRIMARY: Record<Mode, string> = {
+  none: "open",
+  Open: "open",
+  Commands: "run",
+  Calc: "copy result",
+  Ask: "ask",
+  Projects: "open in editor",
+};
 
 /** Splits typed text into its leading prefix mode and the rest. */
 export function parse(text: string): [Mode, string] {
