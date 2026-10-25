@@ -49,6 +49,10 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 | ayu-mirage | Ayu Mirage | https://github.com/ayu-theme/vscode-ayu | https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/ayu-mirage.json | MIT | https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/LICENSE | Copyright (c) 2016 Ike Kurghinyan; colour values generated from ayu-theme/ayu-colors, Copyright (c) Konstantin Pschera <me@kons.ch> (kons.ch) (MIT, https://raw.githubusercontent.com/ayu-theme/ayu-colors/master/license) |
 | ayu-light | Ayu Light | https://github.com/ayu-theme/vscode-ayu | https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/ayu-light.json | MIT | https://raw.githubusercontent.com/ayu-theme/vscode-ayu/master/LICENSE | Copyright (c) 2016 Ike Kurghinyan; colour values generated from ayu-theme/ayu-colors, Copyright (c) Konstantin Pschera <me@kons.ch> (kons.ch) (MIT, https://raw.githubusercontent.com/ayu-theme/ayu-colors/master/license) |
 | dark-modern | Dark Modern | https://github.com/microsoft/vscode | https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/themes/dark_modern.json | MIT | https://raw.githubusercontent.com/microsoft/vscode/main/LICENSE.txt | Copyright (c) 2015 - present Microsoft Corporation |
+| light-modern | Light Modern | https://github.com/microsoft/vscode | https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/themes/light_modern.json | MIT | https://raw.githubusercontent.com/microsoft/vscode/main/LICENSE.txt | Copyright (c) 2015 - present Microsoft Corporation |
+| night-owl | Night Owl | https://github.com/sdras/night-owl-vscode-theme | https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/themes/Night%20Owl-color-theme.json | MIT | https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/LICENSE.md | Copyright (c) 2018 Sarah Drasner |
+| light-owl | Light Owl | https://github.com/sdras/night-owl-vscode-theme | https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/themes/Night%20Owl-Light-color-theme.json | MIT | https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/LICENSE.md | Copyright (c) 2018 Sarah Drasner |
+| cobalt2 | Cobalt2 | https://github.com/wesbos/cobalt2-vscode | https://raw.githubusercontent.com/wesbos/cobalt2-vscode/master/theme/cobalt2.json | MIT | https://raw.githubusercontent.com/wesbos/cobalt2-vscode/master/LICENSE | Copyright (c) 2018 Wes Bos, Roberto Achar |
 
 ## Not included
 
@@ -59,5 +63,7 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 - Material Palenight: licence not attribution-only or unverified; owner rule.
 - Material Ocean: licence not attribution-only or unverified; owner rule.
 - Mariana: licence not attribution-only or unverified; owner rule.
+- Shades of Purple: the LICENSE.md is MIT text plus a "With condition" clause ("Any thing you build with this should also be MIT licensed"), so it is not plain MIT; owner rule.
+- SynthWave '84: MIT (Copyright (c) 2019 Robb Owen), but the theme file defines no `editor.foreground`, so the text colour has no source in the mapping and nothing is guessed.
 
 Paid themes (Monokai Pro, Dracula Pro) are never used.

@@ -373,5 +373,57 @@
     "accent": "#0078d4",
     "line": "#2b2b2b",
     "upstream": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/themes/dark_modern.json"
+  },
+  {
+    "id": "light-modern",
+    "name": "Light Modern",
+    "source": "port",
+    "bg": "#f8f8f8",
+    "panel": "#ffffff",
+    "text": "#3b3b3b",
+    "muted": "#3b3b3b",
+    "accent": "#005fb8",
+    "sel": "#e8e8e8",
+    "line": "#e5e5e5",
+    "upstream": "https://raw.githubusercontent.com/microsoft/vscode/main/extensions/theme-defaults/themes/light_modern.json"
+  },
+  {
+    "id": "night-owl",
+    "name": "Night Owl",
+    "source": "port",
+    "bg": "#011627",
+    "panel": "#011627",
+    "text": "#d6deeb",
+    "muted": "#d6deeb",
+    "accent": "#654aa3",
+    "sel": "#14344f",
+    "line": "#011627",
+    "upstream": "https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/themes/Night%20Owl-color-theme.json"
+  },
+  {
+    "id": "light-owl",
+    "name": "Light Owl",
+    "source": "port",
+    "bg": "#f0f0f0",
+    "panel": "#fbfbfb",
+    "text": "#403f53",
+    "muted": "#403f53",
+    "accent": "#2aa298",
+    "sel": "#d3e8f8",
+    "line": "#f0f0f0",
+    "upstream": "https://raw.githubusercontent.com/sdras/night-owl-vscode-theme/main/themes/Night%20Owl-Light-color-theme.json"
+  },
+  {
+    "id": "cobalt2",
+    "name": "Cobalt2",
+    "source": "port",
+    "bg": "#15232d",
+    "panel": "#193549",
+    "text": "#ffffff",
+    "muted": "#aaaaaa",
+    "accent": "#0088ff",
+    "sel": "#193549",
+    "line": "#0d3a58",
+    "upstream": "https://raw.githubusercontent.com/wesbos/cobalt2-vscode/master/theme/cobalt2.json"
   }
 ]
