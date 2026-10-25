@@ -136,6 +136,9 @@ pub fn run() {
             commands::settings::reindex,
             commands::settings::get_about,
             commands::themes::list_themes,
+            commands::themes::preview_vscode_theme,
+            commands::themes::save_imported_theme,
+            commands::themes::delete_imported_theme,
             hotkey::set_hotkeys_paused
         ])
         .build(tauri::generate_context!());

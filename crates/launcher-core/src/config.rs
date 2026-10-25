@@ -907,6 +907,11 @@ pub fn config_path() -> Result<PathBuf, CoreError> {
     env_dir("APPDATA").map(|d| d.join("config.toml"))
 }
 
+/// `%APPDATA%\<APP_DISPLAY_NAME>\themes`, where imported themes are saved as `<slug>.json`.
+pub fn themes_dir() -> Result<PathBuf, CoreError> {
+    env_dir("APPDATA").map(|d| d.join("themes"))
+}
+
 /// `%LOCALAPPDATA%\<APP_DISPLAY_NAME>`, parent of `cache\`, `data\` and `logs\`.
 pub fn local_data_dir() -> Result<PathBuf, CoreError> {
     env_dir("LOCALAPPDATA")

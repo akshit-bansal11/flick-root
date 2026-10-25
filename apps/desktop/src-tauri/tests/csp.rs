@@ -54,6 +54,9 @@ fn launcher_lacks_settings_commands() {
         "delete-secret",
         "list-secrets",
         "set-provider",
+        "preview-vscode-theme",
+        "save-imported-theme",
+        "delete-imported-theme",
     ] {
         assert!(!p.contains(&format!("allow-{c}")), "launcher has {c}");
     }

@@ -52,6 +52,9 @@ fn main() {
         "set_tutorial_done",
         "get_about",
         "list_themes",
+        "preview_vscode_theme",
+        "save_imported_theme",
+        "delete_imported_theme",
         "set_hotkeys_paused",
     ];
     let attrs = tauri_build::Attributes::new()
