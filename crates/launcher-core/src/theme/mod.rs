@@ -3,12 +3,14 @@
 pub mod color;
 pub mod derive;
 pub mod registry;
+pub mod vscode;
 
 use serde::{Deserialize, Serialize};
 
 pub use color::Rgb;
 pub use derive::{Ratios, Resolved, Roles, resolve};
 pub use registry::{Registry, Theme};
+pub use vscode::{MappingRow, VsImport};
 
 /// Errors returned by the theme engine. Messages never carry user text.
 #[derive(thiserror::Error, Debug)]
@@ -31,6 +33,15 @@ pub enum ThemeError {
     /// A theme seed list is not valid JSON for the seed schema.
     #[error("theme JSON: {0}")]
     Json(#[from] serde_json::Error),
+    /// An imported JSONC file has an unterminated comment or string.
+    #[error("theme file: {0}")]
+    Jsonc(&'static str),
+    /// An imported theme file is over the size cap.
+    #[error("theme file is larger than 1 MB")]
+    TooLarge,
+    /// Valid JSON that is not a usable VS Code colour theme.
+    #[error("not a VS Code colour theme: {0}")]
+    NotATheme(&'static str),
 }
 
 /// Where a seed comes from.
