@@ -81,6 +81,9 @@ describe("tour steps", () => {
     expect(body("calc")).toContain("ctrl shift c");
     expect(body("around")).toContain("f1");
     expect(body("around")).toContain("backspace");
+    expect(body("around")).toContain("ctrl tab");
+    expect(body("around")).toContain("ctrl shift tab");
+    expect(body("plain")).toContain("recent");
     expect(TOUR_STEPS[at("ask")]?.keys).toContain("Tab");
   });
   it("ghostInput sends the prefix first, then the text after it", () => {

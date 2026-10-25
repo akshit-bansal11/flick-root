@@ -58,7 +58,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "plain",
     title: "Type anything",
-    body: "Type without a prefix to search apps and commands. The last rows search files, the web or ask.",
+    body: "Type without a prefix to search apps and commands. An empty bar lists your recent picks. The last rows search files, the web or ask.",
     keys: [],
     example: "spo",
     show: "type",
@@ -121,7 +121,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "around",
     title: "Getting around",
-    body: `${key("leave")} on an empty bar leaves a mode. Then ${key("go:find")} jumps to Open. ${key("sheet")} lists every shortcut and ${key("back")} steps back: close, clear, hide.`,
+    body: `${key("leave")} on an empty bar leaves a mode. ${key("tabNext")} and ${key("tabPrev")} switch mode tabs. Then ${key("go:find")} jumps to Open. ${key("sheet")} lists every shortcut and ${key("back")} steps back: close, clear, hide.`,
     keys: [...caps("leave"), ...caps("go:find"), ...caps("sheet")],
     example: ">",
     show: "type",
@@ -130,7 +130,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "themes",
     title: "Themes",
-    body: "Pick a theme and the bar restyles on the spot. Settings > Appearance has the same choices and more.",
+    body: "Pick a theme and the bar restyles on the spot. In the bar, > theme opens the same quick pick. Settings > Appearance has more.",
     keys: [],
     show: "theme",
     goal: (v) => saw(v, "theme"),

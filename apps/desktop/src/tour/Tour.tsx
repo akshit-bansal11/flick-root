@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Keycaps } from "../Keycaps";
 import "../launcher/launcher.css";
+import "../settings/settings.css";
 import { MODES } from "../launcher/reducer";
 import { DemoLauncher } from "./DemoLauncher";
 import { Logo } from "./Logo";
@@ -17,7 +18,7 @@ interface Props {
 type CssVars = CSSProperties & Record<`--${string}`, string | number>;
 const cssVars = (vars: CssVars): CSSProperties => vars;
 
-const SHOW_LABEL = { type: "Show me", hotkey: "Show me", select: "Show me", theme: "Next theme" };
+const SHOW_LABEL = { type: "show me", hotkey: "show me", select: "show me", theme: "next theme" };
 
 /** Caps with a unique id each, since a chord list can repeat a cap ("Ctrl" twice). */
 const capList = (keys: string[]) =>
@@ -40,10 +41,8 @@ export function Tour({ onDone }: Props) {
         <p className="tour-body">{def.body}</p>
         {t.keys.length > 0 && (
           <p className="tour-keys">
-            {capList(t.keys).map((c, i) => (
-              <span key={c.id} className="tour-cap" style={cssVars({ "--i": i })}>
-                <Keycaps caps={[c.k]} />
-              </span>
+            {capList(t.keys).map((c) => (
+              <Keycaps key={c.id} caps={[c.k]} />
             ))}
           </p>
         )}
@@ -90,7 +89,7 @@ export function Tour({ onDone }: Props) {
         )}
         <div className="tour-actions">
           {def.show && (
-            <button type="button" className="s-btn" onClick={t.showMe}>
+            <button type="button" className="btn" onClick={t.showMe}>
               {SHOW_LABEL[def.show]}
             </button>
           )}
@@ -120,11 +119,11 @@ export function Tour({ onDone }: Props) {
               Skip tour
             </button>
           )}
-          <button type="button" className="s-btn" onClick={t.back} disabled={t.step === 0}>
-            Back
+          <button type="button" className="btn" onClick={t.back} disabled={t.step === 0}>
+            back
           </button>
-          <button type="button" className="s-btn s-btn-primary" onClick={t.next}>
-            {last ? "Finish" : "Next"}
+          <button type="button" className="btn pri" onClick={t.next}>
+            {last ? "finish" : "next"}
           </button>
         </div>
       </nav>

@@ -27,12 +27,10 @@
   min-height: calc(var(--l-input) + var(--l-row) * 5 + var(--l-foot-h));
 }
 
-/* The demo panel is not a window: it sits on the page, so the glass is opaque and max-height is its own. */
+/* The demo panel is not a window: it sits on the page and max-height is its own. */
 .demo {
-  --l-glass-alpha: 100%;
   position: relative;
   border-radius: var(--l-r-window);
-  box-shadow: var(--l-shadow-window);
   transition: opacity var(--l-dur-slow) var(--l-ease-out);
 }
 
@@ -92,17 +90,12 @@
   margin: 0;
 }
 
-.tour-cap {
-  animation: chip-swap var(--l-dur) var(--l-ease-liquid) backwards;
-  animation-delay: calc(var(--i, 0) * var(--l-stagger) * 3);
-}
-
 .tour-sample {
   margin: 0;
   padding: var(--l-sp-6) var(--l-sp-7);
   border: var(--l-border-hair);
   border-radius: var(--l-r-card);
-  background: color-mix(in oklab, var(--l-panel) 58%, transparent);
+  background: var(--l-panel);
   user-select: text;
 }
 
@@ -211,7 +204,7 @@
   background: var(--l-line);
   transition:
     background var(--l-dur-slow) var(--l-ease-out),
-    transform var(--l-dur-slow) var(--l-ease-liquid);
+    transform var(--l-dur-slow) var(--l-ease-out);
 }
 
 .tour-dot.past {

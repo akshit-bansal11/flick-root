@@ -80,20 +80,20 @@ describe("Tour", () => {
 
   it("walks with Next, Back and PageDown/PageUp", async () => {
     await mount();
-    click("Next");
+    click("next");
     expect(title()).toBe("Type anything");
     fireEvent.keyDown(window, { key: "PageDown" });
     expect(title()).toBe("/ Open apps and files");
     fireEvent.keyDown(window, { key: "PageUp" });
-    click("Back");
+    click("back");
     expect(title()).toBe("Open the bar");
   });
 
   it("Show me types into the real launcher and Enter completes the Open step", async () => {
     await mount();
-    click("Next");
-    click("Next");
-    click("Show me");
+    click("next");
+    click("next");
+    click("show me");
     await wait(45 * 12);
     const input = screen.getByRole("combobox");
     expect((input as HTMLInputElement).value).toBe("spotify");
@@ -107,7 +107,7 @@ describe("Tour", () => {
 
   it("Esc inside the demo never ends the tour", async () => {
     const { onDone } = await mount();
-    click("Next");
+    click("next");
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
     expect(onDone).not.toHaveBeenCalled();
     expect(title()).toBe("Type anything");
@@ -115,8 +115,8 @@ describe("Tour", () => {
 
   it("Show me types a plain search and Enter completes the Type anything step", async () => {
     await mount();
-    click("Next");
-    click("Show me");
+    click("next");
+    click("show me");
     await wait(45 * 5);
     const input = screen.getByRole("combobox");
     expect((input as HTMLInputElement).value).toBe("spo");
@@ -136,9 +136,9 @@ describe("Tour", () => {
 
   it("Finish marks the tutorial done", async () => {
     const { onDone } = await mount();
-    for (let i = 0; i < 10; i++) click("Next");
+    for (let i = 0; i < 10; i++) click("next");
     expect(title()).toBe("You are set");
-    click("Finish");
+    click("finish");
     await act(async () => {});
     expect(api.setTutorialDone).toHaveBeenCalledWith(true);
     expect(onDone).toHaveBeenCalledWith(true);
@@ -146,7 +146,7 @@ describe("Tour", () => {
 
   const toThemes = async () => {
     await mount();
-    for (let i = 0; i < 9; i++) click("Next");
+    for (let i = 0; i < 9; i++) click("next");
   };
   const demoBg = () => screen.getByTestId("demo").style.getPropertyValue("--l-bg");
 
@@ -182,9 +182,9 @@ describe("Tour", () => {
 
   it("Next theme cycles through the tour themes and wraps", async () => {
     await toThemes();
-    click("Next theme");
+    click("next theme");
     expect(demoBg()).toBe("#020202");
-    for (let i = 0; i < 5; i++) click("Next theme");
+    for (let i = 0; i < 5; i++) click("next theme");
     expect(demoBg()).toBe("#010101");
   });
 });
