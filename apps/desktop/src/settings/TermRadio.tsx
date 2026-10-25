@@ -28,7 +28,7 @@ export function TermRadio({ legend, name, value, options, onChange }: Props) {
           />
           <span className="tr-mark" aria-hidden="true" />
           <span>{o.label}</span>
-          {o.hint && <span className="tr-hint">{o.hint}</span>}
+          {o.hint && <span className="tr-hint"> {o.hint}</span>}
         </label>
       ))}
     </fieldset>
