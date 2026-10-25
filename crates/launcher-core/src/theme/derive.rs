@@ -112,6 +112,18 @@ fn lifted(name: &str, fg: Rgb, bgs: &[Rgb], adjusted: &mut Vec<String>) -> Rgb {
     out
 }
 
+/// A selected-row colour at least [`MIN_SEL_CONTRAST`] from `panel` that still holds `text` at
+/// [`TARGET`]. Tries tints toward `text` first, then toward the opposite pole; `None` if neither
+/// pole has a step that satisfies both.
+fn visible_sel(panel: Rgb, text: Rgb) -> Option<Rgb> {
+    let away = if luminance(text) > 0.5 { BLACK } else { WHITE };
+    [text, away].into_iter().find_map(|pole| {
+        (1..=12)
+            .map(|i| mix(panel, pole, f64::from(i) * 0.04))
+            .find(|&c| ratio(c, panel) >= MIN_SEL_CONTRAST && ratio(text, c) >= TARGET)
+    })
+}
+
 /// Derives every role from `seed`, lifting text colours to 4.5:1.
 pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
     let bg = hex("bg", &seed.bg)?;
@@ -138,6 +150,9 @@ pub fn resolve(seed: &Seed) -> Result<Resolved, ThemeError> {
     }
     if ratio(text, sel) < TARGET {
         sel = panel;
+    }
+    if ratio(sel, panel) < MIN_SEL_CONTRAST {
+        sel = visible_sel(panel, text).unwrap_or(sel);
     }
 
     let on = [panel, bg, sel];
@@ -236,6 +251,43 @@ mod tests {
         assert_ne!(r.roles.sel, r.roles.panel);
         assert!(ratio(sel, panel) >= MIN_SEL_CONTRAST);
         assert!(r.ratios.sel_text >= TARGET);
+    }
+
+    fn seed_of(panel: &str, bg: &str, text: &str, accent: &str, sel: Option<&str>) -> Seed {
+        serde_json::from_value(serde_json::json!({
+            "id": "t",
+            "name": "T",
+            "source": "imported",
+            "bg": bg,
+            "panel": panel,
+            "text": text,
+            "muted": text,
+            "accent": accent,
+            "sel": sel,
+        }))
+        .expect("seed json")
+    }
+
+    fn assert_sel_visible(r: &Resolved) {
+        let (sel, panel, text) = (
+            parse_hex(&r.roles.sel).expect("sel hex"),
+            parse_hex(&r.roles.panel).expect("panel hex"),
+            parse_hex(&r.roles.text).expect("text hex"),
+        );
+        assert!(ratio(sel, panel) >= MIN_SEL_CONTRAST, "sel {}", r.roles.sel);
+        assert!(ratio(text, sel) >= TARGET, "sel {}", r.roles.sel);
+    }
+
+    #[test]
+    fn grey_accent_dark_theme_gets_visible_sel() {
+        let s = seed_of("#282c34", "#21252b", "#abb2bf", "#404754", Some("#2c313a"));
+        assert_sel_visible(&resolve(&s).expect("resolves"));
+    }
+
+    #[test]
+    fn light_theme_with_panel_like_accent_gets_visible_sel() {
+        let s = seed_of("#fafafa", "#f0f0f0", "#383a42", "#f5f5f5", None);
+        assert_sel_visible(&resolve(&s).expect("resolves"));
     }
 
     #[test]
