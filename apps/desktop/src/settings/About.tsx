@@ -30,7 +30,10 @@ export function About() {
       <SettingRow
         label="Licence"
         value={about.license}
-        preview={{ title: "# licence", body: `${APP_DISPLAY_NAME} is released under this licence.` }}
+        preview={{
+          title: "# licence",
+          body: `${APP_DISPLAY_NAME} is released under this licence.`,
+        }}
       />
       <h2 className="sec"># links</h2>
       {links.map(([label, url, body]) => (
