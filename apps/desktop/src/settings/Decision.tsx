@@ -17,8 +17,7 @@ const STATUS: Record<EngineProbe["status"], string> = {
 /** What each engine does, shown in the preview column. */
 const ABOUT: Record<string, string> = {
   llm: "Uses your Query provider (AI providers page). Receives file names only.",
-  laya:
-    "Runs locally: start laya-serve from the Laya package (see the docs page for setup), then point this at it. Default http://localhost:8000.",
+  laya: "Runs locally: start laya-serve from the Laya package (see the docs page for setup), then point this at it. Default http://localhost:8000.",
   custom:
     "Any server that implements /v1/systemone. Set its URL, then optionally add a key (sent only to that host).",
 };
