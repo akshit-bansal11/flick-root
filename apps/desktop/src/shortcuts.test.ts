@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   capsOf,
+  capsText,
   chordOf,
   groups,
   idFor,
@@ -81,6 +82,15 @@ describe("shortcut table", () => {
     expect(SHORTCUTS.find((s) => s.id === "location")?.scope).toEqual(["none", "find"]);
   });
 
+  it("Use theme for its variant only is Ctrl+Enter in Commands, where Show location is not", () => {
+    const slot = SHORTCUTS.find((s) => s.id === "themeSlot");
+    expect(slot?.keys).toBe("Ctrl+Enter");
+    expect(slot?.scope).toBe("commands");
+    const chord = key("Enter", { ctrl: true });
+    expect(idFor("commands", chord)).toBe("themeSlot");
+    expect(idFor("find", chord)).toBe("location");
+  });
+
   it("plain-text scope shares no chord with the launcher scope", () => {
     const own = inScope("none").map((s) => s.keys);
     const shared = inScope("launcher").map((s) => s.keys);
@@ -159,12 +169,16 @@ describe("keyWords and capsOf", () => {
     expect(keyWords("Ctrl+,")).toBe("ctrl+,");
   });
 
-  it("names Enter, Backspace, Up and Down as words, not glyphs", () => {
-    expect(capsOf("Enter")).toEqual(["enter"]);
-    expect(capsOf("Backspace")).toEqual(["backspace"]);
-    expect(capsOf("Up")).toEqual(["up"]);
-    expect(capsOf("Down")).toEqual(["down"]);
-    expect(capsOf("Ctrl+Shift+Enter")).toEqual(["ctrl", "shift", "enter"]);
+  it("keeps key names in their own case for aria-keyshortcuts, as words not glyphs", () => {
+    expect(capsOf("Enter")).toEqual(["Enter"]);
+    expect(capsOf("Backspace")).toEqual(["Backspace"]);
+    expect(capsOf("Up")).toEqual(["Up"]);
+    expect(capsOf("Down")).toEqual(["Down"]);
+    expect(capsOf("Ctrl+Shift+Enter")).toEqual(["Ctrl", "Shift", "Enter"]);
+  });
+
+  it("capsText reads a shortcut as lower-case words", () => {
+    expect(capsText("copyPath")).toBe("ctrl shift c");
   });
 
   it("joins caps into the same words as the chord", () => {

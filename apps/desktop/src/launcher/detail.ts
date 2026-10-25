@@ -1,6 +1,7 @@
 import { type Condition, keyWords, shortcut } from "../shortcuts";
+import type { ThemeRole, ThemeView } from "../theme";
 import type { ActionKind, Item } from "../types";
-import { isProgram } from "./kinds";
+import { isProgram, themeRow } from "./kinds";
 
 export type DetailCtx = Partial<Record<Condition, boolean>>;
 
@@ -23,6 +24,45 @@ export interface Detail {
   tag: string;
   facts: DetailFact[];
   actions: DetailAction[];
+  /** Role colours of a theme row, in display order; absent for every other row. */
+  swatches?: { role: ThemeRole; color: string }[];
+}
+
+const SWATCH_ROLES: readonly ThemeRole[] = ["bg", "panel", "sel", "accent", "text", "muted"];
+
+const ratio = (n: number): string => `${n.toFixed(1)}:1`;
+
+const SOURCE_TEXT: Record<ThemeView["source"], string> = {
+  builtin: "built in",
+  port: "port of an editor theme",
+  imported: "imported",
+};
+
+/** Theme row pane: only what ThemeView carries (no licence field exists, so none is shown). */
+function themeDetail(t: ThemeView, current: boolean): Detail {
+  const facts: DetailFact[] = [
+    { label: "scheme", value: t.dark ? "dark" : "light" },
+    { label: "source", value: SOURCE_TEXT[t.source] },
+    { label: "text", value: ratio(t.ratios.text) },
+    { label: "accent", value: ratio(t.ratios.accentText) },
+  ];
+  if (t.upstream) facts.push({ label: "upstream", value: t.upstream });
+  if (t.adjusted.length > 0) facts.push({ label: "adjusted", value: t.adjusted.join(", ") });
+  return {
+    title: t.name,
+    tag: current ? "current" : t.dark ? "dark" : "light",
+    facts,
+    actions: [
+      { id: "open", label: "apply", keys: shortcutKeys("open"), primary: true },
+      {
+        id: "themeSlot",
+        label: `use as ${t.dark ? "dark" : "light"} only`,
+        keys: shortcutKeys("themeSlot"),
+        primary: false,
+      },
+    ],
+    swatches: SWATCH_ROLES.map((role) => ({ role, color: t.roles[role] })),
+  };
 }
 
 const shortcutKeys = (id: string): string => keyWords(shortcut(id).keys);
@@ -100,6 +140,8 @@ function actionOf(a: ActionKind, first: boolean, item: Item, ctx: DetailCtx): De
 
 /** Right-pane data for the selected row; actions keep the item's own order. */
 export function detailOf(item: Item, ctx: DetailCtx = {}): Detail {
+  const pick = themeRow(item);
+  if (pick) return themeDetail(pick.theme, pick.current);
   return {
     title: item.title,
     tag: isProgram(item) ? "program" : item.kind,

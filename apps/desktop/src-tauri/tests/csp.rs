@@ -73,3 +73,13 @@ fn settings_lacks_launcher_commands() {
         assert!(!p.contains(&format!("allow-{c}")), "settings has {c}");
     }
 }
+
+#[test]
+fn launcher_and_settings_both_set_appearance() {
+    for name in ["default", "settings"] {
+        assert!(
+            perms(name).contains(&"allow-set-appearance".to_owned()),
+            "{name} lacks set-appearance"
+        );
+    }
+}

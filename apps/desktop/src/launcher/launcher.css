@@ -316,6 +316,18 @@ body,
   color: var(--l-muted);
 }
 
+.swatches {
+  display: flex;
+  gap: var(--l-sp-3);
+  margin-top: var(--l-sp-7);
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--l-line);
+}
+
 .facts {
   display: grid;
   grid-template-columns: 90px minmax(0, 1fr);

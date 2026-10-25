@@ -17,6 +17,13 @@ export function DetailPane({ item, ctx, onPress }: Props) {
         <h2 className="detail-title">{detail.title}</h2>
         <span className="tag">{detail.tag}</span>
       </div>
+      {detail.swatches && (
+        <div className="swatches" aria-hidden="true">
+          {detail.swatches.map((s) => (
+            <span key={s.role} className="swatch" style={{ background: s.color }} />
+          ))}
+        </div>
+      )}
       {detail.facts.length > 0 && (
         <dl className="facts">
           {detail.facts.map((f) => (

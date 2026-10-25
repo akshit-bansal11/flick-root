@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import type { ThemeView } from "../theme";
 import type { Item, LaunchMode } from "../types";
-import { groupLabel } from "./kinds";
+import { groupLabel, themeRow } from "./kinds";
 import {
   type Attachment,
   availableModes,
@@ -89,7 +90,7 @@ describe("reducer", () => {
   it("blank text in none mode does not search and stale results are dropped", () => {
     const typed = reduce(initialState(), { type: "text", text: "ab" }).state;
     const cleared = reduce(typed, { type: "text", text: "" });
-    expect(cleared.effects).toEqual([]);
+    expect(cleared.effects).toEqual([{ type: "loadHome" }]);
     expect(cleared.state).toMatchObject({ mode: "none", input: "", items: [] });
     expect(reduce(cleared.state, { type: "text", text: "  " }).effects).toEqual([]);
     const late = reduce(cleared.state, { type: "results", seq: 1, items: [item("x")] });
@@ -180,7 +181,7 @@ describe("reducer", () => {
     it("Esc clears the text and returns to the prefix list", () => {
       const r = reduce(plain(live, "Google"), k("Escape"));
       expect(r.state).toMatchObject({ mode: "none", input: "", items: [] });
-      expect(r.effects).toEqual([]);
+      expect(r.effects).toEqual([{ type: "loadHome" }]);
     });
 
     it("a prefix as first character still enters its mode", () => {
@@ -460,7 +461,7 @@ describe("reducer", () => {
   it("Backspace on empty input inside a mode returns to none", () => {
     const r = reduce(inMode("find"), k("Backspace"));
     expect(r.state.mode).toBe("none");
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([{ type: "loadHome" }]);
   });
 
   it("Backspace with text stays in the mode; in none it does nothing", () => {
@@ -472,7 +473,7 @@ describe("reducer", () => {
   it("Backspace leaving a streaming ask cancels it", () => {
     const r = reduce(streaming(), k("Backspace"));
     expect(r.state.mode).toBe("none");
-    expect(r.effects).toEqual([{ type: "cancelAsk", token: 0 }]);
+    expect(r.effects).toEqual([{ type: "cancelAsk", token: 0 }, { type: "loadHome" }]);
   });
 
   it("blank all tab shows home and Enter launches the first home row", () => {
@@ -519,7 +520,7 @@ describe("reducer", () => {
     const s = inMode("find", { home });
     const r = reduce(s, { type: "tab", mode: "none" });
     expect(r.state).toMatchObject({ mode: "none", input: "", items: home });
-    expect(r.effects).toEqual([]);
+    expect(r.effects).toEqual([{ type: "loadHome" }]);
   });
 
   it("the tab event ignores a disabled mode and the current mode", () => {
@@ -795,7 +796,7 @@ describe("query state flags", () => {
 
     it("Backspace never kills, even after an arrow", () => {
       const armed = reduce(procs(), k("ArrowDown")).state;
-      expect(reduce(armed, k("Backspace")).effects).toEqual([]);
+      expect(reduce(armed, k("Backspace")).effects).toEqual([{ type: "loadHome" }]);
     });
 
     it("after an arrow Delete asks to kill, then Enter confirms the kill", () => {
@@ -971,5 +972,166 @@ describe("entering modes with text", () => {
       });
       expect(r.state.notice).toBeNull();
     });
+  });
+});
+
+describe("theme quick pick", () => {
+  const ROLES: ThemeView["roles"] = {
+    bg: "#000000",
+    panel: "#111111",
+    surface: "#222222",
+    line: "#333333",
+    text: "#ffffff",
+    muted: "#999999",
+    accent: "#3399ff",
+    accentText: "#66bbff",
+    onAccent: "#000000",
+    sel: "#223344",
+    ok: "#00cc66",
+    warn: "#ffaa00",
+    err: "#ff4444",
+  };
+  const RATIOS: ThemeView["ratios"] = {
+    text: 7,
+    muted: 4.5,
+    accentText: 4.5,
+    onAccent: 4.5,
+    selText: 7,
+    mutedBg: 4.5,
+    mutedSel: 4.5,
+  };
+  const tv = (id: string, name: string, dark: boolean): ThemeView => ({
+    id,
+    name,
+    source: "builtin",
+    dark,
+    roles: ROLES,
+    ratios: RATIOS,
+    adjusted: [],
+    upstream: null,
+  });
+  const FLICK = tv("flick-default", "Flick Default", true);
+  const DRACULA = tv("dracula", "Dracula", true);
+  const LIGHT = tv("flick-default-light", "Flick Default Light", false);
+  const THEMES = [FLICK, DRACULA, LIGHT];
+
+  const asked = (activeId = "dracula"): State => {
+    const shown = reduce(initialState(), { type: "appearance", activeId }).state;
+    return reduce(shown, { type: "text", text: ">theme" }).state;
+  };
+  const loaded = (): State => reduce(asked(), { type: "themesLoaded", themes: THEMES }).state;
+  const rowIds = (s: State) => s.items.map((i) => themeRow(i)?.theme.id);
+
+  it("`> theme` asks for the list once and shows nothing until it lands", () => {
+    const shown = reduce(initialState(), { type: "appearance", activeId: "dracula" }).state;
+    const r = reduce(shown, { type: "text", text: ">theme" });
+    expect(r.effects).toEqual([{ type: "loadThemes" }]);
+    expect(r.state).toMatchObject({ mode: "commands", input: "theme", items: [] });
+    expect(reduce(r.state, { type: "text", text: "theme d" }).effects).toEqual([]);
+  });
+
+  it("is also reached by typing theme in the Commands tab, in any case", () => {
+    const r = reduce(inMode("commands"), { type: "text", text: "THEME" });
+    expect(r.effects).toEqual([{ type: "loadThemes" }]);
+  });
+
+  it("other Commands text still searches", () => {
+    const r = reduce(inMode("commands"), { type: "text", text: "themes" });
+    expect(r.effects).toEqual([expect.objectContaining({ type: "search" })]);
+  });
+
+  it("themesLoaded lists every theme and selects the saved one without previewing", () => {
+    const r = reduce(asked(), { type: "themesLoaded", themes: THEMES });
+    expect(rowIds(r.state)).toEqual(["flick-default", "dracula", "flick-default-light"]);
+    expect(r.state.selected).toBe(1);
+    expect(r.state.items.map((i) => themeRow(i)?.current)).toEqual([false, true, false]);
+    expect(r.effects).toEqual([]);
+  });
+
+  it("filters by name after the word theme and lands on the first match", () => {
+    const r = reduce(loaded(), { type: "text", text: "theme flick" });
+    expect(rowIds(r.state)).toEqual(["flick-default", "flick-default-light"]);
+    expect(r.state.selected).toBe(0);
+    expect(r.effects).toEqual([{ type: "previewTheme", theme: FLICK }]);
+  });
+
+  it("emits one previewTheme per selection move and none when the row is unchanged", () => {
+    const down = reduce(loaded(), k("ArrowDown"));
+    expect(down.effects).toEqual([{ type: "previewTheme", theme: LIGHT }]);
+    const wrap = reduce(down.state, k("ArrowDown"));
+    expect(wrap.effects).toEqual([{ type: "previewTheme", theme: FLICK }]);
+    const one = reduce(loaded(), { type: "text", text: "theme dra" }).state;
+    expect(rowIds(one)).toEqual(["dracula"]);
+    expect(reduce(one, k("ArrowDown")).effects).toEqual([]);
+  });
+
+  it("Enter applies the dark theme to its slot and forces the dark scheme", () => {
+    const r = reduce(loaded(), k("Enter"));
+    expect(r.effects).toEqual([
+      { type: "applyTheme", patch: { darkTheme: "dracula", scheme: "dark" } },
+    ]);
+  });
+
+  it("Enter on a light theme saves the light slot and the light scheme", () => {
+    const down = reduce(loaded(), k("ArrowDown")).state;
+    expect(reduce(down, k("Enter")).effects).toEqual([
+      { type: "applyTheme", patch: { lightTheme: "flick-default-light", scheme: "light" } },
+    ]);
+  });
+
+  it("a click applies like Enter", () => {
+    const r = reduce(loaded(), { type: "activate", index: 0, ctrl: false });
+    expect(r.effects).toContainEqual({
+      type: "applyTheme",
+      patch: { darkTheme: "flick-default", scheme: "dark" },
+    });
+  });
+
+  it("Ctrl+Enter saves the slot only, leaving the scheme alone", () => {
+    const r = reduce(loaded(), k("Enter", { ctrl: true }));
+    expect(r.effects).toEqual([{ type: "applyTheme", patch: { darkTheme: "dracula" } }]);
+  });
+
+  it("Esc once reverts the preview and keeps the text; Esc twice clears it", () => {
+    const previewing = reduce(loaded(), k("ArrowDown")).state;
+    const first = reduce(previewing, k("Escape"));
+    expect(first.effects).toEqual([{ type: "revertTheme" }]);
+    expect(first.state.input).toBe("theme");
+    const second = reduce(first.state, k("Escape"));
+    expect(second.effects).not.toContainEqual({ type: "revertTheme" });
+    expect(second.state.input).toBe("");
+  });
+
+  it("Esc without a preview goes straight to clearing the text", () => {
+    const r = reduce(loaded(), k("Escape"));
+    expect(r.effects).not.toContainEqual({ type: "revertTheme" });
+    expect(r.state.input).toBe("");
+  });
+
+  it("hidden while previewing reverts; hidden without a preview does not", () => {
+    const previewing = reduce(loaded(), k("ArrowDown")).state;
+    expect(reduce(previewing, { type: "hidden" }).effects).toEqual([{ type: "revertTheme" }]);
+    expect(reduce(loaded(), { type: "hidden" }).effects).toEqual([]);
+  });
+
+  it("leaving the pick with a preview reverts, by text or by tab", () => {
+    const previewing = reduce(loaded(), k("ArrowDown")).state;
+    expect(reduce(previewing, { type: "text", text: "x" }).effects).toContainEqual({
+      type: "revertTheme",
+    });
+    expect(reduce(previewing, { type: "tab", mode: "none" }).effects).toContainEqual({
+      type: "revertTheme",
+    });
+  });
+
+  it("the appearance event moves the current tag to the saved theme", () => {
+    const r = reduce(loaded(), { type: "appearance", activeId: "flick-default" });
+    expect(r.state.theme.activeId).toBe("flick-default");
+    expect(r.state.items.map((i) => themeRow(i)?.current)).toEqual([true, false, false]);
+  });
+
+  it("shown starts a fresh pick that asks for the list again", () => {
+    const r = reduce(loaded(), { type: "shown" });
+    expect(r.state.theme).toMatchObject({ list: null, loading: false, activeId: "dracula" });
   });
 });

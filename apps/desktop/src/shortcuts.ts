@@ -76,6 +76,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
     foot: "admin",
   },
   {
+    id: "themeSlot",
+    keys: "Ctrl+Enter",
+    label: "Use theme for its variant only (theme list)",
+    scope: "commands",
+  },
+  {
     id: "copyPath",
     keys: "Ctrl+Shift+C",
     label: "Copy path",
@@ -296,14 +302,18 @@ export function idFor(mode: LaunchMode | "settings", k: KeyInput): string | unde
 /** A chord as words, lower case: "Ctrl+Shift+Enter" becomes "ctrl+shift+enter". */
 export const keyWords = (chord: string): string => chord.toLowerCase();
 
-/** Key caps of a chord, ready for <kbd>: ["ctrl", "shift", "enter"]. */
-export const capsOf = (chord: string): string[] => keyWords(chord).split("+");
+/**
+ * Key names of a chord in their own case: ["Ctrl", "Shift", "Enter"]. They feed
+ * aria-keyshortcuts (which wants "Alt", "Control", "Shift" spelled that way); anything shown
+ * on screen goes through keyWords.
+ */
+export const capsOf = (chord: string): string[] => chord.split("+");
 
 /** Caps of a shortcut by id. */
 export const caps = (id: string): string[] => capsOf(shortcut(id).keys);
 
-/** Caps as one string, "ctrl shift enter". */
-export const capsText = (id: string): string => caps(id).join(" ");
+/** A shortcut as words for prose, "ctrl shift enter". */
+export const capsText = (id: string): string => keyWords(shortcut(id).keys).split("+").join(" ");
 
 export const SCOPE_LABEL: Record<Scope, string> = {
   launcher: "Anywhere in the launcher",

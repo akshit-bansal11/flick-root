@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
 import { errorText } from "../settings/types";
 import { fromEvent, parseChord, shortcut } from "../shortcuts";
-import { applyTheme } from "../theme";
+import { type ActiveTheme, applyTheme } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { cancelsDefault } from "./keys";
 import { type Effect, type Event, initialState, reduce, type State } from "./reducer";
@@ -20,6 +20,8 @@ export function useLauncher(
   const lastHeight = useRef(0);
   const syncHeight = useRef((_force: boolean) => {});
   const copiedTimer = useRef<number | undefined>(undefined);
+  /** The saved theme in use (last shown or applied); revert puts this back. */
+  const saved = useRef<ActiveTheme | null>(null);
 
   const dispatch = useCallback((ev: Event): boolean => {
     const prev = stateRef.current;
@@ -119,6 +121,41 @@ export function useLauncher(
             .then((r) => dispatch({ type: "homeLoaded", items: r.items, pins: r.pins }))
             .catch(warn);
           break;
+        case "loadThemes":
+          ipc
+            .listThemes()
+            .then((themes) => dispatch({ type: "themesLoaded", themes }))
+            .catch((err: unknown) => {
+              warn(err);
+              dispatch({ type: "themesLoaded", themes: [] });
+            });
+          break;
+        case "previewTheme":
+          // Repaint only: the list was loaded once, so an arrow key costs no IPC.
+          applyTheme(document.documentElement, {
+            id: e.theme.id,
+            dark: e.theme.dark,
+            roles: e.theme.roles,
+          });
+          break;
+        case "revertTheme":
+          applyTheme(document.documentElement, saved.current);
+          break;
+        case "applyTheme":
+          ipc
+            .setAppearance(e.patch)
+            .then((view) => {
+              saved.current = view.active;
+              applyTheme(document.documentElement, view.active);
+              dispatch({ type: "appearance", activeId: view.active?.id ?? null });
+            })
+            .catch((err: unknown) => {
+              warn(err);
+              applyTheme(document.documentElement, saved.current);
+              dispatch({ type: "appearance", activeId: saved.current?.id ?? null });
+              dispatch({ type: "actionFailed", message: errorText(err) });
+            });
+          break;
         case "webSearch":
           outcome("ui:web", ipc.webSearch(e.text));
           break;
@@ -132,8 +169,10 @@ export function useLauncher(
   const first = useRef(initialShown);
   useEffect(() => {
     const onShown = (p: ipc.ShownEvent) => {
-      applyTheme(document.documentElement, p.appearance?.active ?? null);
+      saved.current = p.appearance?.active ?? null;
+      applyTheme(document.documentElement, saved.current);
       dispatch({ type: "shown" });
+      dispatch({ type: "appearance", activeId: saved.current?.id ?? null });
       if (p.sources) {
         dispatch({ type: "enabledSources", sources: p.sources, webTitle: p.webTitle ?? null });
       }

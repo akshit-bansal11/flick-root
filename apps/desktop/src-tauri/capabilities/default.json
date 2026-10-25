@@ -27,6 +27,7 @@
     "allow-get-first-run",
     "allow-complete-first-run",
     "allow-probe-providers",
-    "allow-list-themes"
+    "allow-list-themes",
+    "allow-set-appearance"
   ]
 }

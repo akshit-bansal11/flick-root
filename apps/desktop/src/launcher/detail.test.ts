@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { keyWords } from "../shortcuts";
+import type { ThemeView } from "../theme";
 import type { ActionKind, Item, ItemKind } from "../types";
 import { detailOf } from "./detail";
+import { THEME_SOURCE } from "./kinds";
 
 const make = (kind: ItemKind, o: Partial<Item> = {}): Item => ({
   id: `${kind}:x`,
@@ -134,5 +136,92 @@ describe("detailOf actions", () => {
     expect(ids(make("app", { actions: [{ type: "location" }, { type: "primary" }] }))).toEqual([
       "location",
     ]);
+  });
+});
+
+describe("theme rows", () => {
+  const ROLES: ThemeView["roles"] = {
+    bg: "#000001",
+    panel: "#000002",
+    surface: "#000003",
+    line: "#000004",
+    text: "#000005",
+    muted: "#000006",
+    accent: "#000007",
+    accentText: "#000008",
+    onAccent: "#000009",
+    sel: "#00000a",
+    ok: "#00000b",
+    warn: "#00000c",
+    err: "#00000d",
+  };
+  const theme = (o: Partial<ThemeView> = {}): ThemeView => ({
+    id: "dracula",
+    name: "Dracula",
+    source: "port",
+    dark: true,
+    roles: ROLES,
+    ratios: {
+      text: 7,
+      muted: 4.5,
+      accentText: 4.56,
+      onAccent: 4.5,
+      selText: 7,
+      mutedBg: 4.5,
+      mutedSel: 4.5,
+    },
+    adjusted: [],
+    upstream: null,
+    ...o,
+  });
+  const row = (t: ThemeView, current = false): Item =>
+    make("choice", { source: THEME_SOURCE, title: t.name, payload: { theme: t, current } });
+
+  it("shows scheme, source and contrast, and tags the saved theme current", () => {
+    const d = detailOf(row(theme(), true));
+    expect(d.title).toBe("Dracula");
+    expect(d.tag).toBe("current");
+    expect(d.facts).toEqual([
+      { label: "scheme", value: "dark" },
+      { label: "source", value: "port of an editor theme" },
+      { label: "text", value: "7.0:1" },
+      { label: "accent", value: "4.6:1" },
+    ]);
+  });
+
+  it("tags other themes by scheme", () => {
+    expect(detailOf(row(theme())).tag).toBe("dark");
+    expect(detailOf(row(theme({ dark: false }))).tag).toBe("light");
+  });
+
+  it("adds upstream and adjusted facts only when present", () => {
+    const labels = (t: ThemeView) => detailOf(row(t)).facts.map((f) => f.label);
+    expect(labels(theme())).toEqual(["scheme", "source", "text", "accent"]);
+    const more = theme({ upstream: "https://example.com/dracula", adjusted: ["muted", "accent"] });
+    expect(labels(more)).toEqual(["scheme", "source", "text", "accent", "upstream", "adjusted"]);
+    expect(detailOf(row(more)).facts.at(-1)?.value).toBe("muted, accent");
+  });
+
+  it("offers apply on Enter and the variant slot on Ctrl+Enter", () => {
+    expect(detailOf(row(theme())).actions).toEqual([
+      { id: "open", label: "apply", keys: "enter", primary: true },
+      { id: "themeSlot", label: "use as dark only", keys: "ctrl+enter", primary: false },
+    ]);
+    expect(detailOf(row(theme({ dark: false }))).actions[1]?.label).toBe("use as light only");
+  });
+
+  it("carries six role swatches in display order", () => {
+    expect(detailOf(row(theme())).swatches).toEqual([
+      { role: "bg", color: "#000001" },
+      { role: "panel", color: "#000002" },
+      { role: "sel", color: "#00000a" },
+      { role: "accent", color: "#000007" },
+      { role: "text", color: "#000005" },
+      { role: "muted", color: "#000006" },
+    ]);
+  });
+
+  it("other rows have no swatches", () => {
+    expect(detailOf(make("app")).swatches).toBeUndefined();
   });
 });

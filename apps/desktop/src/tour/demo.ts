@@ -273,8 +273,15 @@ export function createDemoRunner(host: DemoHost) {
             0,
           );
           break;
+        case "loadThemes":
+          // The demo has no theme list; the quick pick shows no rows.
+          later(() => host.dispatch({ type: "themesLoaded", themes: [] }), 0);
+          break;
         case "loadHome":
         case "setThinkingMode":
+        case "previewTheme":
+        case "revertTheme":
+        case "applyTheme":
           break;
       }
     },

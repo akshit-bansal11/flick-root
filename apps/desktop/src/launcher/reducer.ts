@@ -1,5 +1,9 @@
+import { filterThemes, slotOf } from "../settings/themePicker";
+import type { AppearancePatch } from "../settings/types";
 import { idFor, type KeyInput } from "../shortcuts";
+import type { ThemeView } from "../theme";
 import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, ThinkingMode } from "../types";
+import { THEME_SOURCE, themeRow } from "./kinds";
 
 export type { KeyInput };
 
@@ -30,6 +34,27 @@ export interface QueryState {
   /** False once a started event says the provider has no reasoning control. */
   reasoning: boolean;
 }
+
+/** The `> theme` quick pick: the list loads once, previews only repaint (no IPC per arrow). */
+export interface ThemePickState {
+  /** Every theme from list_themes; null until the quick pick of this show asks for it. */
+  list: ThemeView[] | null;
+  loading: boolean;
+  /** Id of the saved theme in use; null when Rust did not resolve one. */
+  activeId: string | null;
+  /** Id of the theme the launcher is painted with; differs from `activeId` while previewing. */
+  painted: string | null;
+  /** Id of the selected row last handled, so one selection previews once. */
+  seen: string | null;
+}
+
+const freshTheme = (activeId: string | null): ThemePickState => ({
+  list: null,
+  loading: false,
+  activeId,
+  painted: activeId,
+  seen: null,
+});
 
 export interface State {
   mode: LaunchMode;
@@ -63,6 +88,7 @@ export interface State {
   attachment: Attachment | null;
   /** One muted line under the bar, for example "No text selected". */
   notice: string | null;
+  theme: ThemePickState;
 }
 
 export type Event =
@@ -77,6 +103,9 @@ export type Event =
   | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
   | { type: "tab"; mode: LaunchMode }
   | { type: "homeLoaded"; items: Item[]; pins: string[] }
+  | { type: "themesLoaded"; themes: ThemeView[] }
+  /** The saved theme in use changed (show, or an apply landed); null when unresolved. */
+  | { type: "appearance"; activeId: string | null }
   | { type: "enabledSources"; sources: string[]; webTitle: string | null }
   | { type: "captured"; attachment: Attachment | null }
   | { type: "removeAttachment" }
@@ -105,6 +134,10 @@ export type Effect =
   | { type: "cancelAsk"; token: number }
   | { type: "loadThinkingModes" }
   | { type: "loadHome" }
+  | { type: "loadThemes" }
+  | { type: "previewTheme"; theme: ThemeView }
+  | { type: "revertTheme" }
+  | { type: "applyTheme"; patch: AppearancePatch }
   | { type: "webSearch"; text: string }
   | { type: "setThinkingMode"; id: string }
   | { type: "hide" }
@@ -228,6 +261,7 @@ export const initialState = (
   visible: false,
   attachment: null,
   notice: null,
+  theme: freshTheme(null),
 });
 
 const out = (state: State, ...effects: Effect[]): Result => ({ state, effects });
@@ -251,6 +285,8 @@ function search(s: State, mode: LaunchMode, input: string): Result {
     const state = { ...next, items: next.home };
     return isHome(s) ? out(state) : out(state, { type: "loadHome" });
   }
+  const themeText = themeQuery(next);
+  if (themeText !== null) return pickThemes(s, next, themeText);
   const { wire, sources } = mode === "none" ? PLAIN_SEARCH : MODES[mode];
   const seq = s.seq + 1;
   // Plain text shows the fallback rows at once, under the previous results until new ones land.
@@ -260,6 +296,51 @@ function search(s: State, mode: LaunchMode, input: string): Result {
     { ...next, items, seq, pending: true },
     { type: "search", seq, mode: wire, text: input, sources },
   );
+}
+
+/** Text after `theme` when the input opens the quick pick (Commands tab), else null. */
+function themeQuery(s: State): string | null {
+  if (s.mode !== "commands") return null;
+  const m = /^theme(?:\s+(.*))?$/i.exec(s.input.trimStart());
+  return m ? (m[1] ?? "").trim() : null;
+}
+
+/** Rows of the quick pick: themes matching `text`, the saved one tagged current. */
+function themeRows(s: State, text: string): Item[] {
+  return filterThemes(s.theme.list ?? [], text, "all").map((t) => ({
+    id: `theme:${t.id}`,
+    kind: "choice",
+    title: t.name,
+    subtitle: "",
+    icon: null,
+    score: 0,
+    source: THEME_SOURCE,
+    actions: [{ type: "primary" }],
+    payload: { theme: t, current: t.id === s.theme.activeId },
+  }));
+}
+
+const currentAt = (items: Item[]): number =>
+  Math.max(0, items.findIndex((i) => themeRow(i)?.current));
+
+/** Shows the quick pick's rows instead of searching; asks for the theme list once. */
+function pickThemes(prev: State, next: State, text: string): Result {
+  const items = themeRows(next, text);
+  // Opening lands on the saved theme; filtering lands on the first match.
+  const selected = themeQuery(prev) === null ? currentAt(items) : 0;
+  const load = next.theme.list === null && !next.theme.loading;
+  const effects: Effect[] = load ? [{ type: "loadThemes" }] : [];
+  const theme = load ? { ...next.theme, loading: true } : next.theme;
+  // seq moves on so results of earlier keystrokes (t, th...) are dropped.
+  return { state: { ...next, theme, items, selected, seq: prev.seq + 1 }, effects };
+}
+
+/** Enter or click applies a theme and its scheme; Ctrl+Enter saves its variant slot only. */
+function applyThemeRow(s: State, t: ThemeView, withScheme: boolean): Result {
+  const scheme = withScheme ? { scheme: t.dark ? ("dark" as const) : ("light" as const) } : {};
+  const patch: AppearancePatch =
+    slotOf(t) === "darkTheme" ? { darkTheme: t.id, ...scheme } : { lightTheme: t.id, ...scheme };
+  return out({ ...s, theme: { ...s.theme, painted: t.id } }, { type: "applyTheme", patch });
 }
 
 function switchMode(s: State, mode: LaunchMode, input: string): Result {
@@ -394,6 +475,8 @@ type Intent = "open" | "location" | "admin";
 function openSelected(s: State, intent: Intent): Result {
   const item = s.items[s.selected];
   if (!item) return out(s);
+  const pick = themeRow(item);
+  if (pick) return intent === "admin" ? out(s) : applyThemeRow(s, pick.theme, intent === "open");
   if (item.source === "ui") return intent === "open" ? openFallback(s, item.id) : out(s);
   if (intent === "admin") {
     // Rust lists Admin only for apps and exe/msi programs off removable drives.
@@ -426,6 +509,10 @@ function onEscape(s: State): Result {
       { ...s, query: { ...s.query, status: "idle" } },
       { type: "cancelAsk", token: s.askToken },
     );
+  }
+  // First Esc in the quick pick puts the saved look back; the next one clears the input.
+  if (themeQuery(s) !== null && s.theme.painted !== s.theme.activeId) {
+    return out({ ...s, theme: { ...s.theme, painted: s.theme.activeId } }, { type: "revertTheme" });
   }
   if (s.input !== "") return textChange(s, "");
   return out(s, { type: "hide" });
@@ -498,6 +585,8 @@ function key(s: State, k: KeyInput): Result {
       return openSelected(s, "location");
     case "admin":
       return openSelected(s, "admin");
+    case "themeSlot":
+      return themeRow(item) ? openSelected(s, "location") : out(s);
     case "tabNext":
       return cycleTab(s, 1);
     case "tabPrev":
@@ -587,8 +676,36 @@ function outcomeOf(s: State, commandId: string, o: Outcome): Result {
   }
 }
 
+/**
+ * Keeps the painted theme in step with the quick pick: a newly selected row previews once, and
+ * leaving the quick pick with an unsaved look puts the saved theme back.
+ */
+function settleTheme(r: Result): Result {
+  const { state: s } = r;
+  const t = s.theme;
+  if (themeQuery(s) === null) {
+    if (t.painted === t.activeId && t.seen === null) return r;
+    const effects: Effect[] =
+      t.painted === t.activeId ? r.effects : [...r.effects, { type: "revertTheme" }];
+    return { state: { ...s, theme: { ...t, painted: t.activeId, seen: null } }, effects };
+  }
+  const theme = themeRow(s.items[s.selected])?.theme;
+  if (!theme || theme.id === t.seen) return r;
+  if (theme.id === t.painted) {
+    return { state: { ...s, theme: { ...t, seen: theme.id } }, effects: r.effects };
+  }
+  return {
+    state: { ...s, theme: { ...t, seen: theme.id, painted: theme.id } },
+    effects: [...r.effects, { type: "previewTheme", theme }],
+  };
+}
+
 /** Pure reducer: next state plus effects for the shell to run. */
 export function reduce(s: State, ev: Event): Result {
+  return settleTheme(step(s, ev));
+}
+
+function step(s: State, ev: Event): Result {
   switch (ev.type) {
     case "key":
       return key(s, ev.key);
@@ -665,6 +782,19 @@ export function reduce(s: State, ev: Event): Result {
       const selected = Math.min(s.selected, Math.max(0, home.length - 1));
       return out({ ...s, home, items: home, selected });
     }
+    case "themesLoaded": {
+      const base: State = { ...s, theme: { ...s.theme, list: ev.themes, loading: false } };
+      const text = themeQuery(base);
+      if (text === null) return out(base);
+      const items = themeRows(base, text);
+      return out({ ...base, items, selected: currentAt(items) });
+    }
+    case "appearance": {
+      const theme = { ...s.theme, activeId: ev.activeId, painted: ev.activeId };
+      const base: State = { ...s, theme };
+      const text = themeQuery(base);
+      return text === null ? out(base) : out({ ...base, items: themeRows(base, text) });
+    }
     case "enabledSources": {
       const load: Effect[] =
         ev.sources.includes("ask") && s.thinkingModes.modes.length === 0
@@ -682,22 +812,30 @@ export function reduce(s: State, ev: Event): Result {
           seq: s.seq,
           askToken: s.askToken,
           visible: true,
+          theme: freshTheme(s.theme.activeId),
         },
         { type: "loadHome" },
       );
-    case "hidden":
-      return out(
-        {
+    case "hidden": {
+      // Hiding mid-preview puts the saved theme back.
+      const effects: Effect[] = [
+        ...(s.query.status === "streaming"
+          ? [{ type: "cancelAsk", token: s.askToken } as const]
+          : []),
+        ...(s.theme.painted === s.theme.activeId ? [] : [{ type: "revertTheme" } as const]),
+      ];
+      return {
+        state: {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           home: s.home,
           items: s.home,
           seq: s.seq,
           askToken: s.askToken,
+          theme: freshTheme(s.theme.activeId),
         },
-        ...(s.query.status === "streaming"
-          ? [{ type: "cancelAsk", token: s.askToken } as const]
-          : []),
-      );
+        effects,
+      };
+    }
   }
 }

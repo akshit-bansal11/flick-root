@@ -5,6 +5,7 @@ import "../query/attachment.css";
 import { QueryView } from "../query/QueryView";
 import { DetailPane } from "./DetailPane";
 import { InputBar } from "./InputBar";
+import { themeRow } from "./kinds";
 import { ModeTabs } from "./ModeTabs";
 import { LISTBOX_ID, optionId, Results } from "./Results";
 import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
@@ -56,6 +57,12 @@ export function LauncherView({
     answer: q.text !== "",
   };
   const counts = state.mode === "query" ? [] : countsOf(state.items);
+  const pick = themeRow(selected);
+  const base = statusHints(state.mode, ctx, counts);
+  const status =
+    pick && state.theme.painted !== state.theme.activeId
+      ? { ...base, text: `previewing ${pick.theme.name}` }
+      : base;
   const hints = availableModes(state.enabledSources);
   const activeId = state.items.length > 0 ? optionId(state.selected) : undefined;
 
@@ -112,7 +119,7 @@ export function LauncherView({
         )}
       </div>
       <StatusLine
-        status={statusHints(state.mode, ctx, counts)}
+        status={status}
         copied={state.copied}
         copyFailed={state.copyFailed}
       />

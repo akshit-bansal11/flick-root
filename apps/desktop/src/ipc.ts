@@ -5,6 +5,7 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { AppearancePatch } from "./settings/types";
 import type { Appearance, ThemeView } from "./theme";
 import type {
   AskEvent,
@@ -90,6 +91,10 @@ export type ShownEvent = ShownPayload & {
 
 /** Every theme with its resolved roles; loaded once, never per keystroke. */
 export const listThemes = () => invoke<ThemeView[]>("list_themes");
+
+/** Saves appearance fields (the quick pick's apply); returns the appearance now in effect. */
+export const setAppearance = (patch: AppearancePatch) =>
+  invoke<Appearance>("set_appearance", patch);
 
 export const onShown = (cb: (p: ShownEvent) => void): Promise<UnlistenFn> =>
   listen<ShownEvent>("launcher://shown", (e) => cb(e.payload));

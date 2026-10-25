@@ -1,3 +1,4 @@
+import type { ThemeView } from "../theme";
 import type { Item, ItemKind } from "../types";
 
 const GROUP: Record<ItemKind, string> = {
@@ -43,18 +44,43 @@ const isHome = (item: Item): boolean =>
 /** Group label of the blank tab's recent picks; rendering prefixes it with `# `. */
 export const HOME_GROUP = "recent";
 
+/** Source of the rows the `> theme` quick pick shows. */
+export const THEME_SOURCE = "ui:theme";
+
+const isThemeView = (v: unknown): v is ThemeView =>
+  typeof v === "object" &&
+  v !== null &&
+  "id" in v &&
+  typeof v.id === "string" &&
+  "roles" in v &&
+  "ratios" in v;
+
+/** The theme a quick-pick row carries, and whether it is the saved one; null for any other row. */
+export function themeRow(item: Item | undefined): { theme: ThemeView; current: boolean } | null {
+  const p = item?.payload;
+  if (item?.source !== THEME_SOURCE || typeof p !== "object" || p === null) return null;
+  if (!("theme" in p) || !isThemeView(p.theme)) return null;
+  return { theme: p.theme, current: "current" in p && p.current === true };
+}
+
 /** Group label shown above a run of same-group results. */
 export const groupLabel = (item: Item): string =>
-  item.source === "ui"
-    ? "Search instead"
-    : isHome(item)
-      ? HOME_GROUP
-      : isProgram(item)
-        ? "Programs"
-        : GROUP[item.kind];
+  item.source === THEME_SOURCE
+    ? "Themes"
+    : item.source === "ui"
+      ? "Search instead"
+      : isHome(item)
+        ? HOME_GROUP
+        : isProgram(item)
+          ? "Programs"
+          : GROUP[item.kind];
 
 /** Human name of a kind, used as the subtitle when an item has none. */
 export const kindName = (kind: ItemKind): string => NAME[kind];
 
 /** Short kind label at the end of a row. */
-export const rowKind = (item: Item): string => (isProgram(item) ? "Program" : item.kind);
+export function rowKind(item: Item): string {
+  const pick = themeRow(item);
+  if (pick) return pick.current ? "current" : pick.theme.dark ? "dark" : "light";
+  return isProgram(item) ? "Program" : item.kind;
+}

@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ipc from "../ipc";
-import type { Appearance, ThemeRoles } from "../theme";
+import type { Appearance, ThemeRoles, ThemeView } from "../theme";
 import type { ExplainCaptured, Item } from "../types";
 import { Launcher } from "./Launcher";
 
@@ -24,6 +24,8 @@ vi.mock("../ipc", () => ({
   openLink: vi.fn(() => Promise.resolve()),
   webSearch: vi.fn(() => Promise.resolve({ type: "done" })),
   copyText: vi.fn(() => Promise.resolve()),
+  listThemes: vi.fn(() => Promise.resolve([])),
+  setAppearance: vi.fn(),
   onShown: vi.fn(() => Promise.resolve(() => {})),
   onHidden: vi.fn(() => Promise.resolve(() => {})),
   onExplainCaptured: vi.fn(() => Promise.resolve(() => {})),
@@ -522,5 +524,67 @@ describe("Launcher explain", () => {
     expect(ipc.hideLauncher).not.toHaveBeenCalled();
     await type(">alp");
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  describe("> theme quick pick", () => {
+    const view = (id: string, name: string, accent: string): ThemeView => ({
+      id,
+      name,
+      source: "builtin",
+      dark: true,
+      roles: { ...ROLE_FIXTURE, accent },
+      ratios: {
+        text: 7,
+        muted: 4.5,
+        accentText: 4.5,
+        onAccent: 4.5,
+        selText: 7,
+        mutedBg: 4.5,
+        mutedSel: 4.5,
+      },
+      adjusted: [],
+      upstream: null,
+    });
+    const accent = () => document.documentElement.style.getPropertyValue("--l-accent");
+    const arrow = (key: string) =>
+      act(() => {
+        fireEvent.keyDown(window, { key });
+      });
+
+    async function openPick() {
+      vi.mocked(ipc.listThemes).mockResolvedValue([
+        view("t", "Saved", C),
+        view("u", "Other", "#00aa00"),
+      ]);
+      vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+        cb({ shownId: 1, reason: "hotkey", appearance: APPEARANCE });
+        return Promise.resolve(() => {});
+      });
+      await mount();
+      await type(">theme");
+      await act(async () => {});
+    }
+
+    it("arrows repaint without another list_themes or any set_appearance", async () => {
+      await openPick();
+      expect(screen.getAllByRole("option")).toHaveLength(2);
+      expect(accent()).toBe(C);
+      arrow("ArrowDown");
+      expect(accent()).toBe("#00aa00");
+      arrow("ArrowDown");
+      expect(accent()).toBe(C);
+      expect(ipc.listThemes).toHaveBeenCalledTimes(1);
+      expect(ipc.setAppearance).not.toHaveBeenCalled();
+    });
+
+    it("Escape puts the saved look back and keeps the pick open", async () => {
+      await openPick();
+      arrow("ArrowDown");
+      expect(accent()).toBe("#00aa00");
+      arrow("Escape");
+      expect(accent()).toBe(C);
+      expect(screen.getAllByRole("option")).toHaveLength(2);
+      expect(ipc.hideLauncher).not.toHaveBeenCalled();
+    });
   });
 });
