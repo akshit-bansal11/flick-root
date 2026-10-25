@@ -321,7 +321,10 @@ function themeRows(s: State, text: string): Item[] {
 }
 
 const currentAt = (items: Item[]): number =>
-  Math.max(0, items.findIndex((i) => themeRow(i)?.current));
+  Math.max(
+    0,
+    items.findIndex((i) => themeRow(i)?.current),
+  );
 
 /** Shows the quick pick's rows instead of searching; asks for the theme list once. */
 function pickThemes(prev: State, next: State, text: string): Result {

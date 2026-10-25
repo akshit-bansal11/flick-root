@@ -118,11 +118,7 @@ export function LauncherView({
           />
         )}
       </div>
-      <StatusLine
-        status={status}
-        copied={state.copied}
-        copyFailed={state.copyFailed}
-      />
+      <StatusLine status={status} copied={state.copied} copyFailed={state.copyFailed} />
     </div>
   );
 }
