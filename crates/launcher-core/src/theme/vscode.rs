@@ -584,10 +584,10 @@ mod tests {
 
     #[test]
     fn invisible_chars_stripped_from_name() {
-        let zw = format!(r#"{{"name": "​", "colors": {{{BASE}}}}}"#);
+        let zw = format!(r#"{{"name": "{}", "colors": {{{BASE}}}}}"#, '\u{200b}');
         let imp = parse(&zw, "my-theme").unwrap();
         assert_eq!(imp.seed.name, "my-theme (imported)");
-        let bidi = format!(r#"{{"name": "Nord‮", "colors": {{{BASE}}}}}"#);
+        let bidi = format!(r#"{{"name": "Nord{}", "colors": {{{BASE}}}}}"#, '\u{202e}');
         assert_eq!(parse(&bidi, "f").unwrap().seed.name, "Nord (imported)");
     }
 
