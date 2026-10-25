@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AddKeyDialog } from "./AddKeyDialog";
 import * as api from "./api";
+import { keyHelp } from "./MaskedKey";
 import { OnOff } from "./OnOff";
 import { SettingRow } from "./Row";
 import { type EnginePatch, type EngineProbe, type EngineView, errorText } from "./types";
@@ -54,6 +55,7 @@ function Row({ e, probe, apply, reload }: RowProps) {
         label={e.title}
         value={ok ? status : undefined}
         hint={ok ? undefined : status}
+        help={ABOUT[e.id]}
         preview={{
           title: `# ${e.title.toLowerCase()}`,
           body: `${ABOUT[e.id] ?? "Asked about ambiguous requests when enabled."} Status: ${status}.`,
@@ -101,9 +103,10 @@ function Row({ e, probe, apply, reload }: RowProps) {
         <SettingRow
           label="key"
           value={`Key stored for ${e.key_host}`}
+          help={keyHelp(e.key_host ?? "")}
           preview={{
             title: "# key",
-            body: `Stored in Windows Credential Manager and only sent to ${e.key_host}. The key itself is never shown.`,
+            body: keyHelp(e.key_host ?? ""),
           }}
         >
           <span className="s-add">

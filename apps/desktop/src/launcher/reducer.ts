@@ -789,7 +789,10 @@ function step(s: State, ev: Event): Result {
       const home = ev.items;
       const pins = ev.pins;
       if (!isHome(s)) return out({ ...s, home, pins });
-      const selected = Math.min(s.selected, Math.max(0, home.length - 1));
+      // Follow the selected item when a pin moves it; else keep the index, clamped.
+      const keptId = s.items[s.selected]?.id;
+      const at = home.findIndex((i) => i.id === keptId);
+      const selected = at >= 0 ? at : Math.min(s.selected, Math.max(0, home.length - 1));
       return out({ ...s, home, pins, items: home, selected });
     }
     case "themesLoaded": {

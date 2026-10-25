@@ -190,6 +190,19 @@ describe("Launcher", () => {
       expect(ipc.togglePin).not.toHaveBeenCalled();
     });
 
+    it("a held Ctrl+P (repeat) does not toggle the pin again", async () => {
+      showHome([recent("app:r1", "Recent One")], []);
+      await mount();
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "p", ctrlKey: true, repeat: true });
+      });
+      expect(ipc.togglePin).not.toHaveBeenCalled();
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "p", ctrlKey: true });
+      });
+      expect(ipc.togglePin).toHaveBeenCalledTimes(1);
+    });
+
     it("a rejected togglePin shows its message as the notice", async () => {
       showHome([recent("app:r1", "Recent One")], []);
       await mount();

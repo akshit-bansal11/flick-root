@@ -86,6 +86,7 @@ export function Prefixes() {
       <SettingRow
         label={label}
         hint="switches the whole prefix"
+        help="Turn it off and the prefix stops completely; with nothing on it is hidden from the launcher."
         preview={{
           title: `# ${label.toLowerCase()}`,
           body: "Turn it off and the prefix stops completely; with nothing on it is hidden from the launcher.",

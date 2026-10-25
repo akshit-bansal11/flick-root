@@ -57,6 +57,8 @@ interface RowProps {
   value?: string;
   /** Muted one-line comment, shown when there is no value. */
   hint?: string;
+  /** Muted sentence under the row, always visible: the preview column hides on narrow windows. */
+  help?: string;
   /** Shown in the preview column while the row has focus or the pointer. */
   preview?: Preview;
   /** The control: `OnOff`, a `.btn`, a select. */
@@ -64,7 +66,7 @@ interface RowProps {
 }
 
 /** One config-file row: marker, label, value or comment, control. Focus or hover selects it. */
-export function SettingRow({ label, value, hint, preview, children }: RowProps) {
+export function SettingRow({ label, value, hint, help, preview, children }: RowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const setPreview = usePreview();
   // Native listeners: the row is not itself interactive, its controls are.
@@ -80,13 +82,16 @@ export function SettingRow({ label, value, hint, preview, children }: RowProps) 
     };
   }, [preview, setPreview]);
   return (
-    <div ref={ref} className="sr">
-      <span className="sr-mark" aria-hidden="true">
-        ›
-      </span>
-      <span>{label}</span>
-      {value ? <span className="sr-val">{value}</span> : <span className="sr-hint">{hint}</span>}
-      {children}
-    </div>
+    <>
+      <div ref={ref} className="sr">
+        <span className="sr-mark" aria-hidden="true">
+          ›
+        </span>
+        <span>{label}</span>
+        {value ? <span className="sr-val">{value}</span> : <span className="sr-hint">{hint}</span>}
+        {children}
+      </div>
+      {help && <p className="s-help s-editor">{help}</p>}
+    </>
   );
 }

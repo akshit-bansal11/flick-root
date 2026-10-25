@@ -5,6 +5,7 @@ import "./features.css";
 import { OnOff } from "./OnOff";
 import { SettingRow } from "./Row";
 import { errorText, type GeneralPatch, type SettingsView } from "./types";
+import { useSwapFocus } from "./useSwapFocus";
 
 interface Props {
   settings: SettingsView;
@@ -27,6 +28,7 @@ export function General({ settings, onChange, onTour }: Props) {
   const [skipInput, setSkipInput] = useState("");
   const [editing, setEditing] = useState<"skip" | "roots" | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const swap = useSwapFocus(confirming);
   const [cleared, setCleared] = useState(false);
   const [reindexing, setReindexing] = useState(false);
 
@@ -90,6 +92,7 @@ export function General({ settings, onChange, onTour }: Props) {
     } catch (e) {
       setError("history", e);
     }
+    swap.arm();
     setConfirming(false);
   };
 
@@ -111,9 +114,17 @@ export function General({ settings, onChange, onTour }: Props) {
         {errors[k]}
       </div>
     );
+  /** Focus the next remove button (or the add input) before this row unmounts. */
+  const focusAfterRemove = (btn: HTMLButtonElement) => {
+    const box = btn.closest(".s-roots");
+    const all = [...(box?.querySelectorAll<HTMLButtonElement>("ul button") ?? [])];
+    const next = all[all.indexOf(btn) + 1] ?? box?.querySelector<HTMLInputElement>("input");
+    next?.focus();
+  };
   const toggleEdit = (k: "skip" | "roots") => setEditing(editing === k ? null : k);
   const skipFolders = settings.programSkip.filter((s) => !DRIVE_RE.test(s));
   const programsNote = `${settings.programsCount} found.${settings.programsCapped ? " A drive hit its limit, so some programs are missing." : ""}`;
+  const programsHelp = `Scans every fixed and removable drive for exe, msi, apk and other installers. Network and optical drives are never touched. ${programsNote}`;
 
   return (
     <section>
@@ -157,6 +168,7 @@ export function General({ settings, onChange, onTour }: Props) {
       <SettingRow
         label="check for updates"
         hint="daily, asks GitHub only"
+        help="Once a day, asks GitHub whether a newer release exists. Nothing else is sent."
         preview={{
           title: "# check for updates",
           body: "Once a day, asks GitHub whether a newer release exists. Nothing else is sent.",
@@ -174,6 +186,7 @@ export function General({ settings, onChange, onTour }: Props) {
       <SettingRow
         label="index all drives"
         hint="D:, E: · system folders skipped"
+        help="Fixed, non-system drives. System folders like Windows and Program Files are skipped."
         preview={{
           title: "# index all drives",
           body: "Fixed, non-system drives. System folders like Windows and Program Files are skipped.",
@@ -189,9 +202,10 @@ export function General({ settings, onChange, onTour }: Props) {
       <SettingRow
         label="find programs on all drives"
         hint={programsNote}
+        help={programsHelp}
         preview={{
           title: "# find programs on all drives",
-          body: `Scans every fixed and removable drive for exe, msi, apk and other installers. Network and optical drives are never touched. ${programsNote}`,
+          body: programsHelp,
         }}
       >
         <OnOff
@@ -204,6 +218,7 @@ export function General({ settings, onChange, onTour }: Props) {
       <SettingRow
         label="drives"
         hint="untick a drive to skip it"
+        help="Untick a drive and the program scan skips it. Needs program scanning on."
         preview={{
           title: "# drives",
           body: "Untick a drive and the program scan skips it. Needs program scanning on.",
@@ -263,12 +278,13 @@ export function General({ settings, onChange, onTour }: Props) {
                   className="btn"
                   aria-label={`Remove ${s}`}
                   disabled={!settings.scanPrograms}
-                  onClick={() =>
+                  onClick={(ev) => {
+                    focusAfterRemove(ev.currentTarget);
                     void editSkip(
                       "skip",
                       settings.programSkip.filter((x) => x !== s),
-                    )
-                  }
+                    );
+                  }}
                 >
                   remove
                 </button>
@@ -323,9 +339,10 @@ export function General({ settings, onChange, onTour }: Props) {
                   type="button"
                   className="btn"
                   aria-label={`Remove ${r}`}
-                  onClick={() =>
-                    void run("roots", api.setRoots(settings.extraRoots.filter((x) => x !== r)))
-                  }
+                  onClick={(ev) => {
+                    focusAfterRemove(ev.currentTarget);
+                    void run("roots", api.setRoots(settings.extraRoots.filter((x) => x !== r)));
+                  }}
                 >
                   remove
                 </button>
@@ -357,10 +374,22 @@ export function General({ settings, onChange, onTour }: Props) {
       >
         {confirming ? (
           <span className="s-add">
-            <button type="button" className="btn s-btn-danger" onClick={() => void clear()}>
+            <button
+              type="button"
+              className="btn s-btn-danger"
+              ref={swap.whenOn}
+              onClick={() => void clear()}
+            >
               confirm clear
             </button>
-            <button type="button" className="btn" onClick={() => setConfirming(false)}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                swap.arm();
+                setConfirming(false);
+              }}
+            >
               cancel
             </button>
           </span>
@@ -368,8 +397,10 @@ export function General({ settings, onChange, onTour }: Props) {
           <button
             type="button"
             className="btn"
+            ref={swap.whenOff}
             onClick={() => {
               setCleared(false);
+              swap.arm();
               setConfirming(true);
             }}
           >

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as ipc from "../ipc";
 import { errorText } from "../settings/types";
-import { fromEvent, parseChord, shortcut } from "../shortcuts";
+import { fromEvent, idFor, parseChord, shortcut } from "../shortcuts";
 import { type ActiveTheme, applyTheme } from "../theme";
 import type { LaunchMode, Outcome } from "../types";
 import { cancelsDefault } from "./keys";
@@ -238,6 +238,8 @@ export function useLauncher(
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mode = stateRef.current.mode;
+      // Held Ctrl+P must not toggle the pin on and off.
+      if (e.repeat && idFor(mode, fromEvent(e)) === "pin") return e.preventDefault();
       const handled = dispatch({ type: "key", key: fromEvent(e) });
       if (cancelsDefault(e, mode, handled)) e.preventDefault();
     };

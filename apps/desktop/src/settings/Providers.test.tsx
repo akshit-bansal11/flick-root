@@ -99,10 +99,34 @@ describe("Providers", () => {
   it("masks the key and delete needs two steps", async () => {
     await mount();
     expect(screen.getByText(/•••• wxyz · api\.anthropic\.com/)).toBeTruthy();
-    await click("delete");
+    await click("Delete key for Anthropic");
     expect(api.deleteSecret).not.toHaveBeenCalled();
-    await click("confirm delete");
+    await click("Confirm delete key for Anthropic");
     expect(api.deleteSecret).toHaveBeenCalledWith("provider.anthropic@api.anthropic.com");
+  });
+
+  it("labels every key and options button with the provider name", async () => {
+    await mount();
+    for (const name of ["Test key for Anthropic", "Replace key for Anthropic"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    await click("Delete key for Anthropic");
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Confirm delete key for Anthropic" }),
+    );
+    await click("Keep key for Anthropic");
+    expect(api.deleteSecret).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Delete key for Anthropic" }),
+    );
+    await click("Options for Anthropic");
+    expect(screen.getByRole("button", { name: "Save options for Anthropic" })).toBeTruthy();
+  });
+
+  it("shows the key help sentence without hover", async () => {
+    await mount();
+    const help = screen.getByText(/only sent to api\.anthropic\.com/);
+    expect(help.className).toContain("s-help");
   });
 
   it("warns when the base URL host changes on a keyed provider", async () => {
@@ -139,7 +163,7 @@ describe("Providers", () => {
     fireEvent.change(screen.getByLabelText("Extra models"), {
       target: { value: " llama3 , ,qwen " },
     });
-    await click("save options");
+    await click("Save options for Ollama");
     expect(api.setProvider).toHaveBeenCalledWith(
       "ollama",
       expect.objectContaining({ models: ["llama3", "qwen"] }),

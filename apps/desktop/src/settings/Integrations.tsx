@@ -168,6 +168,7 @@ function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply })
         label="Spotify"
         value={connected ? (name ? `Connected as ${name}` : "connected") : undefined}
         hint="not connected"
+        help="Playing, queueing and moving playback need Spotify Premium."
         preview={{
           title: "# spotify",
           body: 'Works without connecting: "play X on spotify" opens the Spotify app. Connecting is optional and unlocks more Spotify features, using your own Spotify developer app. Playing, queueing and moving playback need Spotify Premium.',

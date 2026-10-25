@@ -2,6 +2,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../settings/api";
+import type { ProviderView } from "../settings/types";
 import { Detect, NONE_FOUND } from "./Detect";
 import { FirstRun } from "./FirstRun";
 import { Hotkey } from "./Hotkey";
@@ -53,6 +54,19 @@ const probe = (id: string, reachable: boolean) => ({
   ms: 5,
   error: null,
 });
+const view: ProviderView = {
+  id: "ollama",
+  title: "Ollama",
+  group: "local",
+  enabled: true,
+  base_url: "http://localhost:11434",
+  model: "",
+  models: [],
+  key_required: false,
+  key: null,
+  supports_effort: false,
+  status: "off",
+};
 
 describe("hotkeyRules", () => {
   it.each([
@@ -124,6 +138,41 @@ describe("Detect", () => {
     expect(host.querySelector<HTMLInputElement>('input[value="ollama"]')?.checked).toBe(false);
   });
 
+  it("drops a second choice made while the first call is in flight", async () => {
+    vi.mocked(api.probeProviders).mockResolvedValue([
+      probe("ollama", true),
+      probe("lmstudio", true),
+    ]);
+    let release: (v: ProviderView) => void = () => {};
+    vi.mocked(api.setProvider).mockReturnValueOnce(
+      new Promise<ProviderView>((res) => {
+        release = res;
+      }),
+    );
+    await mount(<Detect />);
+    await click(host.querySelector('input[value="ollama"]'));
+    await click(host.querySelector('input[value="lmstudio"]'));
+    expect(api.setProvider).toHaveBeenCalledTimes(1);
+    expect(api.setProvider).toHaveBeenCalledWith("ollama", { enabled: true });
+    await act(async () => release(view));
+    expect(api.setProvider).toHaveBeenCalledTimes(1);
+    expect(host.querySelector<HTMLInputElement>('input[value="ollama"]')?.checked).toBe(true);
+  });
+
+  it("a rejected enable shows the error and keeps the committed choice", async () => {
+    vi.mocked(api.probeProviders).mockResolvedValue([
+      probe("ollama", true),
+      probe("lmstudio", true),
+    ]);
+    await mount(<Detect />);
+    await click(host.querySelector('input[value="ollama"]'));
+    vi.mocked(api.setProvider).mockRejectedValueOnce({ code: "x", message: "boom" });
+    await click(host.querySelector('input[value="lmstudio"]'));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("boom");
+    expect(host.querySelector<HTMLInputElement>('input[value="ollama"]')?.checked).toBe(true);
+    expect(host.querySelector<HTMLInputElement>('input[value="lmstudio"]')?.checked).toBe(false);
+  });
+
   it("shows the none-found message", async () => {
     vi.mocked(api.probeProviders).mockResolvedValue([probe("ollama", false)]);
     await mount(<Detect />);
@@ -182,6 +231,13 @@ describe("FirstRun", () => {
     await click(byText("skip"));
     expect(bar()?.getAttribute("aria-valuenow")).toBe("4");
     expect(current()?.textContent).toContain("ask");
+  });
+
+  it("hides the step marks from assistive tech", async () => {
+    await setup();
+    const marks = [...host.querySelectorAll(".fr-mark")];
+    expect(marks.length).toBeGreaterThan(0);
+    for (const m of marks) expect(m.getAttribute("aria-hidden")).toBe("true");
   });
 
   it("marks the tour skipped only when it was skipped", async () => {

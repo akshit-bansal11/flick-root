@@ -76,6 +76,25 @@ describe("SettingRow and PreviewProvider", () => {
     expect(preview().textContent).toContain("At login.");
   });
 
+  it("renders the help sentence under the row, visible without focus", () => {
+    act(() =>
+      root?.render(
+        <PreviewProvider resetKey="x">
+          <SettingRow label="a" hint="h" help="Always visible." preview={{ title: "#", body: "b" }}>
+            <button type="button">go</button>
+          </SettingRow>
+          <SettingRow label="b" hint="h">
+            <button type="button">go2</button>
+          </SettingRow>
+        </PreviewProvider>,
+      ),
+    );
+    const help = screen.getByText("Always visible.");
+    expect(help.tagName).toBe("P");
+    expect(help.className).toContain("s-help");
+    expect(document.querySelectorAll(".s-help")).toHaveLength(1);
+  });
+
   it("resets when the page (resetKey) changes", () => {
     focusIn("change");
     expect(preview().textContent).toContain("Opens it.");

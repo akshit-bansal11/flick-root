@@ -193,3 +193,37 @@ describe("programs scan toggle", () => {
     expect(api.setGeneral).toHaveBeenCalledWith({ scanPrograms: false });
   });
 });
+
+describe("General focus and help", () => {
+  afterEach(cleanup);
+  const btn = (name: string) => screen.getByRole("button", { name });
+
+  it("focus follows clear to confirm clear and back to clear on cancel", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    fireEvent.click(btn("clear"));
+    expect(document.activeElement).toBe(btn("confirm clear"));
+    fireEvent.click(btn("cancel"));
+    expect(document.activeElement).toBe(btn("clear"));
+  });
+
+  it("removing a folder focuses the next remove button, the last one the add input", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    openSkipEditor();
+    fireEvent.click(screen.getByLabelText("Remove D:\Games"));
+    expect(document.activeElement).toBe(screen.getByLabelText("Remove node_modules"));
+    fireEvent.click(screen.getByLabelText("Remove node_modules"));
+    expect(document.activeElement).toBe(screen.getByLabelText("Exclude"));
+  });
+
+  it("shows the help sentences under the rows without hover", () => {
+    render(<General settings={settings} onChange={() => {}} />);
+    for (const text of [
+      /Once a day, asks GitHub/,
+      /System folders like Windows and Program Files are skipped/,
+      /Scans every fixed and removable drive.* 42 found\./,
+      /Untick a drive and the program scan skips it/,
+    ]) {
+      expect(screen.getByText(text).className).toContain("s-help");
+    }
+  });
+});

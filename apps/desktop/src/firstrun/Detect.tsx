@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../settings/api";
 import { TermRadio } from "../settings/TermRadio";
 import { errorText, type ProbeResult } from "../settings/types";
@@ -19,6 +19,8 @@ const SKIP = "";
 export function Detect() {
   const [found, setFound] = useState<ProbeResult[] | null>(null);
   const [chosen, setChosen] = useState(SKIP);
+  const committed = useRef(SKIP);
+  const inflight = useRef(false);
   const [err, setErr] = useState<string | null>(null);
 
   const probe = useCallback(() => {
@@ -35,15 +37,22 @@ export function Detect() {
   useEffect(probe, [probe]);
 
   /** Select one server (or `SKIP`): enable the new choice, then turn the previous one off. */
-  const choose = (id: string) => {
-    const prev = chosen;
-    const enable = id === SKIP ? Promise.resolve({}) : api.setProvider(id, { enabled: true });
-    enable
-      .then(() => {
-        setChosen(id);
-        return prev === SKIP ? undefined : api.setProvider(prev, { enabled: false });
-      })
-      .catch((e: unknown) => setErr(errorText(e)));
+  const choose = async (id: string) => {
+    // One call at a time: a second arrow press mid-flight is dropped, not interleaved.
+    if (inflight.current || id === committed.current) return;
+    inflight.current = true;
+    const prev = committed.current;
+    try {
+      if (id !== SKIP) await api.setProvider(id, { enabled: true });
+      committed.current = id;
+      setChosen(id);
+      if (prev !== SKIP) await api.setProvider(prev, { enabled: false });
+    } catch (e) {
+      setErr(errorText(e));
+      setChosen(committed.current);
+    } finally {
+      inflight.current = false;
+    }
   };
 
   return (
@@ -59,7 +68,7 @@ export function Detect() {
           legend="Ask provider"
           name="ask-provider"
           value={chosen}
-          onChange={choose}
+          onChange={(id) => void choose(id)}
           options={[
             ...found.map((p) => ({
               value: p.id,

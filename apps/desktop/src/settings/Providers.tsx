@@ -106,7 +106,12 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
         </span>
       </SettingRow>
       {p.key && (
-        <MaskedKey info={p.key} onReplace={() => setDialog("replace")} onDeleted={reload} />
+        <MaskedKey
+          title={p.title}
+          info={p.key}
+          onReplace={() => setDialog("replace")}
+          onDeleted={reload}
+        />
       )}
       {open && (
         <div className="f-form">
@@ -136,6 +141,7 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
             <button
               type="button"
               className="btn"
+              aria-label={`Save options for ${p.title}`}
               onClick={() =>
                 run(() =>
                   api.setProvider(p.id, {

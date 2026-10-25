@@ -591,6 +591,22 @@ describe("reducer", () => {
     expect(kept.home.map((i) => i.id)).toEqual(["n0"]);
   });
 
+  it("homeLoaded keeps the selection on the same item when a pin reorders the list", () => {
+    const old = [item("a"), item("b"), item("c")];
+    const s = inMode("none", { home: old, items: old, selected: 2 });
+    const next = [item("c"), item("a"), item("b")];
+    const r = reduce(s, { type: "homeLoaded", items: next, pins: ["c"] });
+    expect(r.state.selected).toBe(0);
+    expect(r.state.items[r.state.selected]?.id).toBe("c");
+  });
+
+  it("homeLoaded clamps the index when the selected item is gone", () => {
+    const old = [item("a"), item("b"), item("c")];
+    const s = inMode("none", { home: old, items: old, selected: 2 });
+    const r = reduce(s, { type: "homeLoaded", items: [item("a"), item("b")], pins: [] });
+    expect(r.state.selected).toBe(1);
+  });
+
   it("Ctrl+Shift+Enter skips a program row with no Admin action", () => {
     const prog = { ...item("p"), payload: { program: true } };
     const s = { ...inMode("find"), items: [prog] };

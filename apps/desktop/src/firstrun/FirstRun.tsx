@@ -86,7 +86,7 @@ export function FirstRun() {
         <ol className="fr-steps">
           {STEPS.map((s, i) => (
             <li key={s} className="fr-st" aria-current={i === at ? "step" : undefined}>
-              <span className="fr-mark">{i < at ? "✓" : i === at ? "›" : ""}</span>
+              <span className="fr-mark" aria-hidden="true">{i < at ? "✓" : i === at ? "›" : ""}</span>
               {s}
               {s === "tour" && skipped && <span className="fr-skipped">skipped</span>}
             </li>
