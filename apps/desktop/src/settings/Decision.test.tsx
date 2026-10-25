@@ -84,7 +84,7 @@ describe("Decision", () => {
     fireEvent.change(screen.getByLabelText("API key"), { target: { value: "jv-test" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /understand/ }));
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      fireEvent.click(screen.getByRole("button", { name: "save" }));
     });
     expect(api.setSecret).toHaveBeenCalledWith("engine.jev@api.typesafe.ai", "jv-test", true);
   });

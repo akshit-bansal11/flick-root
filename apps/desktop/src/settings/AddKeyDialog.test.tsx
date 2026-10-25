@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 const key = () => screen.getByLabelText("API key") as HTMLInputElement;
-const save = () => screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+const save = () => screen.getByRole("button", { name: "save" }) as HTMLButtonElement;
 
 describe("AddKeyDialog", () => {
   it("shows the exact warning and checkbox text", () => {
@@ -51,7 +51,7 @@ describe("AddKeyDialog", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("enables Save only with checkbox and value", () => {
+  it("enables save only with checkbox and value", () => {
     mount();
     expect(save().disabled).toBe(true);
     fireEvent.change(key(), { target: { value: "sk-1" } });

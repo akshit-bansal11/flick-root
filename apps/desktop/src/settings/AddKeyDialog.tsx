@@ -107,11 +107,17 @@ function Dialog({ providerName, host, mode, onSave, onCancel }: Props) {
           </p>
         )}
         <div className="key-dialog-actions">
-          <button type="button" onClick={cancel}>
-            Cancel
+          <button type="button" className="btn" onClick={cancel}>
+            cancel
           </button>
-          <button type="button" disabled={!canSave} aria-busy={busy} onClick={save}>
-            {busy ? "Saving…" : "Save"}
+          <button
+            type="button"
+            className="btn pri"
+            disabled={!canSave}
+            aria-busy={busy}
+            onClick={save}
+          >
+            {busy ? "saving…" : "save"}
           </button>
         </div>
       </div>

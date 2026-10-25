@@ -1,5 +1,7 @@
 import { useState } from "react";
 import * as api from "./api";
+import "./features.css";
+import { SettingRow } from "./Row";
 import { errorText, type SecretInfo } from "./types";
 
 interface Props {
@@ -43,33 +45,43 @@ export function MaskedKey({ info, onReplace, onDeleted }: Props) {
   };
 
   return (
-    <div className="pv-key">
-      <code>{`•••• ${info.last4 ?? ""} · ${info.host} · last used ${relative(info.last_used)}`}</code>
-      <button type="button" onClick={test}>
-        Test
-      </button>
-      <button type="button" onClick={onReplace}>
-        Replace
-      </button>
-      {confirming ? (
-        <>
-          <button type="button" className="pv-danger" onClick={del}>
-            Confirm delete
+    <>
+      <SettingRow
+        label="key"
+        value={`•••• ${info.last4 ?? ""} · ${info.host} · last used ${relative(info.last_used)}`}
+        preview={{
+          title: "# key",
+          body: `Stored in Windows Credential Manager and only sent to ${info.host}. The key itself is never shown.`,
+        }}
+      >
+        <span className="s-add">
+          <button type="button" className="btn" onClick={test}>
+            test
           </button>
-          <button type="button" onClick={() => setConfirming(false)}>
-            Keep
+          <button type="button" className="btn" onClick={onReplace}>
+            replace
           </button>
-        </>
-      ) : (
-        <button type="button" onClick={() => setConfirming(true)}>
-          Delete
-        </button>
-      )}
-      {result && (
-        <span role="status" className="s-help">
-          {result}
+          {confirming ? (
+            <>
+              <button type="button" className="btn s-btn-danger" onClick={del}>
+                confirm delete
+              </button>
+              <button type="button" className="btn" onClick={() => setConfirming(false)}>
+                keep
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn" onClick={() => setConfirming(true)}>
+              delete
+            </button>
+          )}
         </span>
+      </SettingRow>
+      {result && (
+        <div role="status" className="s-help s-editor">
+          {result}
+        </div>
       )}
-    </div>
+    </>
   );
 }

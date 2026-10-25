@@ -2,14 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { AddKeyDialog } from "./AddKeyDialog";
 import * as api from "./api";
 import { MaskedKey } from "./MaskedKey";
+import { OnOff } from "./OnOff";
+import { SettingRow } from "./Row";
 import { errorText, type ProbeResult, type ProviderGroup, type ProviderView } from "./types";
 import "./features.css";
 import "./providers.css";
 
 const GROUPS: [ProviderGroup, string][] = [
-  ["local", "Local"],
-  ["free", "Free gateways"],
-  ["own_key", "Your own key"],
+  ["local", "local"],
+  ["free", "free gateways"],
+  ["own_key", "your own key"],
 ];
 
 function hostOf(url: string): string {
@@ -62,60 +64,78 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
     }
   };
 
+  const status = statusText(p, probe);
+  const ok = p.key_required ? !!p.key : !!probe?.reachable;
+
   return (
-    <li className="pv-row">
-      <div className="pv-head">
-        <input
-          type="checkbox"
-          aria-label={`Enable ${p.title}`}
-          checked={p.enabled}
-          onChange={(e) => run(() => api.setProvider(p.id, { enabled: e.target.checked }))}
-        />
-        <span className="f-tile" aria-hidden="true">
-          {p.title.charAt(0)}
-        </span>
-        <span className="pv-title">{p.title}</span>
-        <span className="pv-stat" data-ok={p.key_required ? !!p.key : !!probe?.reachable}>
-          {statusText(p, probe)}
-        </span>
-        {p.key_required && !p.key && (
-          <button type="button" onClick={() => setDialog("add")}>
-            Add key
+    <>
+      <SettingRow
+        label={p.title}
+        value={ok ? status : undefined}
+        hint={ok ? undefined : status}
+        preview={{
+          title: `# ${p.title.toLowerCase()}`,
+          body: `${status}. Enable it to use it as an answer source.`,
+        }}
+      >
+        <span className="s-add">
+          {p.key_required && !p.key && (
+            <button
+              type="button"
+              className="btn"
+              aria-label={`Add key for ${p.title}`}
+              onClick={() => setDialog("add")}
+            >
+              add key
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn"
+            aria-label={`Options for ${p.title}`}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
+            options
           </button>
-        )}
-        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
-          Options
-        </button>
-      </div>
+          <OnOff
+            checked={p.enabled}
+            label={`Enable ${p.title}`}
+            onChange={(v) => void run(() => api.setProvider(p.id, { enabled: v }))}
+          />
+        </span>
+      </SettingRow>
       {p.key && (
         <MaskedKey info={p.key} onReplace={() => setDialog("replace")} onDeleted={reload} />
       )}
       {open && (
-        <div className="pv-opts">
-          <label>
+        <div className="f-form">
+          <label className="f-field">
             Base URL
-            <input value={url} onChange={(e) => setUrl(e.target.value)} />
+            <input className="s-input" value={url} onChange={(e) => setUrl(e.target.value)} />
           </label>
           {hostChanged && p.key && (
             <p className="pv-warn" role="alert">
               Changing the host deletes the stored key for this provider when you save.
             </p>
           )}
-          <label>
+          <label className="f-field">
             Model
-            <input value={model} onChange={(e) => setModel(e.target.value)} />
+            <input className="s-input" value={model} onChange={(e) => setModel(e.target.value)} />
           </label>
-          <label>
+          <label className="f-field">
             Extra models
             <input
+              className="s-input"
               value={extra}
               placeholder="comma-separated"
               onChange={(e) => setExtra(e.target.value)}
             />
           </label>
-          <div className="pv-head">
+          <div className="s-add">
             <button
               type="button"
+              className="btn"
               onClick={() =>
                 run(() =>
                   api.setProvider(p.id, {
@@ -129,10 +149,11 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
                 )
               }
             >
-              Save options
+              save options
             </button>
             <button
               type="button"
+              className="btn"
               aria-label={`Move ${p.title} up`}
               disabled={!canUp}
               onClick={() => onMove(-1)}
@@ -141,6 +162,7 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
             </button>
             <button
               type="button"
+              className="btn"
               aria-label={`Move ${p.title} down`}
               disabled={!canDown}
               onClick={() => onMove(1)}
@@ -170,7 +192,7 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
           }}
         />
       )}
-    </li>
+    </>
   );
 }
 
@@ -212,13 +234,13 @@ export function Providers() {
   };
 
   return (
-    <section className="pv-shell" aria-label="AI providers">
+    <section aria-label="AI providers">
       <h1 className="s-title">AI providers</h1>
-      <p className="s-desc">
+      <p className="s-desc s-prose">
         Choose where answers come from. Keys stay in Windows Credential Manager.
       </p>
-      <button type="button" className="s-btn-primary" onClick={probe}>
-        Probe local servers
+      <button type="button" className="btn pri" onClick={probe}>
+        probe local servers
       </button>
       {err && (
         <p className="s-error" role="alert">
@@ -227,22 +249,20 @@ export function Providers() {
       )}
       {GROUPS.map(([g, label]) => (
         <div key={g}>
-          <h2 className="pv-group">{label}</h2>
-          <ul>
-            {list.map((p, i) =>
-              p.group === g ? (
-                <Row
-                  key={p.id}
-                  p={p}
-                  probe={probes[p.id]}
-                  canUp={list.slice(0, i).some((x) => x.group === g)}
-                  canDown={list.slice(i + 1).some((x) => x.group === g)}
-                  onMove={(d) => move(i, d)}
-                  reload={reload}
-                />
-              ) : null,
-            )}
-          </ul>
+          <h2 className="sec">{`# ${label}`}</h2>
+          {list.map((p, i) =>
+            p.group === g ? (
+              <Row
+                key={p.id}
+                p={p}
+                probe={probes[p.id]}
+                canUp={list.slice(0, i).some((x) => x.group === g)}
+                canDown={list.slice(i + 1).some((x) => x.group === g)}
+                onMove={(d) => move(i, d)}
+                reload={reload}
+              />
+            ) : null,
+          )}
         </div>
       ))}
     </section>

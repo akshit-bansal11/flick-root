@@ -11,17 +11,13 @@
   flex-direction: column;
   gap: var(--l-sp-6);
   padding: var(--l-sp-9);
-  background: color-mix(in oklab, var(--l-panel) 92%, transparent);
+  background: var(--l-panel);
   color: var(--l-text);
+  border: var(--l-border);
   border-radius: var(--l-r-card);
-  box-shadow:
-    inset 0 1px 0 var(--l-spec),
-    inset 0 0 0 1px var(--l-hairline),
-    var(--l-shadow-overlay);
   font-family: var(--l-ui);
   font-size: var(--l-fs-body);
   line-height: var(--l-lh-body);
-  animation: key-dialog-in var(--l-dur) var(--l-ease-out);
 }
 .key-dialog h2 {
   margin: 0;
@@ -30,13 +26,14 @@
 }
 .key-dialog p {
   margin: 0;
-  color: var(--l-muted-strong);
+  color: var(--l-muted);
+  font-family: var(--l-prose);
 }
 .key-dialog input[type="password"] {
   padding: var(--l-sp-4) var(--l-sp-6);
   background: var(--l-bg);
   color: var(--l-text);
-  border: var(--l-border-hair);
+  border: var(--l-border);
   border-radius: var(--l-r-control);
   font-family: var(--l-mono);
 }
@@ -53,34 +50,7 @@
   justify-content: flex-end;
   gap: var(--l-sp-4);
 }
-.key-dialog button {
-  padding: var(--l-sp-3) var(--l-sp-8);
-  background: var(--l-raise);
-  color: var(--l-text);
-  border: var(--l-border-hair);
-  border-radius: var(--l-r-control);
-  cursor: pointer;
-  font: inherit;
-}
-.key-dialog button:last-child {
-  border-color: var(--l-accent);
-  background: var(--l-accent);
-  color: var(--l-on-accent);
-}
-.key-dialog button:disabled {
-  opacity: 0.5;
-}
 .key-dialog :focus-visible {
   outline: 2px solid var(--l-focus);
   outline-offset: 1px;
-}
-@keyframes key-dialog-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .key-dialog {
-    animation: none;
-  }
 }

@@ -36,11 +36,7 @@
 .pv-title {
   font-weight: 600;
 }
-.pv-shell > .s-btn-primary {
-  margin-bottom: var(--l-sp-4);
-}
 .pv-head,
-.pv-key,
 .pv-opts label {
   display: flex;
   align-items: center;
@@ -65,15 +61,10 @@
   color: var(--l-text);
   font: inherit;
 }
-.pv-key {
-  padding: var(--l-sp-4) 0 0 var(--l-sp-10);
-  font-size: var(--l-fs-caption);
-}
 .pv-warn {
+  margin: 0;
   color: var(--l-warn);
-}
-.pv-danger {
-  color: var(--l-err);
+  font-size: var(--l-fs-caption);
 }
 .pv-shell button,
 .pv-links button {
