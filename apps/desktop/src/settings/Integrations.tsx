@@ -199,8 +199,7 @@ function Spotify({ v, apply }: { v: IntegrationsView["spotify"]; apply: Apply })
       <ol className="s-prose">
         <li>Open the Spotify developer dashboard and create an app.</li>
         <li>
-          Add this redirect URI:{" "}
-          <code>{v.redirect_uri}</code>
+          Add this redirect URI: <code>{v.redirect_uri}</code>
         </li>
         <li>Copy the app's Client ID and paste it below.</li>
       </ol>
