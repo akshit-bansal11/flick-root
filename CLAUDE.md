@@ -2,6 +2,16 @@
 
 **Session start:** if .agent/HANDOFF.md exists, read it first and resume from its Next section (KICKOFF.md section 10). Keep it current after every commit. Decide for yourself; do not ask questions or wait for approval (KICKOFF.md section 9).
 
+## Notion project log (owner rule, 2026-10-27)
+
+The Notion page Claude Second Brain › Projects › Flick (https://app.notion.com/p/401c6445b19f81a3a192fc3db6328813) is the project's memory across sessions. Its child pages "Handbook: how Flick sessions are run" and "Flick 1.0 redesign" hold the execution method and the design record.
+
+- At session start, read the Flick page and the Handbook before working.
+- Copy the session's content onto the page actively, while working, not only at the end: add a dated Chat log entry at the top of `## Chat log` early in the session and extend it after each milestone or commit batch. Record the owner's asks (in their words), what was built and why (commit hashes), what was verified (CI runs), problems and their fixes, decisions and rejected alternatives, owner steps, and open questions.
+- Keep the snapshot sections (Project facts, Current state, Open threads, Next actions) and the `Last touched` and `Next action` properties current; superseded snapshots move under a dated "superseded" heading instead of being deleted.
+- When the method, rules or release procedure change, update the Handbook page; when design, themes or the plan change, update the design-record page.
+- Never write secret values (keys, tokens, passwords) to Notion. Private methods and agent notes go to Notion, not the public repo.
+
 Free, open-source, keyboard-first Windows launcher: five prefixes in one bar (Open, Commands, Calc, Ask, Projects). Tauri 2 shell, Rust crates for all logic, React 19 + TypeScript UI, Next.js site in apps/web. KICKOFF.md is the spec; docs/adr/ holds the locked decisions.
 
 ## FOSS-first
