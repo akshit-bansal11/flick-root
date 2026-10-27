@@ -21,6 +21,8 @@ export function Appearance() {
   const [themes, setThemes] = useState<ThemeView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState<ThemeSlot | null>(null);
+  /** Bumps on import and delete so the picker reopens on the fresh list; `id` is the new row. */
+  const [fresh, setFresh] = useState<{ n: number; id?: string }>({ n: 0 });
   /** Saves run one after another so a slow reply never lands after a newer one. */
   const chain = useRef<Promise<void>>(Promise.resolve());
 
@@ -70,6 +72,15 @@ export function Appearance() {
     });
     chain.current = done.then(() => undefined);
     return done;
+  };
+
+  /** Takes the list an import or delete returned; paints the imported row, else the saved theme. */
+  const onThemes = (list: ThemeView[], id?: string) => {
+    setThemes(list);
+    setFresh((f) => ({ n: f.n + 1, id }));
+    const t = list.find((x) => x.id === id);
+    if (t) applyTheme(document.documentElement, { id: t.id, dark: t.dark, roles: t.roles });
+    else applyTheme(document.documentElement, saved.current);
   };
 
   const slotRow = (slot: ThemeSlot, label: string, id: string) => (
@@ -130,13 +141,15 @@ export function Appearance() {
 
       {picking && (
         <ThemeList
-          key={picking}
+          key={`${picking}-${fresh.n}`}
           themes={themes}
           slot={picking}
           darkId={a.darkTheme}
           lightId={a.lightTheme}
           saved={a.active}
+          selectId={fresh.id}
           onSave={save}
+          onThemes={onThemes}
           onClose={() => setPicking(null)}
         />
       )}

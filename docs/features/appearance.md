@@ -26,10 +26,12 @@ seed that cannot reach 4.5:1 is refused, not shown. The derivation and its corre
 - **Ported editor themes:** 40 at this commit, each under an MIT, ISC, BSD or CC0 licence. The
   upstream repo, licence and copyright for each are in
   [THIRD-PARTY-THEMES.md](../../THIRD-PARTY-THEMES.md).
-- **Import a VS Code theme:** the parser exists and reads a theme file as untrusted input. It caps the
-  file size, reads JSONC, never follows `include` and makes safe names. **The import screen is not
-  built yet.** Choosing a file needs a new dependency, `tauri-plugin-dialog`, or a paste-a-path box
-  instead. That choice is pending the owner's decision.
+- **Import a VS Code theme:** in Settings, Appearance, `import VS Code theme…` opens the Windows file
+  picker for a `.json` or `.jsonc` colour theme. The file is read as untrusted input: at most 1 MiB,
+  JSONC comments and trailing commas allowed, `include` never followed, safe names. A preview shows
+  each Flick role, the VS Code key it came from, the colour, and whether it was used as is, raised for
+  contrast or filled from a fallback. `import as "<name>"` saves it as an `imported` theme; a selected
+  imported theme can be deleted (with a confirm step).
 
 ## Settings, Appearance
 

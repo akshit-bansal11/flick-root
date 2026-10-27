@@ -255,3 +255,24 @@ export interface IntegrationPatch {
   newName?: string;
   remove?: boolean;
 }
+
+/** Largest theme file the picker reads; mirrors vscode::MAX_BYTES in launcher-core. */
+export const MAX_THEME_BYTES = 1_048_576;
+
+/** One line of the import mapping table; mirrors MappingRowView in Rust. */
+export interface MappingRow {
+  role: string;
+  key: string;
+  hex: string;
+  used: boolean;
+}
+
+/** Payload of preview_vscode_theme; the fields the dialog shows (see ImportPreview in Rust). */
+export interface ImportPreview {
+  token: string;
+  id: string;
+  name: string;
+  rows: MappingRow[];
+  adjusted: string[];
+  notes: string[];
+}

@@ -54,3 +54,40 @@
   outline: 2px solid var(--l-focus);
   outline-offset: 1px;
 }
+.imp-dialog {
+  width: min(640px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.imp-map {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--l-fs-caption);
+}
+.imp-map th,
+.imp-map td {
+  padding: var(--l-sp-2) var(--l-sp-4) var(--l-sp-2) 0;
+  text-align: left;
+  font-weight: normal;
+}
+.imp-map thead th {
+  color: var(--l-muted);
+}
+.imp-map td:nth-child(3) {
+  font-family: var(--l-mono);
+  white-space: nowrap;
+}
+.imp-sw {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: var(--l-sp-3);
+  vertical-align: middle;
+  border-radius: var(--l-r-control);
+  box-shadow: 0 0 0 1px var(--l-line);
+}
+.imp-notes {
+  margin: 0;
+  padding-left: var(--l-sp-7);
+  color: var(--l-warn);
+}

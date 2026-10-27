@@ -1,5 +1,7 @@
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { type ActiveTheme, applyTheme, type ThemeView } from "../theme";
+import * as api from "./api";
+import { ImportTheme } from "./ImportTheme";
 import { ThemeMini, themeVars } from "./ThemeMini";
 import {
   chipCounts,
@@ -15,7 +17,8 @@ import {
   type ThemeSlot,
   visibleThemes,
 } from "./themePicker";
-import type { AppearancePatch } from "./types";
+import { type AppearancePatch, errorText } from "./types";
+import { useSwapFocus } from "./useSwapFocus";
 import "./themes.css";
 
 const CHIP_LABEL: Record<PickerChip, string> = {
@@ -49,15 +52,26 @@ interface Props {
   saved: ActiveTheme | null;
   /** Saves a patch; resolves true when it was stored. */
   onSave: (patch: AppearancePatch) => Promise<boolean>;
+  /** Opens with this theme selected and previewed (the one just imported). */
+  selectId?: string;
+  /** Gets the fresh list after an import or a delete; `selectId` names the row to select. */
+  onThemes: (themes: ThemeView[], selectId?: string) => void;
   onClose: () => void;
 }
 
 /** Filter, chips and a listbox of themes with a live preview of the highlighted one. */
-export function ThemeList({ themes, slot, darkId, lightId, saved, onSave, onClose }: Props) {
+export function ThemeList(props: Props) {
+  const { themes, slot, darkId, lightId, saved, selectId, onSave, onThemes, onClose } = props;
   const isDark = slot === "darkTheme";
   const [pk, setPk] = useState<PickerState>(() =>
-    initPicker(themes, isDark ? "dark" : "light", isDark ? darkId : lightId),
+    selectId
+      ? initPicker(themes, "all", selectId)
+      : initPicker(themes, isDark ? "dark" : "light", isDark ? darkId : lightId),
   );
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const confirming = confirmId !== null && confirmId === pk.selected;
+  const swap = useSwapFocus(confirming);
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
   const wrap = useRef<HTMLFieldSetElement>(null);
@@ -71,6 +85,20 @@ export function ThemeList({ themes, slot, darkId, lightId, saved, onSave, onClos
   const preview = (id: string) => {
     const t = themes.find((x) => x.id === id);
     if (t) applyTheme(root, { id: t.id, dark: t.dark, roles: t.roles });
+  };
+
+  const toggleConfirm = (on: boolean) => {
+    swap.arm();
+    setConfirmId(on ? pk.selected : null);
+  };
+  const del = async (id: string) => {
+    setError(null);
+    try {
+      onThemes(await api.deleteImportedTheme(id));
+    } catch (e) {
+      setError(errorText(e));
+      toggleConfirm(false);
+    }
   };
 
   const run = (effect: PickerEffect) => {
@@ -239,12 +267,44 @@ export function ThemeList({ themes, slot, darkId, lightId, saved, onSave, onClos
               >
                 use as {sel.dark ? "dark" : "light"} theme
               </button>
-              <button type="button" className="btn" disabled aria-describedby={`${listId}-imp`}>
-                import VS Code theme…
-              </button>
-              <span id={`${listId}-imp`} className="tp-sub">
-                Importing arrives in a later update.
-              </span>
+              {sel.source === "imported" &&
+                (confirming ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn s-btn-danger"
+                      ref={swap.whenOn}
+                      aria-label={`Confirm delete ${sel.name}`}
+                      onClick={() => void del(sel.id)}
+                    >
+                      confirm delete
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      aria-label={`Keep ${sel.name}`}
+                      onClick={() => toggleConfirm(false)}
+                    >
+                      keep
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn"
+                    ref={swap.whenOff}
+                    aria-label={`Delete ${sel.name}`}
+                    onClick={() => toggleConfirm(true)}
+                  >
+                    delete
+                  </button>
+                ))}
+              <ImportTheme onImported={onThemes} />
+              {error && (
+                <span role="alert" className="s-error">
+                  {error}
+                </span>
+              )}
             </div>
           </div>
         )}

@@ -17,6 +17,9 @@ vi.mock("./api", () => ({
   getAppearance: vi.fn(),
   setAppearance: vi.fn(),
   listThemes: vi.fn(),
+  previewVscodeTheme: vi.fn(),
+  saveImportedTheme: vi.fn(),
+  deleteImportedTheme: vi.fn(),
 }));
 
 const BASE: ThemeRoles = {
@@ -257,12 +260,59 @@ describe("theme picker", () => {
     expect(screen.getByText("from github.com/example/harbor")).toBeTruthy();
   });
 
-  it("the import button is disabled and says why", async () => {
+  it("the import button is enabled and the old stub text is gone", async () => {
     render(<Appearance />);
     await openDark();
     const btn = screen.getByRole("button", { name: /import VS Code theme/ });
-    expect(btn.hasAttribute("disabled")).toBe(true);
-    const reason = screen.getByText("Importing arrives in a later update.");
-    expect(btn.getAttribute("aria-describedby")).toBe(reason.id);
+    expect(btn.hasAttribute("disabled")).toBe(false);
+    expect(screen.queryByText("Importing arrives in a later update.")).toBeNull();
+  });
+
+  const openSage = async () => {
+    fireEvent.click((await screen.findAllByRole("button", { name: "change" }))[1]);
+    const input = await screen.findByRole("combobox", { name: "Filter themes" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+  };
+
+  it("builtin and port rows have no delete button", async () => {
+    render(<Appearance />);
+    const input = await openDark();
+    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(screen.getByText("from github.com/example/harbor")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
+  });
+
+  it("delete then confirm delete removes the imported theme", async () => {
+    vi.mocked(api.deleteImportedTheme).mockResolvedValue([D1, D2, L1]);
+    render(<Appearance />);
+    await openSage();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sage" }));
+    const confirm = screen.getByRole("button", { name: "Confirm delete Sage" });
+    expect(document.activeElement).toBe(confirm);
+    expect(api.deleteImportedTheme).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(api.deleteImportedTheme).toHaveBeenCalledWith("l2"));
+    expect(api.deleteImportedTheme).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole("option", { name: /Sage/ })).toBeNull());
+  });
+
+  it("keep cancels the delete and focuses delete", async () => {
+    render(<Appearance />);
+    await openSage();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep Sage" }));
+    const del = screen.getByRole("button", { name: "Delete Sage" });
+    expect(document.activeElement).toBe(del);
+    expect(api.deleteImportedTheme).not.toHaveBeenCalled();
+  });
+
+  it("a failed delete shows an alert", async () => {
+    vi.mocked(api.deleteImportedTheme).mockRejectedValue(new Error("disk full"));
+    render(<Appearance />);
+    await openSage();
+    fireEvent.click(screen.getByRole("button", { name: "Delete Sage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm delete Sage" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("disk full");
   });
 });

@@ -66,7 +66,7 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 - **Programs:** `/` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
 - **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); file search matches letters in order. [Details](docs/features/search.md).
 - **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
-- **Themes:** Flick's own themes and ported editor themes (MIT, ISC, BSD or CC0 licences), each checked for contrast. Pick one for dark and one for light in Settings, Appearance. Importing a VS Code theme is not built yet. [Details](docs/features/appearance.md).
+- **Themes:** Flick's own themes and ported editor themes (MIT, ISC, BSD or CC0 licences), each checked for contrast. Pick one for dark and one for light in Settings, Appearance, or import a VS Code colour theme file. [Details](docs/features/appearance.md).
 - **Pins:** `ctrl+p` pins or unpins an app or file in Home and Open; pinned items sit at the top. [Details](docs/features/search.md). [Details](docs/features/appearance.md).
 - **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).
 - **Frecency:** ranks items you use often and recently higher, with a 7-day half-life. You can turn on prefix learning, change the half-life, clear history, or turn ranking off to get pure match order.

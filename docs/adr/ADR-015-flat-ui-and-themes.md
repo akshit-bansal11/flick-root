@@ -58,11 +58,15 @@ checked for a few hand-written palettes only, and users could not bring their ow
   at 80 characters and slugs at 40, and never produces a bare Windows device name such as `con` or
   `com1`. Imported ids are `imported:<slug>`.
 
-## Not built yet
+## Importing without a dialog plugin
 
-The import UI is not built. The parser exists, but no command reads a file or path and calls it.
-Choosing a file needs `tauri-plugin-dialog` (a new dependency), or a paste-a-path box instead. This
-is the owner's decision, and the cards that build the UI wait for it. The dependency is not added.
+Settings picks the file with a native `<input type="file">` and reads it with the File API, so no
+dialog dependency is added and no path reaches the WebView (the File API exposes only a name). The
+page refuses a file over 1 MiB before reading it; `preview_vscode_theme` checks the size again before
+parsing and holds the result behind a single-use token. `save_imported_theme` writes
+`themes/<slug>.json` in the config folder atomically, and the registry re-checks every saved file on
+load (at most 100 files, 8 KB each). `delete_imported_theme` accepts only `imported:<slug>` ids. The
+three commands exist only in the Settings window.
 
 ## Alternatives
 
