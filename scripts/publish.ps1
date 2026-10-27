@@ -41,7 +41,8 @@ Get-ChildItem $work -Force | Where-Object Name -ne '.git' | Remove-Item -Recurse
 $tarball = Join-Path ([IO.Path]::GetTempPath()) "flick-publish-$Version.tar"
 $specs = @('.') + ($Private | ForEach-Object { ":(exclude)$_" })
 Invoke-Git archive --format=tar -o $tarball HEAD -- @specs
-tar -xf $tarball -C $work
+# Windows' own bsdtar: launched from Git Bash, a bare `tar` is GNU tar, which reads C:\ as a host.
+& (Join-Path $env:SystemRoot 'System32\tar.exe') -xf $tarball -C $work
 if ($LASTEXITCODE) { throw 'tar failed' }
 Remove-Item $tarball
 
