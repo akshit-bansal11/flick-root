@@ -2,7 +2,7 @@ import { type ChangeEvent, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ThemeView } from "../theme";
 import * as api from "./api";
-import { errorText, type ImportPreview, type MappingRow, MAX_THEME_BYTES } from "./types";
+import { errorText, type ImportPreview, MAX_THEME_BYTES, type MappingRow } from "./types";
 import "./dialog.css";
 
 interface Props {
