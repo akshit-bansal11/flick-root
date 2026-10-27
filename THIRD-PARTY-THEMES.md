@@ -62,16 +62,16 @@ Nothing that needs a request, a purchase, share-alike or copyleft terms is used:
 
 ## Not included
 
-- Darcula: licence not attribution-only or unverified; owner rule.
-- JetBrains Dark: licence not attribution-only or unverified; owner rule.
-- Zenburn: licence not attribution-only or unverified; owner rule.
-- Monokai: licence not attribution-only or unverified; owner rule.
-- Material Palenight: licence not attribution-only or unverified; owner rule.
-- Material Ocean: licence not attribution-only or unverified; owner rule.
-- Mariana: licence not attribution-only or unverified; owner rule.
-- Shades of Purple: the LICENSE.md is MIT text plus a "With condition" clause ("Any thing you build with this should also be MIT licensed"), so it is not plain MIT; owner rule.
+- Darcula: licence not attribution-only or unverified; project licence rule.
+- JetBrains Dark: licence not attribution-only or unverified; project licence rule.
+- Zenburn: licence not attribution-only or unverified; project licence rule.
+- Monokai: licence not attribution-only or unverified; project licence rule.
+- Material Palenight: licence not attribution-only or unverified; project licence rule.
+- Material Ocean: licence not attribution-only or unverified; project licence rule.
+- Mariana: licence not attribution-only or unverified; project licence rule.
+- Shades of Purple: the LICENSE.md is MIT text plus a "With condition" clause ("Any thing you build with this should also be MIT licensed"), so it is not plain MIT; project licence rule.
 - SynthWave '84: MIT (Copyright (c) 2019 Robb Owen), but the theme file defines no `editor.foreground`, so the text colour has no source in the mapping and nothing is guessed.
-- Tomorrow Night: the origin chriskempson/tomorrow-theme is MIT (Copyright (C) 2011 Chris Kempson) but ships only TextMate/other-editor files with no VS Code workbench keys (no accent, sidebar, selection list or border to map), and the VS Code port nashokin/Base16-Tomorrow-Night is GPL-3.0; owner rule.
-- Panda Syntax: tinkertrain/panda-syntax-vscode has no LICENSE file (LICENSE, LICENSE.md, LICENSE.txt all 404), no `license` field in package.json and no licence text in the README, so there is no grant to rely on; owner rule.
+- Tomorrow Night: the origin chriskempson/tomorrow-theme is MIT (Copyright (C) 2011 Chris Kempson) but ships only TextMate/other-editor files with no VS Code workbench keys (no accent, sidebar, selection list or border to map), and the VS Code port nashokin/Base16-Tomorrow-Night is GPL-3.0; project licence rule.
+- Panda Syntax: tinkertrain/panda-syntax-vscode has no LICENSE file (LICENSE, LICENSE.md, LICENSE.txt all 404), no `license` field in package.json and no licence text in the README, so there is no grant to rely on; project licence rule.
 
 Paid themes (Monokai Pro, Dracula Pro) are never used.

@@ -85,5 +85,5 @@ three commands exist only in the Settings window.
 - Old config files keep their look once. A file with `glass` loads, and the key is removed on the
   next save.
 - CI covers the derivation, the registry, the migration and the hygiene rules. CI cannot prove
-  how the flat panel looks on real displays, the caret style on the owner's WebView2 version, or
+  how the flat panel looks on real displays, the caret style on a given machine's WebView2 version, or
   contrast over real wallpapers. Those need a manual pass on Windows before release.

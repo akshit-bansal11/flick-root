@@ -1,4 +1,4 @@
-//! T1 acceptance tests: colour math and role derivation, public API only.
+//! Acceptance tests: colour math and role derivation, public API only.
 
 use launcher_core::theme::color::{
     BLACK, WHITE, blend_over, lift, lift_all, luminance, min_ratio, mix, parse_hex,

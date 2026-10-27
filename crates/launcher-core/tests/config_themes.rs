@@ -1,4 +1,4 @@
-//! T3 acceptance tests: dark_theme / light_theme and legacy theme migration. Public API only.
+//! Acceptance tests: dark_theme / light_theme and legacy theme migration. Public API only.
 
 use launcher_core::brand::{DEFAULT_THEME_ID, DEFAULT_THEME_LIGHT_ID};
 use launcher_core::config::{Appearance, Config};

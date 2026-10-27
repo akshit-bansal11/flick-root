@@ -1,4 +1,4 @@
-//! T2 acceptance tests: built-in registry, Flick defaults, imports. Public API only.
+//! Acceptance tests: built-in registry, Flick defaults, imports. Public API only.
 
 use launcher_core::brand::{DEFAULT_THEME_ID, DEFAULT_THEME_LIGHT_ID};
 use launcher_core::theme::color::{parse_hex, ratio};
