@@ -135,18 +135,16 @@ pub async fn ask_stream(
     }
     let cancel = CancellationToken::new();
     ASKS.lock().insert(id.clone(), cancel.clone());
-    let first = {
+    let (first, effort) = {
         let cfg = state.config.load();
-        thinking_mode
+        let effort = super::providers::effective_effort(&cfg, thinking_mode.as_deref(), &effort);
+        let first = thinking_mode
             .and_then(|m| super::providers::resolve_mode(&cfg, &m))
-            .and_then(|(p, m)| hub.with_model(&p, &m))
+            .and_then(|(p, m)| hub.with_model(&p, &m));
+        (first, effort)
     };
     let mut events = hub.ask_with(
-        request(
-            &text,
-            attachment.as_deref(),
-            providers::parse_effort(&effort).map(str::to_owned),
-        ),
+        request(&text, attachment.as_deref(), effort),
         cancel.clone(),
         first,
     );

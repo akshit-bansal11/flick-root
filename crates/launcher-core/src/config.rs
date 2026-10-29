@@ -425,7 +425,7 @@ pub struct FindMode {
 pub struct QueryMode {
     /// Query mode enabled.
     pub enabled: bool,
-    /// `fast` or `think`.
+    /// `auto` or an effort level; old `fast`/`think` still load (see `providers::parse_effort`).
     pub effort: String,
     /// Output token cap.
     pub max_tokens: u32,
@@ -455,6 +455,9 @@ pub struct ProviderEntry {
     /// Optional per-provider effort override.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// Supported effort levels per model id, low to max; filled by the model refresh.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub efforts: BTreeMap<String, Vec<String>>,
 }
 
 /// `[providers]`: an `order` list plus one table per provider id.
@@ -610,7 +613,7 @@ impl Default for QueryMode {
     fn default() -> Self {
         Self {
             enabled: true,
-            effort: "fast".into(),
+            effort: "auto".into(),
             max_tokens: 1024,
             thinking_mode: None,
         }
@@ -632,6 +635,7 @@ fn provider(wire: &str, base_url: &str, key_host: Option<&str>, model: &str) -> 
         models: Vec::new(),
         key_host: key_host.map(String::from),
         effort: None,
+        efforts: BTreeMap::new(),
     }
 }
 
@@ -928,6 +932,30 @@ first_run_done = true
                 .unwrap()
                 .contains("models")
         );
+    }
+
+    #[test]
+    fn efforts_default_absent_old_effort_loads_and_round_trips() {
+        let old: Config = toml::from_str(
+            "[modes.query]\neffort = \"think\"\n[providers.ollama]\nenabled = true\nwire = \"openai\"\n",
+        )
+        .unwrap();
+        assert_eq!(old.modes.query.effort, "think");
+        assert!(old.providers.entries["ollama"].efforts.is_empty());
+        assert!(
+            !toml::to_string(&Config::default())
+                .unwrap()
+                .contains("efforts")
+        );
+        let mut c = Config::default();
+        c.providers
+            .entries
+            .get_mut("ollama")
+            .unwrap()
+            .efforts
+            .insert("m".into(), vec!["low".into(), "max".into()]);
+        let back: Config = toml::from_str(&toml::to_string(&c).unwrap()).unwrap();
+        assert_eq!(back, c);
     }
 
     #[test]

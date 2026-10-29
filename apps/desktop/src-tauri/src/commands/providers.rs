@@ -349,6 +349,8 @@ pub struct ThinkingMode {
     pub model: String,
     /// Runs on this machine.
     pub local: bool,
+    /// Effort levels this model accepts, low to max; empty when none.
+    pub efforts: Vec<String>,
 }
 
 /// Modes plus the current pick.
@@ -358,6 +360,39 @@ pub struct ThinkingModes {
     pub modes: Vec<ThinkingMode>,
     /// Chosen mode id; the first mode when none or stale.
     pub selected: Option<String>,
+    /// Stored effort: `auto` or a level.
+    pub effort: String,
+}
+
+const DEFAULT_EFFORTS: [&str; 3] = ["low", "medium", "high"];
+
+/// Levels `model` supports: none when the preset cannot send effort, the fetched list when
+/// present, else the default three.
+fn efforts_for(e: &ProviderEntry, pr: &Preset, model: &str) -> Vec<String> {
+    if !pr.supports_effort {
+        return Vec::new();
+    }
+    match e.efforts.get(model) {
+        Some(list) => list.clone(),
+        None => DEFAULT_EFFORTS.iter().map(|l| (*l).to_owned()).collect(),
+    }
+}
+
+/// The effort to send: `effort` as a level, only if the chosen model (else the first) lists it.
+pub(crate) fn effective_effort(
+    cfg: &Config,
+    thinking_mode: Option<&str>,
+    effort: &str,
+) -> Option<String> {
+    let level = providers::parse_effort(effort)?;
+    let modes = thinking_modes(cfg);
+    let mode = thinking_mode
+        .and_then(|id| modes.iter().find(|m| m.id == id))
+        .or_else(|| modes.first())?;
+    mode.efforts
+        .iter()
+        .any(|l| l == level)
+        .then(|| level.to_owned())
 }
 
 /// Splits a mode id at the first `/`.
@@ -387,6 +422,7 @@ pub(crate) fn thinking_modes(cfg: &Config) -> Vec<ThinkingMode> {
                 provider_label: pr.title.to_owned(),
                 model: m.to_owned(),
                 local: pr.group == Group::Local,
+                efforts: efforts_for(e, pr, m),
             });
         }
     }
@@ -418,7 +454,37 @@ pub fn list_thinking_modes(state: State<'_, Arc<AppState>>) -> ThinkingModes {
     let cfg = state.config.load();
     let modes = thinking_modes(&cfg);
     let selected = selected_mode(&cfg, &modes);
-    ThinkingModes { modes, selected }
+    let effort = providers::parse_effort(&cfg.modes.query.effort)
+        .unwrap_or("auto")
+        .to_owned();
+    ThinkingModes {
+        modes,
+        selected,
+        effort,
+    }
+}
+
+/// Persists the global effort: `auto` or a level.
+#[tauri::command]
+pub async fn set_effort(
+    state: State<'_, Arc<AppState>>,
+    level: String,
+) -> Result<(), CommandError> {
+    let level = if level == "auto" {
+        level
+    } else {
+        providers::parse_effort(&level)
+            .ok_or_else(|| CommandError::new("invalid_effort", "effort is auto or a level"))?
+            .to_owned()
+    };
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|cfg| {
+            cfg.modes.query.effort = level;
+            Ok(())
+        })
+    })
+    .await
 }
 
 /// Persists the chosen thinking mode; unknown ids are rejected.
@@ -559,5 +625,62 @@ mod tests {
         assert_eq!(selected_mode(&cfg, &modes).as_deref(), Some("ollama/llama"));
         cfg.modes.query.thinking_mode = Some("gone/x".into());
         assert_eq!(selected_mode(&cfg, &modes).as_deref(), Some("openai/gpt-a"));
+    }
+
+    fn strs(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    #[test]
+    fn efforts_for_cases() {
+        let mut e = ProviderEntry::default();
+        assert!(!preset_of("ollama").supports_effort);
+        assert!(efforts_for(&e, preset_of("ollama"), "m").is_empty());
+        let pr = preset_of("openai");
+        assert!(pr.supports_effort);
+        assert_eq!(efforts_for(&e, pr, "m"), strs(&["low", "medium", "high"]));
+        e.efforts.insert("m".into(), Vec::new());
+        assert!(efforts_for(&e, pr, "m").is_empty());
+        e.efforts.insert("m".into(), strs(&["low", "max"]));
+        assert_eq!(efforts_for(&e, pr, "m"), strs(&["low", "max"]));
+    }
+
+    fn effort_cfg() -> Config {
+        let mut cfg = Config::default();
+        apply_order(&mut cfg, vec!["openai".into(), "ollama".into()]).unwrap();
+        let o = cfg.providers.entries.get_mut("openai").unwrap();
+        o.enabled = true;
+        o.model = "a".into();
+        o.models = vec!["b".into()];
+        o.efforts.insert("a".into(), strs(&["low", "high"]));
+        o.efforts.insert("b".into(), strs(&["medium"]));
+        let l = cfg.providers.entries.get_mut("ollama").unwrap();
+        l.enabled = true;
+        l.model = "l".into();
+        cfg
+    }
+
+    #[test]
+    fn modes_carry_efforts_and_effective_effort_filters() {
+        let cfg = effort_cfg();
+        let modes = thinking_modes(&cfg);
+        assert_eq!(modes[0].efforts, strs(&["low", "high"]));
+        assert!(modes[2].efforts.is_empty());
+        assert_eq!(
+            effective_effort(&cfg, Some("openai/a"), "low").as_deref(),
+            Some("low")
+        );
+        assert_eq!(effective_effort(&cfg, Some("openai/a"), "max"), None);
+        assert_eq!(effective_effort(&cfg, Some("openai/a"), "fast"), None);
+        assert_eq!(
+            effective_effort(&cfg, Some("openai/a"), "think").as_deref(),
+            Some("high")
+        );
+        assert_eq!(effective_effort(&cfg, Some("ollama/l"), "low"), None);
+        assert_eq!(
+            effective_effort(&cfg, Some("gone/x"), "high").as_deref(),
+            Some("high")
+        );
+        assert_eq!(effective_effort(&cfg, None, "low").as_deref(), Some("low"));
     }
 }

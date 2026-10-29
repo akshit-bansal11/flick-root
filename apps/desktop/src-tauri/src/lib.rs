@@ -105,6 +105,7 @@ pub fn run() {
             commands::providers::set_provider_order,
             commands::providers::list_thinking_modes,
             commands::providers::set_thinking_mode,
+            commands::providers::set_effort,
             commands::engines::list_engines,
             commands::engines::probe_decision_engines,
             commands::engines::set_engine,

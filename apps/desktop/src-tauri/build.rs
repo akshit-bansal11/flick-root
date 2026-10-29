@@ -18,6 +18,7 @@ fn main() {
         "cancel_ask",
         "list_thinking_modes",
         "set_thinking_mode",
+        "set_effort",
         "get_settings",
         "set_general",
         "get_appearance",
