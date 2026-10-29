@@ -201,8 +201,10 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `set_feature_enabled` | `id, enabled` | `FeatureView` | `unknown_feature`, `start_failed` | Features |
 | `set_mode_enabled` | `mode, enabled` | `()` | `locked` (Command) | Features |
 | `set_feature_options` | `id, options: json` | `FeatureView` | `invalid_options` | Features |
-| `list_thinking_modes` | none | `{ modes: Vec<{ id, provider_id, provider_label, model, local }>, selected? }` (every enabled provider x model, fallback order; stale or missing `selected` means the first) | none | Launcher (Ask) |
+| `list_thinking_modes` | none | `{ modes: Vec<{ id, provider_id, provider_label, model, local, efforts }>, selected?, effort }` (every enabled provider x model, fallback order; stale or missing `selected` means the first; `efforts` lists the model's levels, empty when none; `effort` is `auto` or a level) | none | Launcher (Ask) |
 | `set_thinking_mode` | `id` | `()` | see `providers.rs` | Launcher (Ask) |
+| `set_effort` | `level: auto, low, medium, high, xhigh or max` | `()` | `invalid_effort` | Launcher (Ask) |
+| `refresh_provider_models` | `id` | `ProviderView` | `unknown_provider`, `no_key`, `host_mismatch`, `network`, `no_models` | AI providers |
 | `get_appearance` / `set_appearance` | none / `{ theme, glass, scheme }` | `AppearanceView` | `invalid_value` | Appearance |
 | `set_tutorial_done` | `done` | `()` | none | Settings window only (the tour) |
 | `set_hotkeys_paused` | `paused: bool` | `()` | none | Settings window only (the tour pauses the global hotkeys) |
@@ -294,7 +296,7 @@ extra_roots = []
 
 [modes.query]
 enabled = true              # on, but shows "Connect a model" until a provider is enabled
-effort = "fast"             # fast | think
+effort = "auto"             # auto | low | medium | high | xhigh | max (old fast/think still load)
 max_tokens = 1024
 thinking_mode = "ollama/llama3"  # optional; last chosen <provider>/<model>, omitted when unset
 
@@ -307,6 +309,9 @@ models = []                 # extra model names; each becomes a thinking mode
 wire = "openai"
 base_url = "http://localhost:11434/v1"
 model = ""
+[providers.<id>.efforts]    # written by fetch or refresh; one entry per model id
+"<model-id>" = ["low", "medium", "high"]
+
 [providers.lmstudio]
 enabled = false
 wire = "openai"

@@ -9,7 +9,7 @@ Flick is at v1.0.0. Features:
 - Open (`/`): fuzzy search of installed apps, including Store apps, as Start's "All apps" lists them, plus programs found on your drives, and files and folders under the indexed roots, with Open, Open file location and Copy path.
 - Commands (`>`): system commands, web shortcuts, ports, media, capture.
 - Calc (`=`): math, units, currency and time zones.
-- Ask (`?`): streams an answer from the provider and model you pick, with Fast/Think, thinking modes and provider fallback.
+- Ask (`?`): streams an answer from the provider and model you pick, with model and effort switching and provider fallback.
 - Features: frecency, inline math and units, system commands, web shortcuts.
 - Settings window (General, Appearance, Prefixes, AI providers, Decision engine, Integrations, About), first run with a welcome screen, and an interactive tour.
 - Natural-language finder, ports and processes, media controls, Explain this, and Quick capture (see Features below and [docs/features/](docs/features/)).
@@ -44,8 +44,8 @@ A prefix typed first in the empty bar narrows the search to one set of results; 
 | `Ctrl+Shift+C` | Copy: path in Open (files and folders), answer in Ask. Enter copies a result in Calc and Commands |
 | `Delete` | End a process, after arrowing to its row in Commands; `Enter` confirms |
 | `Ctrl+1` to `Ctrl+4` | Go to Open, Commands, Calc, Ask |
-| `Tab` / `Shift+Tab` | Next / previous thinking mode (Ask) |
-| `Ctrl+T` | Fast/Think toggle (Ask) |
+| `Ctrl+T` | Next model (Ask) |
+| `Shift+Tab` | Next effort (Ask): auto, then the model's levels |
 | `Ctrl+Shift+X` | Remove the attached Explain text (Ask) |
 | `Backspace` | On an empty input, leave the mode |
 | `Esc` | Cancel a running answer, then clear the input, then hide |
@@ -63,7 +63,8 @@ Flick hides on `Esc`, on focus loss, and after a successful launch.
 
 - **Programs:** `/` also lists programs found by scanning every fixed and removable drive, ranked below installed apps; loose fuzzy hits are dropped. [Details](docs/features/programs.md).
 - **Search:** typos are tolerated in app names, system commands and feature keywords (`spotifu`, `slep`); file search matches letters in order. [Details](docs/features/search.md).
-- **Thinking modes:** in `?`, every enabled provider and model is a mode; Tab switches. [Details](docs/features/thinking-modes.md).
+- **Model and effort switching:** in `?`, every enabled provider and model is a mode; `Ctrl+T` switches model and `Shift+Tab` switches effort. [Details](docs/features/thinking-modes.md).
+- **Model lists:** models and efforts are fetched from your provider when you save its key, or on demand in Settings, AI providers, refresh models.
 - **Themes:** Flick's own themes and ported editor themes (MIT, ISC, BSD or CC0 licences), each checked for contrast. Pick one for dark and one for light in Settings, Appearance, or import a VS Code colour theme file. [Details](docs/features/appearance.md).
 - **Pins:** `ctrl+p` pins or unpins an app or file in Home and Open; pinned items sit at the top. [Details](docs/features/search.md). [Details](docs/features/appearance.md).
 - **Welcome and tour:** first launch asks to take an interactive tour; replay it in Settings > General. [Details](docs/features/tutorial.md).

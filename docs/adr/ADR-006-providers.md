@@ -25,6 +25,8 @@ Current state:
 - The OpenAI-format `Bearer` header string is wrapped in `zeroize::Zeroizing`; the Anthropic `x-api-key` header borrows the secret directly. `HeaderValue` still copies the bytes, which cannot be zeroized.
 - Outbound HTTP for providers uses `reqwest` 0.13 with the `native-tls` feature (SChannel on Windows). reqwest 0.13 has no `rustls-tls` feature, so rustls is not used.
 
+Amended 2026-10-29: Fast/Think is replaced by effort levels (`auto`, `low`, `medium`, `high`, `xhigh`, `max`). Each model lists the levels its provider supports, fetched when a key is saved or on refresh. Anthropic requests carry the chosen level in `output_config.effort`; no explicit `thinking` field is sent. Auto omits the field, so the model default applies. The Decision and Current state lines above are kept as the original record.
+
 ## Alternatives
 
 - One client per vendor SDK. Rejected: two wire formats cover every preset, and a vendor SDK per provider adds dependencies the user did not ask for.
