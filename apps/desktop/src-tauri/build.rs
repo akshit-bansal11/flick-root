@@ -34,6 +34,7 @@ fn main() {
         "probe_providers",
         "set_provider",
         "set_provider_order",
+        "refresh_provider_models",
         "list_engines",
         "probe_decision_engines",
         "set_engine",

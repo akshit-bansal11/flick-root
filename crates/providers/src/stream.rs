@@ -123,11 +123,7 @@ pub(crate) fn start<W: WireState>(
 
 /// GET a models list (`{"data":[{"id":..}]}`) with a capped body.
 pub(crate) async fn list_models(rb: reqwest::RequestBuilder) -> Result<Vec<String>, ProviderError> {
-    let resp = rb.send().await.map_err(net_err)?;
-    check_status(&resp)?;
-    let body = read_capped(resp, MAX_PROBE_BYTES).await?;
-    let v: Value =
-        serde_json::from_slice(&body).map_err(|_| ProviderError::Decode("models json"))?;
+    let v = get_json(rb).await?;
     Ok(v["data"]
         .as_array()
         .map(|a| {
@@ -136,6 +132,23 @@ pub(crate) async fn list_models(rb: reqwest::RequestBuilder) -> Result<Vec<Strin
                 .collect()
         })
         .unwrap_or_default())
+}
+
+/// Send `rb`, require a 2xx status and parse a capped JSON body. Errors carry no body.
+pub(crate) async fn get_json(rb: reqwest::RequestBuilder) -> Result<Value, ProviderError> {
+    let resp = rb.send().await.map_err(net_err)?;
+    check_status(&resp)?;
+    let body = read_capped(resp, MAX_PROBE_BYTES).await?;
+    serde_json::from_slice(&body).map_err(|_| ProviderError::Decode("models json"))
+}
+
+/// Run a model-list fetch with a 10 s deadline; past it, `Timeout { phase: "response" }`.
+pub(crate) async fn with_deadline<T>(
+    fetch: impl Future<Output = Result<T, ProviderError>>,
+) -> Result<T, ProviderError> {
+    tokio::time::timeout(Duration::from_secs(10), fetch)
+        .await
+        .map_err(|_| ProviderError::Timeout { phase: "response" })?
 }
 
 /// Wrap a models-list call into a [`ProbeResult`] with a deadline.

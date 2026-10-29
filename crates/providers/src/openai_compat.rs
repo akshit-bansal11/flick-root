@@ -4,8 +4,8 @@ use crate::http;
 use crate::sse::SseEvent;
 use crate::stream::{self, WireState};
 use crate::{
-    Delta, KeySource, Message, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role,
-    Usage,
+    Delta, KeySource, MAX_FETCHED_MODELS, Message, ModelInfo, ProbeResult, Provider,
+    ProviderConfig, ProviderError, Request, Role, Usage,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -53,6 +53,36 @@ impl OpenAiCompat {
         let rb = authorize(&self.cfg, &self.keys, self.http.get(self.url("models"))).await?;
         stream::list_models(rb).await
     }
+
+    async fn fetch_model_list(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        let rb = authorize(&self.cfg, &self.keys, self.http.get(self.url("models"))).await?;
+        let v = stream::get_json(rb).await?;
+        Ok(parse_models(&v, self.cfg.supports_effort))
+    }
+}
+
+/// Model ids from a `GET /models` body in API order. The wire reports no effort support,
+/// so every model gets low/medium/high when the preset can send effort, else none.
+// ponytail: cap, a picker if users need more
+pub(crate) fn parse_models(v: &Value, supports_effort: bool) -> Vec<ModelInfo> {
+    let efforts: Vec<String> = if supports_effort {
+        ["low", "medium", "high"].map(str::to_owned).to_vec()
+    } else {
+        Vec::new()
+    };
+    v["data"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| m["id"].as_str())
+                .take(MAX_FETCHED_MODELS)
+                .map(|id| ModelInfo {
+                    id: id.to_owned(),
+                    efforts: efforts.clone(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Set the sensitive bearer header when a key exists.
@@ -155,5 +185,31 @@ impl Provider for OpenAiCompat {
 
     async fn probe(&self) -> ProbeResult {
         self.probe_with(Duration::from_secs(3)).await
+    }
+
+    async fn fetch_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        stream::with_deadline(self.fetch_model_list()).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_models;
+    use serde_json::json;
+
+    #[test]
+    fn ids_efforts_and_cap() {
+        let v = json!({ "data": [{ "id": "a" }, { "object": "x" }, { "id": "b" }] });
+        let got = parse_models(&v, true);
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[1].id, "b");
+        assert_eq!(got[0].efforts, ["low", "medium", "high"]);
+        assert!(parse_models(&v, false).iter().all(|m| m.efforts.is_empty()));
+        let data: Vec<_> = (0..30).map(|i| json!({ "id": format!("m{i}") })).collect();
+        assert_eq!(
+            parse_models(&json!({ "data": data }), false).len(),
+            crate::MAX_FETCHED_MODELS
+        );
+        assert!(parse_models(&json!({}), true).is_empty());
     }
 }

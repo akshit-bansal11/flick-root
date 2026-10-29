@@ -24,6 +24,7 @@
     "allow-probe-providers",
     "allow-set-provider",
     "allow-set-provider-order",
+    "allow-refresh-provider-models",
     "allow-list-engines",
     "allow-probe-decision-engines",
     "allow-set-engine",

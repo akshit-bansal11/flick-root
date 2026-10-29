@@ -9,7 +9,7 @@ use secrecy::SecretString;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 struct FakeKey;
@@ -237,4 +237,58 @@ async fn probe_needs_key_then_lists_models() {
     let r = client(&s, Arc::new(FakeKey)).probe().await;
     assert!(r.reachable);
     assert_eq!(r.models, ["a", "b"]);
+}
+
+#[tokio::test]
+async fn fetch_models_sends_key_and_version_and_parses() {
+    let s = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .and(query_param("limit", "1000"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"data":[{"id":"a","lifecycle":"active","capabilities":{"effort":
+            {"supported":true,"low":{"supported":true},"medium":{"supported":true},
+            "high":{"supported":true},"xhigh":null,"max":{"supported":false}}}},
+            {"id":"r","lifecycle":"retired","capabilities":null}],
+            "has_more":false,"first_id":"a","last_id":"r"}"#,
+        ))
+        .mount(&s)
+        .await;
+    let got = client(&s, Arc::new(FakeKey)).fetch_models().await.unwrap();
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].id, "a");
+    assert_eq!(got[0].efforts, ["low", "medium", "high"]);
+    let r = last_request(&s).await;
+    assert!(r.headers.get("x-api-key").is_some());
+    assert_eq!(
+        r.headers
+            .get("anthropic-version")
+            .unwrap()
+            .to_str()
+            .unwrap(),
+        ANTHROPIC_VERSION
+    );
+}
+
+#[tokio::test]
+async fn fetch_models_needs_key_and_hides_key_and_body() {
+    let s = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(ResponseTemplate::new(401).set_body_string("secret body"))
+        .mount(&s)
+        .await;
+    let e = client(&s, Arc::new(NoKeys))
+        .fetch_models()
+        .await
+        .unwrap_err();
+    assert!(matches!(e, ProviderError::NoKey { .. }));
+    assert!(s.received_requests().await.unwrap().is_empty());
+    let e = client(&s, Arc::new(FakeKey))
+        .fetch_models()
+        .await
+        .unwrap_err();
+    assert!(matches!(e, ProviderError::Status { code: 401 }));
+    let msg = e.to_string();
+    assert!(!msg.contains("sk-ant-fake") && !msg.contains("secret body"));
 }

@@ -35,4 +35,9 @@ pub trait Provider: Send + Sync {
     ) -> BoxStream<'static, Result<Delta, ProviderError>>;
     /// Check reachability and list models (GET /models).
     async fn probe(&self) -> ProbeResult;
+    /// Read the server's model list with each model's effort levels, at most
+    /// [`MAX_FETCHED_MODELS`]. The default reports that listing is unsupported.
+    async fn fetch_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        Err(ProviderError::Decode("model list not supported"))
+    }
 }

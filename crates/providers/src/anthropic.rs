@@ -9,7 +9,8 @@ use crate::http;
 use crate::sse::SseEvent;
 use crate::stream::{self, WireState};
 use crate::{
-    Delta, KeySource, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role, Usage,
+    Delta, EFFORT_LEVELS, KeySource, MAX_FETCHED_MODELS, ModelInfo, ProbeResult, Provider,
+    ProviderConfig, ProviderError, Request, Role, Usage,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -57,6 +58,42 @@ impl Anthropic {
         .await?;
         stream::list_models(rb).await
     }
+
+    async fn fetch_model_list(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        let rb = authorize(
+            &self.cfg,
+            &self.keys,
+            self.http.get(url(&self.cfg, "v1/models?limit=1000")),
+            true,
+        )
+        .await?;
+        Ok(parse_models(&stream::get_json(rb).await?))
+    }
+}
+
+/// Models from a `GET /v1/models` body: active (or lifecycle-less) entries in API order,
+/// each with the effort levels its `capabilities.effort` marks supported. Missing or null
+/// `capabilities`, `effort` or level objects mean "not supported".
+// ponytail: first page only (limit=1000), cap 20; add paging/picker if users need more
+pub(crate) fn parse_models(v: &Value) -> Vec<ModelInfo> {
+    let Some(data) = v["data"].as_array() else {
+        return Vec::new();
+    };
+    data.iter()
+        .filter(|m| m["lifecycle"].as_str().is_none_or(|l| l == "active"))
+        .filter_map(|m| {
+            let id = m["id"].as_str()?.to_owned();
+            let effort = &m["capabilities"]["effort"];
+            let on = |k: &str| effort["supported"] == true && effort[k]["supported"] == true;
+            let efforts = EFFORT_LEVELS
+                .iter()
+                .filter(|l| on(l))
+                .map(|l| (*l).to_owned())
+                .collect();
+            Some(ModelInfo { id, efforts })
+        })
+        .take(MAX_FETCHED_MODELS)
+        .collect()
 }
 
 fn host_of(cfg: &ProviderConfig) -> String {
@@ -214,5 +251,84 @@ impl Provider for Anthropic {
 
     async fn probe(&self) -> ProbeResult {
         self.probe_with(Duration::from_secs(3)).await
+    }
+
+    async fn fetch_models(&self) -> Result<Vec<ModelInfo>, ProviderError> {
+        stream::with_deadline(self.fetch_model_list()).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_models;
+    use serde_json::json;
+
+    fn ids(v: &serde_json::Value) -> Vec<String> {
+        parse_models(v).into_iter().map(|m| m.id).collect()
+    }
+
+    fn level(on: bool) -> serde_json::Value {
+        json!({ "supported": on })
+    }
+
+    #[test]
+    fn keeps_active_and_reads_efforts() {
+        let v = json!({
+            "data": [
+                {
+                    "id": "a",
+                    "lifecycle": "active",
+                    "capabilities": { "effort": {
+                        "supported": true, "low": level(true), "medium": level(false),
+                        "high": level(true), "xhigh": level(true), "max": level(true)
+                    }}
+                },
+                { "id": "old", "lifecycle": "retired", "capabilities": null },
+                { "id": "dep", "lifecycle": "deprecated", "capabilities": null },
+                { "id": "b" }
+            ],
+            "has_more": false
+        });
+        let got = parse_models(&v);
+        assert_eq!(ids(&v), ["a", "b"]);
+        assert_eq!(got[0].efforts, ["low", "high", "xhigh", "max"]);
+        assert!(got[1].efforts.is_empty());
+    }
+
+    #[test]
+    fn null_capabilities_and_null_xhigh_skip_cleanly() {
+        let v = json!({ "data": [
+            { "id": "n", "lifecycle": "active", "capabilities": null },
+            { "id": "x", "lifecycle": "active", "capabilities": { "effort": {
+                "supported": true, "low": level(true), "medium": level(true),
+                "high": level(true), "xhigh": null, "max": level(true)
+            }}},
+            { "id": "e", "capabilities": { "effort": null } }
+        ]});
+        let got = parse_models(&v);
+        assert!(got[0].efforts.is_empty());
+        assert_eq!(got[1].efforts, ["low", "medium", "high", "max"]);
+        assert!(got[2].efforts.is_empty());
+    }
+
+    #[test]
+    fn effort_unsupported_means_none() {
+        let v = json!({ "data": [{ "id": "a", "capabilities": { "effort": {
+            "supported": false, "low": level(true), "high": level(true)
+        }}}]});
+        assert!(parse_models(&v)[0].efforts.is_empty());
+    }
+
+    #[test]
+    fn caps_at_twenty_and_tolerates_missing_data() {
+        let data: Vec<_> = (0..25).map(|i| json!({ "id": format!("m{i}") })).collect();
+        let got = ids(&json!({ "data": data }));
+        assert_eq!(got.len(), crate::MAX_FETCHED_MODELS);
+        assert_eq!(got[0], "m0");
+        assert!(parse_models(&json!({})).is_empty());
+        assert_eq!(
+            ids(&json!({ "data": [{ "id": 3 }, { "id": "ok" }] })),
+            ["ok"]
+        );
     }
 }

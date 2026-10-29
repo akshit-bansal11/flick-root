@@ -5,7 +5,7 @@ use crate::state::AppState;
 use launcher_core::config::{Config, ProviderEntry};
 use providers::presets::{Group, PRESETS, Preset, build_provider, preset};
 use providers::secret::{SecretInfo, SecretName, SecretVault};
-use providers::{ProbeResult, ProviderConfig, Wire, http};
+use providers::{ModelInfo, ProbeResult, ProviderConfig, ProviderError, Wire, http};
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
@@ -301,6 +301,85 @@ pub async fn set_provider(
             effort,
         };
         s.update_config(|cfg| apply_patch(&s.vault, cfg, &id, patch))?;
+        let cfg = s.config.load();
+        let e = entry_of(&cfg, &id)
+            .ok_or_else(|| CommandError::new("unknown_provider", "no such provider"))?;
+        Ok(view(&s.vault, &cfg, &id, &e))
+    })
+    .await
+}
+
+/// Writes a fetched model list to provider `id`: the first id becomes `model` when none is
+/// set, the rest replace `models` (capped), and `efforts` is replaced by the fetched map.
+/// `enabled` is unchanged. An empty list is an error and leaves `cfg` untouched.
+pub(crate) fn apply_models(
+    cfg: &mut Config,
+    id: &str,
+    fetched: Vec<ModelInfo>,
+) -> Result<(), CommandError> {
+    let clean = |m: &str| m.trim().chars().take(MAX_MODEL_LEN).collect::<String>();
+    let fetched: Vec<ModelInfo> = fetched
+        .into_iter()
+        .map(|m| ModelInfo {
+            id: clean(&m.id),
+            efforts: m.efforts,
+        })
+        .filter(|m| !m.id.is_empty())
+        .collect();
+    let Some(first) = fetched.first() else {
+        return Err(CommandError::new(
+            "no_models",
+            "the server listed no models",
+        ));
+    };
+    let mut e = entry_of(cfg, id)
+        .ok_or_else(|| CommandError::new("unknown_provider", "no such provider"))?;
+    if e.model.trim().is_empty() {
+        e.model = first.id.clone();
+    }
+    let mut models: Vec<String> = Vec::new();
+    for m in &fetched {
+        if m.id != e.model.trim() && !models.contains(&m.id) {
+            models.push(m.id.clone());
+        }
+    }
+    models.truncate(MAX_MODELS);
+    e.models = models;
+    e.efforts = fetched.into_iter().map(|m| (m.id, m.efforts)).collect();
+    cfg.providers.entries.insert(id.to_owned(), e);
+    if !cfg.providers.order.iter().any(|i| i == id) {
+        cfg.providers.order.push(id.to_owned());
+    }
+    Ok(())
+}
+
+/// Maps a model-fetch failure to a UI error code; the message never holds a key or body.
+fn fetch_err(e: ProviderError) -> CommandError {
+    let code = match e {
+        ProviderError::NoKey { .. } => "no_key",
+        ProviderError::HostMismatch { .. } => "host_mismatch",
+        _ => "network",
+    };
+    CommandError::new(code, e.to_string())
+}
+
+/// Reads provider `id`'s model list and effort levels from its server, then saves them.
+/// A failed fetch leaves the config untouched.
+#[tauri::command]
+pub async fn refresh_provider_models(
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<ProviderView, CommandError> {
+    let cfg = state.config.load_full();
+    let mut entry = entry_of(&cfg, &id)
+        .ok_or_else(|| CommandError::new("unknown_provider", "no such provider"))?;
+    entry.key_host = entry.key_host.or_else(|| expected_host(&cfg, &id));
+    let p = build_provider(&id, &entry, preset_of(&id), state.keys.clone())
+        .map_err(|e| CommandError::new("network", e.to_string()))?;
+    let fetched = p.fetch_models().await.map_err(fetch_err)?;
+    let s = Arc::clone(&state);
+    blocking(move || {
+        s.update_config(|cfg| apply_models(cfg, &id, fetched))?;
         let cfg = s.config.load();
         let e = entry_of(&cfg, &id)
             .ok_or_else(|| CommandError::new("unknown_provider", "no such provider"))?;
@@ -682,5 +761,94 @@ mod tests {
             Some("high")
         );
         assert_eq!(effective_effort(&cfg, None, "low").as_deref(), Some("low"));
+    }
+
+    fn info(id: &str, efforts: &[&str]) -> ModelInfo {
+        ModelInfo {
+            id: id.into(),
+            efforts: strs(efforts),
+        }
+    }
+
+    #[test]
+    fn apply_models_fills_empty_model_and_writes_efforts() {
+        let mut cfg = Config::default();
+        cfg.providers.order.clear();
+        assert!(cfg.providers.entries["openai"].model.is_empty());
+        apply_models(
+            &mut cfg,
+            "openai",
+            vec![
+                info("a", &["low", "max"]),
+                info("b", &[]),
+                info("a", &["low"]),
+            ],
+        )
+        .unwrap();
+        let e = &cfg.providers.entries["openai"];
+        assert_eq!(e.model, "a");
+        assert_eq!(e.models, ["b"]);
+        assert_eq!(e.efforts["a"], strs(&["low"]));
+        assert!(e.efforts["b"].is_empty());
+        assert!(!e.enabled);
+        assert_eq!(cfg.providers.order, ["openai"]);
+    }
+
+    #[test]
+    fn apply_models_keeps_set_model_and_enabled() {
+        let mut cfg = effort_cfg();
+        apply_models(
+            &mut cfg,
+            "openai",
+            vec![info("x", &["low"]), info("a", &["high"])],
+        )
+        .unwrap();
+        let e = &cfg.providers.entries["openai"];
+        assert_eq!(e.model, "a");
+        assert_eq!(e.models, ["x"]);
+        assert!(e.enabled);
+        assert_eq!(e.efforts.len(), 2);
+        let modes = thinking_modes(&cfg);
+        assert_eq!(modes[0].id, "openai/a");
+        assert_eq!(modes[0].efforts, strs(&["high"]));
+        assert_eq!(modes[1].efforts, strs(&["low"]));
+    }
+
+    #[test]
+    fn apply_models_caps_extra_models() {
+        let mut cfg = Config::default();
+        let many: Vec<_> = (0..30).map(|i| info(&format!("m{i}"), &[])).collect();
+        apply_models(&mut cfg, "openai", many).unwrap();
+        let e = &cfg.providers.entries["openai"];
+        assert_eq!(e.model, "m0");
+        assert_eq!(e.models.len(), MAX_MODELS);
+        assert!(!e.models.contains(&e.model));
+    }
+
+    #[test]
+    fn apply_models_empty_is_error_and_leaves_cfg() {
+        let mut cfg = effort_cfg();
+        let before = cfg.clone();
+        let e = apply_models(&mut cfg, "openai", vec![info(" ", &["low"])]).unwrap_err();
+        assert_eq!(e.code, "no_models");
+        assert_eq!(cfg, before);
+        let e = apply_models(&mut cfg, "nope", vec![info("a", &[])]).unwrap_err();
+        assert_eq!(e.code, "unknown_provider");
+        assert_eq!(cfg, before);
+    }
+
+    #[test]
+    fn fetch_errors_map_to_codes_without_secrets() {
+        let e = fetch_err(ProviderError::NoKey { host: "h".into() });
+        assert_eq!(e.code, "no_key");
+        let e = fetch_err(ProviderError::HostMismatch {
+            bound: "a".into(),
+            actual: "b".into(),
+        });
+        assert_eq!(e.code, "host_mismatch");
+        assert_eq!(
+            fetch_err(ProviderError::Status { code: 401 }).code,
+            "network"
+        );
     }
 }

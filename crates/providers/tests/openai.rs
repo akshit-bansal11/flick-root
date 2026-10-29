@@ -253,3 +253,27 @@ async fn keyed_request_never_follows_redirect() {
     assert!(matches!(out[0], Err(ProviderError::Status { code: 302 })));
     assert!(target.received_requests().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn fetch_models_uses_bearer_key() {
+    let s = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/models"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_string(r#"{"data":[{"id":"a"},{"id":"b"}]}"#),
+        )
+        .mount(&s)
+        .await;
+    let got = client(&s, true, Arc::new(FakeKey))
+        .fetch_models()
+        .await
+        .unwrap();
+    let ids: Vec<_> = got.iter().map(|m| m.id.as_str()).collect();
+    assert_eq!(ids, ["a", "b"]);
+    assert_eq!(got[0].efforts, ["low", "medium", "high"]);
+    let r = last_request(&s).await;
+    assert_eq!(
+        r.headers.get("authorization").unwrap().to_str().unwrap(),
+        "Bearer sk-fake-0000"
+    );
+}

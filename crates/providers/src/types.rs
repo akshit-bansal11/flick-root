@@ -37,6 +37,18 @@ pub fn parse_effort(raw: &str) -> Option<&'static str> {
     EFFORT_LEVELS.iter().copied().find(|l| *l == raw)
 }
 
+/// Most models kept from one model-list fetch.
+pub const MAX_FETCHED_MODELS: usize = 20;
+
+/// One model read from a provider's model list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelInfo {
+    /// Model id as the API names it.
+    pub id: String,
+    /// Effort levels the model accepts, low to max; empty when none.
+    pub efforts: Vec<String>,
+}
+
 /// A completion request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
