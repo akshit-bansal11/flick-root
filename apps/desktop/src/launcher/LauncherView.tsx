@@ -12,6 +12,7 @@ import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
 import { StatusLine } from "./StatusLine";
 import { countsOf, statusHints } from "./status";
+import { Welcome } from "./Welcome";
 
 /** What the launcher panel needs: a reducer state and the callbacks that feed events back. */
 export interface LauncherViewProps {
@@ -109,6 +110,8 @@ export function LauncherView({
             onOpenSettings={() => openSettings("providers")}
             onOpenLink={openLink}
           />
+        ) : state.mode === "none" && state.input.trim() === "" && state.home.length === 0 ? (
+          <Welcome modes={hints} />
         ) : (
           <Results
             items={state.items}

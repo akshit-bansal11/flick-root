@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,13 @@ const APPEARANCE: Appearance = {
   active: { id: "t", dark: true, roles: ROLE_FIXTURE },
 };
 
+const PREFIXES = [
+  ["/", "open"],
+  [">", "commands"],
+  ["=", "calc"],
+  ["?", "ask"],
+] as const;
+
 let root: Root | undefined;
 
 async function mount() {
@@ -128,6 +135,49 @@ describe("Launcher", () => {
     expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
     expect(ipc.search).not.toHaveBeenCalled();
     expect(screen.getByTestId("prompt").textContent).toBe("›");
+  });
+
+  it("fresh install shows the welcome block", async () => {
+    await mount();
+    const region = screen.getByRole("region", { name: "Welcome" });
+    expect(within(region).getByRole("heading", { name: "Flick" })).toBeTruthy();
+    const rows = within(region)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent ?? "");
+    expect(rows).toHaveLength(4);
+    PREFIXES.forEach(([prefix, label], i) => {
+      expect(rows[i]?.startsWith(`${prefix} ${label}`)).toBe(true);
+    });
+    expect(region.textContent).toContain("ctrl+, settings");
+    expect(region.textContent).toContain("f1 shortcuts");
+    expect(region.textContent).not.toContain("@");
+  });
+
+  it("typing hides the welcome block", async () => {
+    await mount();
+    await type("a");
+    expect(screen.queryByRole("region", { name: "Welcome" })).toBeNull();
+  });
+
+  it("home items hide the welcome block", async () => {
+    vi.mocked(ipc.homeItems).mockResolvedValue({
+      items: [{ ...item("r1", "Recent One"), payload: { home: "recent" } }],
+      pins: [],
+    });
+    await mount();
+    expect(screen.queryByRole("region", { name: "Welcome" })).toBeNull();
+    expect(screen.getByText("# recent")).toBeTruthy();
+  });
+
+  it("a disabled prefix is not listed in the welcome block", async () => {
+    vi.mocked(ipc.onShown).mockImplementationOnce((cb) => {
+      cb({ shownId: 1, reason: "hotkey", sources: ["apps"], appearance: APPEARANCE });
+      return Promise.resolve(() => {});
+    });
+    await mount();
+    const rows = within(screen.getByRole("region", { name: "Welcome" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("/ open");
   });
 
   it("shown loads the recent picks and lists them under # recent", async () => {

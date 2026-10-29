@@ -472,3 +472,44 @@ body,
 .sheet-when {
   color: var(--l-muted);
 }
+
+.welcome {
+  padding: var(--l-sp-9) var(--l-sp-10);
+  color: var(--l-muted);
+}
+
+.welcome-title {
+  margin: 0 0 var(--l-sp-3);
+  font-size: var(--l-fs-title);
+  font-weight: 600;
+  color: var(--l-text);
+}
+
+.welcome p {
+  margin: 0 0 var(--l-sp-6);
+}
+
+.welcome-list {
+  margin: 0 0 var(--l-sp-6);
+  padding: 0;
+  list-style: none;
+}
+
+.welcome-list li {
+  padding: var(--l-sp-1) 0;
+}
+
+.welcome-list b {
+  display: inline-block;
+  min-width: var(--l-sp-9);
+  color: var(--l-accent-text);
+}
+
+.welcome-desc {
+  margin-left: var(--l-sp-6);
+}
+
+.welcome-keys em {
+  font-style: normal;
+  color: var(--l-accent-text);
+}
