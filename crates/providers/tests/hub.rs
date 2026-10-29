@@ -5,8 +5,8 @@ use futures::StreamExt;
 use futures::stream::{self, BoxStream};
 use providers::hub::{HubEvent, ProviderHub};
 use providers::{
-    Delta, Effort, Message, NoKeys, OpenAiCompat, ProbeResult, Provider, ProviderConfig,
-    ProviderError, Request, Role, Usage, Wire,
+    Delta, Message, NoKeys, OpenAiCompat, ProbeResult, Provider, ProviderConfig, ProviderError,
+    Request, Role, Usage, Wire,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -52,7 +52,7 @@ fn req() -> Request {
             role: Role::User,
             content: "q".into(),
         }],
-        Effort::Fast,
+        None,
     )
 }
 

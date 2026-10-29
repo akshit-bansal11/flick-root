@@ -26,7 +26,7 @@ use launcher_core::{Action, ActionKind, Config, Input, Item, ItemId, ItemKind, M
 use parking_lot::Mutex;
 use parse::Parsed;
 use providers::secret::SecretVault;
-use providers::{Delta, Effort, Message, Provider, Request, Role};
+use providers::{Delta, Message, Provider, Request, Role};
 use reqwest::RequestBuilder;
 use secrecy::SecretString;
 use serde::Deserialize;
@@ -351,7 +351,7 @@ async fn ask_provider(p: Arc<dyn Provider>, rest: &str) -> Option<String> {
             role: Role::User,
             content: prompt,
         }],
-        Effort::Fast,
+        None,
     );
     let mut stream = p.stream(req, CancellationToken::new());
     let mut out = String::new();

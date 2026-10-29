@@ -4,8 +4,8 @@ use crate::http;
 use crate::sse::SseEvent;
 use crate::stream::{self, WireState};
 use crate::{
-    Delta, Effort, KeySource, Message, ProbeResult, Provider, ProviderConfig, ProviderError,
-    Request, Role, Usage,
+    Delta, KeySource, Message, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role,
+    Usage,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -86,12 +86,10 @@ fn build_body(cfg: &ProviderConfig, req: &Request) -> Value {
     let mut body = json!({
         "model": cfg.model, "messages": msgs, "stream": true, "max_tokens": req.max_tokens
     });
-    if cfg.supports_effort {
-        body["reasoning_effort"] = match req.effort {
-            Effort::Fast => "low",
-            Effort::Think => "high",
-        }
-        .into();
+    if cfg.supports_effort
+        && let Some(level) = &req.effort
+    {
+        body["reasoning_effort"] = level.as_str().into();
     }
     body
 }

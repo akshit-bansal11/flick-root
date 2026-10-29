@@ -5,7 +5,7 @@ use futures::StreamExt;
 use launcher_core::detect::looks_secret;
 use parking_lot::Mutex;
 use providers::hub::HubEvent;
-use providers::{Effort, Message, Request, Role};
+use providers::{Message, Request, Role};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -100,15 +100,10 @@ fn check_enabled(enabled: bool) -> Result<(), CommandError> {
     }
 }
 
-fn request(text: &str, attachment: Option<&str>, effort: &str) -> Request {
+fn request(text: &str, attachment: Option<&str>, effort: Option<String>) -> Request {
     let content = match attachment {
         Some(a) if !a.is_empty() => format!("{text}\n\n{a}"),
         _ => text.to_owned(),
-    };
-    let effort = if effort == "think" {
-        Effort::Think
-    } else {
-        Effort::Fast
     };
     Request::new(
         vec![Message {
@@ -147,7 +142,11 @@ pub async fn ask_stream(
             .and_then(|(p, m)| hub.with_model(&p, &m))
     };
     let mut events = hub.ask_with(
-        request(&text, attachment.as_deref(), &effort),
+        request(
+            &text,
+            attachment.as_deref(),
+            providers::parse_effort(&effort).map(str::to_owned),
+        ),
         cancel.clone(),
         first,
     );

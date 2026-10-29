@@ -3,8 +3,7 @@
 use futures::StreamExt;
 use providers::anthropic::{ANTHROPIC_VERSION, Anthropic};
 use providers::{
-    Delta, Effort, KeySource, Message, NoKeys, Provider, ProviderConfig, ProviderError, Request,
-    Role, Wire,
+    Delta, KeySource, Message, NoKeys, Provider, ProviderConfig, ProviderError, Request, Role, Wire,
 };
 use secrecy::SecretString;
 use std::sync::Arc;
@@ -32,7 +31,7 @@ fn client(server: &MockServer, keys: Arc<dyn KeySource>) -> Anthropic {
     Anthropic::new(cfg, keys).unwrap()
 }
 
-fn req(effort: Effort) -> Request {
+fn req(effort: Option<&str>) -> Request {
     Request::new(
         vec![
             Message {
@@ -48,7 +47,7 @@ fn req(effort: Effort) -> Request {
                 content: "again".into(),
             },
         ],
-        effort,
+        effort.map(str::to_owned),
     )
 }
 
@@ -66,7 +65,7 @@ async fn mount(server: &MockServer, t: ResponseTemplate) {
         .await;
 }
 
-async fn collect(p: &Anthropic, e: Effort) -> Vec<Result<Delta, ProviderError>> {
+async fn collect(p: &Anthropic, e: Option<&str>) -> Vec<Result<Delta, ProviderError>> {
     p.stream(req(e), CancellationToken::new()).collect().await
 }
 
@@ -78,7 +77,7 @@ async fn last_request(s: &MockServer) -> wiremock::Request {
 async fn deltas_in_order() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/anthropic_basic.sse"))).await;
-    let got: Vec<_> = collect(&client(&s, Arc::new(NoKeys)), Effort::Fast)
+    let got: Vec<_> = collect(&client(&s, Arc::new(NoKeys)), None)
         .await
         .into_iter()
         .map(Result::unwrap)
@@ -101,7 +100,7 @@ async fn deltas_in_order() {
 async fn thinking_block_yields_one_thinking() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/anthropic_thinking.sse"))).await;
-    let got: Vec<_> = collect(&client(&s, Arc::new(NoKeys)), Effort::Think)
+    let got: Vec<_> = collect(&client(&s, Arc::new(NoKeys)), Some("high"))
         .await
         .into_iter()
         .map(Result::unwrap)
@@ -113,7 +112,7 @@ async fn thinking_block_yields_one_thinking() {
 
 #[tokio::test]
 async fn request_body_rules() {
-    for effort in [Effort::Fast, Effort::Think] {
+    for effort in [None, Some("low"), Some("max")] {
         let s = MockServer::start().await;
         mount(&s, sse(include_str!("fixtures/anthropic_basic.sse"))).await;
         collect(&client(&s, Arc::new(NoKeys)), effort).await;
@@ -127,15 +126,8 @@ async fn request_body_rules() {
         let msgs = body["messages"].as_array().unwrap();
         assert_eq!(msgs.last().unwrap()["role"], "user");
         assert!(msgs.iter().all(|m| m["role"] != "system"));
-        assert_eq!(
-            body["thinking"]["type"].as_str(),
-            (effort == Effort::Think).then_some("adaptive")
-        );
-        assert!(body["thinking"].get("budget_tokens").is_none());
-        assert_eq!(
-            body["output_config"]["effort"].as_str(),
-            (effort == Effort::Think).then_some("high")
-        );
+        assert!(body.get("thinking").is_none());
+        assert_eq!(body["output_config"]["effort"].as_str(), effort);
     }
 }
 
@@ -148,7 +140,7 @@ async fn assistant_last_is_rejected_without_request() {
             role: Role::Assistant,
             content: "prefill".into(),
         }],
-        Effort::Fast,
+        None,
     );
     let out: Vec<_> = client(&s, Arc::new(NoKeys))
         .stream(r, CancellationToken::new())
@@ -166,7 +158,7 @@ async fn headers_and_key_only_when_present() {
     ] {
         let s = MockServer::start().await;
         mount(&s, sse(include_str!("fixtures/anthropic_basic.sse"))).await;
-        collect(&client(&s, keys), Effort::Fast).await;
+        collect(&client(&s, keys), None).await;
         let r = last_request(&s).await;
         assert_eq!(r.headers.get("x-api-key").is_some(), present);
         assert_eq!(
@@ -185,7 +177,7 @@ async fn headers_and_key_only_when_present() {
 async fn error_event_is_error() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/anthropic_error.sse"))).await;
-    let out = collect(&client(&s, Arc::new(NoKeys)), Effort::Fast).await;
+    let out = collect(&client(&s, Arc::new(NoKeys)), None).await;
     let Some(Err(e)) = out.into_iter().last() else {
         panic!("expected error")
     };
@@ -202,7 +194,7 @@ async fn status_errors() {
             ResponseTemplate::new(code).set_body_string("secret body"),
         )
         .await;
-        let got = collect(&client(&s, Arc::new(NoKeys)), Effort::Fast).await;
+        let got = collect(&client(&s, Arc::new(NoKeys)), None).await;
         let Some(Err(e)) = got.into_iter().next() else {
             panic!("expected error")
         };
@@ -216,7 +208,7 @@ async fn cancel_after_first_delta() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/anthropic_basic.sse"))).await;
     let token = CancellationToken::new();
-    let mut st = client(&s, Arc::new(NoKeys)).stream(req(Effort::Fast), token.clone());
+    let mut st = client(&s, Arc::new(NoKeys)).stream(req(None), token.clone());
     assert!(matches!(st.next().await, Some(Ok(Delta::Text(_)))));
     token.cancel();
     let t = Instant::now();

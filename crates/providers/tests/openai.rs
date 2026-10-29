@@ -2,8 +2,8 @@
 
 use futures::StreamExt;
 use providers::{
-    Delta, Effort, KeySource, Message, NoKeys, OpenAiCompat, Provider, ProviderConfig,
-    ProviderError, Request, Role, Wire,
+    Delta, KeySource, Message, NoKeys, OpenAiCompat, Provider, ProviderConfig, ProviderError,
+    Request, Role, Wire,
 };
 use secrecy::SecretString;
 use std::sync::Arc;
@@ -31,13 +31,13 @@ fn client(server: &MockServer, effort: bool, keys: Arc<dyn KeySource>) -> OpenAi
     OpenAiCompat::new(cfg, keys).unwrap()
 }
 
-fn req(effort: Effort) -> Request {
+fn req(effort: Option<&str>) -> Request {
     Request::new(
         vec![Message {
             role: Role::User,
             content: "hi".into(),
         }],
-        effort,
+        effort.map(str::to_owned),
     )
 }
 
@@ -55,7 +55,7 @@ async fn mount(server: &MockServer, t: ResponseTemplate) {
         .await;
 }
 
-async fn collect(p: &OpenAiCompat, e: Effort) -> Vec<Result<Delta, ProviderError>> {
+async fn collect(p: &OpenAiCompat, e: Option<&str>) -> Vec<Result<Delta, ProviderError>> {
     p.stream(req(e), CancellationToken::new()).collect().await
 }
 
@@ -63,7 +63,7 @@ async fn collect(p: &OpenAiCompat, e: Effort) -> Vec<Result<Delta, ProviderError
 async fn deltas_in_order() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/openai_basic.sse"))).await;
-    let got: Vec<_> = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast)
+    let got: Vec<_> = collect(&client(&s, false, Arc::new(NoKeys)), None)
         .await
         .into_iter()
         .map(Result::unwrap)
@@ -89,7 +89,7 @@ async fn deltas_in_order() {
 async fn reasoning_yields_one_thinking() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/openai_reasoning.sse"))).await;
-    let got: Vec<_> = collect(&client(&s, true, Arc::new(NoKeys)), Effort::Think)
+    let got: Vec<_> = collect(&client(&s, true, Arc::new(NoKeys)), Some("high"))
         .await
         .into_iter()
         .map(Result::unwrap)
@@ -104,7 +104,7 @@ async fn cancel_after_first_delta() {
     let s = MockServer::start().await;
     mount(&s, sse(include_str!("fixtures/openai_basic.sse"))).await;
     let token = CancellationToken::new();
-    let mut st = client(&s, false, Arc::new(NoKeys)).stream(req(Effort::Fast), token.clone());
+    let mut st = client(&s, false, Arc::new(NoKeys)).stream(req(None), token.clone());
     assert!(matches!(st.next().await, Some(Ok(Delta::Text(_)))));
     token.cancel();
     let t = Instant::now();
@@ -125,7 +125,7 @@ async fn status_errors() {
             ResponseTemplate::new(code).set_body_string("secret body"),
         )
         .await;
-        let got = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast).await;
+        let got = collect(&client(&s, false, Arc::new(NoKeys)), None).await;
         let Some(Err(e)) = got.into_iter().next() else {
             panic!("expected error")
         };
@@ -140,14 +140,15 @@ async fn last_request(s: &MockServer) -> wiremock::Request {
 
 #[tokio::test]
 async fn effort_omitted_unless_supported() {
-    for (supported, think, want) in [
-        (false, Effort::Think, None),
-        (true, Effort::Fast, Some("low")),
-        (true, Effort::Think, Some("high")),
+    for (supported, effort, want) in [
+        (false, Some("high"), None),
+        (true, Some("low"), Some("low")),
+        (true, Some("xhigh"), Some("xhigh")),
+        (true, None, None),
     ] {
         let s = MockServer::start().await;
         mount(&s, sse(include_str!("fixtures/openai_basic.sse"))).await;
-        collect(&client(&s, supported, Arc::new(NoKeys)), think).await;
+        collect(&client(&s, supported, Arc::new(NoKeys)), effort).await;
         let body: serde_json::Value = serde_json::from_slice(&last_request(&s).await.body).unwrap();
         assert_eq!(body["reasoning_effort"].as_str(), want);
         assert_eq!(body["stream"], true);
@@ -163,7 +164,7 @@ async fn auth_header_only_with_key() {
     ] {
         let s = MockServer::start().await;
         mount(&s, sse(include_str!("fixtures/openai_basic.sse"))).await;
-        collect(&client(&s, false, keys), Effort::Fast).await;
+        collect(&client(&s, false, keys), None).await;
         let r = last_request(&s).await;
         assert_eq!(r.headers.get("authorization").is_some(), present);
     }
@@ -210,7 +211,7 @@ async fn oversize_sse_line_is_decode_error() {
         )),
     )
     .await;
-    let out = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast).await;
+    let out = collect(&client(&s, false, Arc::new(NoKeys)), None).await;
     assert!(matches!(
         out.last(),
         Some(Err(ProviderError::Decode("sse line too long")))
@@ -227,7 +228,7 @@ async fn oversize_sse_event_is_decode_error() {
     )
     .repeat(1100);
     mount(&s, sse(&body)).await;
-    let out = collect(&client(&s, false, Arc::new(NoKeys)), Effort::Fast).await;
+    let out = collect(&client(&s, false, Arc::new(NoKeys)), None).await;
     assert!(matches!(
         out.last(),
         Some(Err(ProviderError::Decode("sse event too large")))
@@ -246,7 +247,7 @@ async fn keyed_request_never_follows_redirect() {
         .mount(&s)
         .await;
     let out: Vec<_> = client(&s, false, Arc::new(FakeKey))
-        .stream(req(Effort::Fast), CancellationToken::new())
+        .stream(req(None), CancellationToken::new())
         .collect()
         .await;
     assert!(matches!(out[0], Err(ProviderError::Status { code: 302 })));

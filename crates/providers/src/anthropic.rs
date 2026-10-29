@@ -1,16 +1,15 @@
 //! Anthropic Messages client (`/v1/messages`, SSE).
 //!
 //! Haiku 5.5 rules (ADR-006): never send `temperature`, `top_p`, `top_k` or an
-//! assistant prefill. Reasoning is steered with `output_config.effort` plus
-//! adaptive thinking; `thinking.type = "enabled"` with `budget_tokens` is
-//! rejected with a 400 on these models, so it is never sent.
+//! assistant prefill. Reasoning is steered with `output_config.effort` only;
+//! adaptive thinking is the model default, so `thinking` is never sent, and
+//! `budget_tokens` is rejected with a 400 on these models.
 
 use crate::http;
 use crate::sse::SseEvent;
 use crate::stream::{self, WireState};
 use crate::{
-    Delta, Effort, KeySource, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role,
-    Usage,
+    Delta, KeySource, ProbeResult, Provider, ProviderConfig, ProviderError, Request, Role, Usage,
 };
 use async_trait::async_trait;
 use futures::StreamExt;
@@ -105,11 +104,12 @@ fn build_body(cfg: &ProviderConfig, req: &Request) -> Result<Value, ProviderErro
         "model": cfg.model, "max_tokens": req.max_tokens, "system": SYSTEM_PROMPT,
         "messages": msgs, "stream": true
     });
-    // Think: adaptive thinking at high effort. Fast: omit (model default).
+    // Adaptive thinking is the model default: send only the chosen level, if any.
     // No budget_tokens: manual thinking is a 400 on Haiku 5.5.
-    if cfg.supports_effort && req.effort == Effort::Think {
-        body["thinking"] = json!({"type": "adaptive"});
-        body["output_config"] = json!({"effort": "high"});
+    if cfg.supports_effort
+        && let Some(level) = &req.effort
+    {
+        body["output_config"] = json!({"effort": level});
     }
     Ok(body)
 }

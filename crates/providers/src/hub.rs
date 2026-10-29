@@ -161,6 +161,16 @@ fn order_with(
     std::iter::once(f).chain(rest).collect()
 }
 
+/// The request for provider `index`: a level was chosen for the first model only, so
+/// fallback providers get `None` (auto).
+fn request_for(req: &Request, index: usize) -> Request {
+    let mut r = req.clone();
+    if index > 0 {
+        r.effort = None;
+    }
+    r
+}
+
 async fn run(
     providers: Vec<Arc<dyn Provider>>,
     req: Request,
@@ -181,7 +191,7 @@ async fn run(
     });
     for (i, p) in providers.iter().enumerate() {
         let id = p.config().id.clone();
-        let mut stream = p.stream(req.clone(), cancel.clone());
+        let mut stream = p.stream(request_for(&req, i), cancel.clone());
         let mut started = false;
         let mut first = true;
         let deadline = tokio::time::Instant::now() + first_token;
@@ -229,5 +239,18 @@ async fn run(
             }),
             None => send(err("all_failed", "every provider failed".into())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::request_for;
+    use crate::Request;
+
+    #[test]
+    fn effort_goes_to_the_first_provider_only() {
+        let req = Request::new(Vec::new(), Some("high".into()));
+        assert_eq!(request_for(&req, 0).effort.as_deref(), Some("high"));
+        assert_eq!(request_for(&req, 1).effort, None);
     }
 }

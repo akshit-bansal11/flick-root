@@ -24,13 +24,17 @@ pub struct Message {
     pub content: String,
 }
 
-/// Reasoning effort requested from the model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Effort {
-    /// Low effort, fastest answer.
-    Fast,
-    /// High effort.
-    Think,
+/// Effort levels a request may carry, ordered low to max.
+pub const EFFORT_LEVELS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+
+/// The level for a stored or wire effort string. Old `think` is `high`; `fast`, `auto`,
+/// empty and unknown values are `None` (omit the parameter).
+pub fn parse_effort(raw: &str) -> Option<&'static str> {
+    let raw = raw.trim();
+    if raw == "think" {
+        return Some("high");
+    }
+    EFFORT_LEVELS.iter().copied().find(|l| *l == raw)
 }
 
 /// A completion request.
@@ -38,15 +42,15 @@ pub enum Effort {
 pub struct Request {
     /// Conversation so far (no system prompt; the client adds it).
     pub messages: Vec<Message>,
-    /// Reasoning effort.
-    pub effort: Effort,
+    /// Reasoning effort; `None` = auto, the parameter is omitted.
+    pub effort: Option<String>,
     /// Output token cap.
     pub max_tokens: u32,
 }
 
 impl Request {
     /// Request with the default 1024 token cap.
-    pub fn new(messages: Vec<Message>, effort: Effort) -> Self {
+    pub fn new(messages: Vec<Message>, effort: Option<String>) -> Self {
         Self {
             messages,
             effort,
@@ -116,4 +120,19 @@ pub struct ProbeResult {
     pub ms: u64,
     /// Short error text, never containing secrets.
     pub error: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_effort;
+
+    #[test]
+    fn parse_effort_maps_stored_values() {
+        assert_eq!(parse_effort("think"), Some("high"));
+        assert_eq!(parse_effort("fast"), None);
+        assert_eq!(parse_effort("auto"), None);
+        assert_eq!(parse_effort(""), None);
+        assert_eq!(parse_effort("max"), Some("max"));
+        assert_eq!(parse_effort("bogus"), None);
+    }
 }

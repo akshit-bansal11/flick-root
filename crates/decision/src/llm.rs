@@ -5,7 +5,7 @@ use crate::systemone::DecisionEngine;
 use crate::{ChoiceAnswer, ChoiceQuestion, EngineError, ProbeResult};
 use async_trait::async_trait;
 use futures::StreamExt;
-use providers::{Delta, Effort, Message, Provider, Request, Role};
+use providers::{Delta, Message, Provider, Request, Role};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration;
@@ -68,7 +68,7 @@ impl LlmPicker {
                 role: Role::User,
                 content: prompt(q),
             }],
-            Effort::Fast,
+            None,
         );
         let mut stream = self.provider.stream(req, CancellationToken::new());
         let mut out = String::new();
