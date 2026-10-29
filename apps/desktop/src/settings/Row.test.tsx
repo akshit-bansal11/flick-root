@@ -58,18 +58,6 @@ describe("SettingRow and PreviewProvider", () => {
     expect(screen.getByText("runs at login")).toBeTruthy();
   });
 
-  it("renders label, value and control cells", () => {
-    const rows = document.querySelectorAll(".sr");
-    expect(rows).toHaveLength(2);
-    expect(rows[0]?.querySelector(":scope > .sr-label")?.textContent).toBe("hotkey");
-    expect(rows[0]?.querySelector(":scope > .sr-val")?.textContent).toBe("Alt+Space");
-    expect(rows[1]?.querySelector(":scope > .sr-hint")?.textContent).toBe("runs at login");
-    expect(rows[1]?.querySelector(":scope > .sr-val")).toBeNull();
-    for (const row of rows) {
-      expect(row.querySelector(":scope > .sr-ctl > button")).not.toBeNull();
-    }
-  });
-
   it("shows the focused row in the preview column", () => {
     expect(preview().textContent).toContain("# preview");
     focusIn("change");

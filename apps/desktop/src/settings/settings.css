@@ -11,8 +11,6 @@ body,
 }
 .s-shell {
   --l-prev-w: 280px;
-  /* Where the value column's left rule starts: row padding, mark, label. */
-  --l-sr-lead: calc(var(--l-sp-5) + 1ch + var(--l-sp-4) + var(--l-nav-w));
   display: flex;
   height: 100%;
   overflow: hidden;
@@ -104,18 +102,20 @@ body,
 /* Config-file row (SettingRow): marker, label, value or comment, control. */
 .sr {
   display: grid;
-  grid-template-columns: calc(1ch + var(--l-sp-4)) var(--l-nav-w) minmax(0, 1fr) auto;
+  grid-template-columns: 1ch var(--l-nav-w) minmax(0, 1fr) auto;
   align-items: center;
-  padding: 0 var(--l-sp-5);
+  column-gap: var(--l-sp-4);
+  padding: var(--l-sp-3) var(--l-sp-5);
+  /* A line above each setting; its help, list or form stays under it, inside the same block. */
+  border-top: var(--l-border);
+}
+.sec + .sr,
+.sr:first-child {
+  border-top: none;
 }
 .sr:hover,
 .sr:focus-within {
   background: var(--l-sel);
-}
-.sr-mark,
-.sr-label {
-  padding-block: var(--l-sp-3);
-  padding-right: var(--l-sp-4);
 }
 .sr-mark {
   color: var(--l-accent-text);
@@ -125,35 +125,18 @@ body,
 .sr:focus-within .sr-mark {
   visibility: visible;
 }
-/* Column rules: the value cell carries label|value and value|control; its inner span truncates. */
-.sr-val,
-.sr-hint {
-  display: flex;
-  align-items: center;
-  align-self: stretch;
-  min-width: 0;
-  padding: var(--l-sp-3) var(--l-sp-4);
-  border-right: var(--l-border);
-  border-left: var(--l-border);
-}
-.sr-val > span,
-.sr-hint > span {
+.sr-val {
   overflow: hidden;
+  color: var(--l-accent-text);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.sr-val {
-  color: var(--l-accent-text);
-}
 .sr-hint {
+  overflow: hidden;
   color: var(--l-muted);
   font-size: var(--l-fs-caption);
-}
-.sr-ctl {
-  display: flex;
-  align-items: center;
-  gap: var(--l-sp-4);
-  padding: var(--l-sp-3) 0 var(--l-sp-3) var(--l-sp-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* Buttons and the on/off pair. */
