@@ -87,9 +87,17 @@ export function SettingRow({ label, value, hint, help, preview, children }: RowP
         <span className="sr-mark" aria-hidden="true">
           ›
         </span>
-        <span>{label}</span>
-        {value ? <span className="sr-val">{value}</span> : <span className="sr-hint">{hint}</span>}
-        {children}
+        <span className="sr-label">{label}</span>
+        {value ? (
+          <span className="sr-val">
+            <span>{value}</span>
+          </span>
+        ) : (
+          <span className="sr-hint">
+            <span>{hint}</span>
+          </span>
+        )}
+        <span className="sr-ctl">{children}</span>
       </div>
       {help && <p className="s-help s-editor">{help}</p>}
     </>

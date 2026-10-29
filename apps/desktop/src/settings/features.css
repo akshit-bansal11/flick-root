@@ -15,14 +15,18 @@
 }
 .s-editor {
   margin: 0;
-  padding: var(--l-sp-2) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
+  padding: var(--l-sp-2) var(--l-sp-5) var(--l-sp-4) var(--l-sp-4);
+  margin-left: var(--l-sr-lead);
+  border-left: var(--l-border);
 }
 .f-form {
   display: flex;
   flex-direction: column;
   gap: var(--l-sp-6);
-  padding: var(--l-sp-6) var(--l-sp-5) var(--l-sp-4) calc(1ch + var(--l-nav-w) + var(--l-sp-8));
+  padding: var(--l-sp-6) var(--l-sp-5) var(--l-sp-4) var(--l-sp-4);
+  margin-left: var(--l-sr-lead);
   border-top: var(--l-border);
+  border-left: var(--l-border);
 }
 .f-field {
   display: flex;
