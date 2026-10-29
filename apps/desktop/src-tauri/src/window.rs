@@ -32,14 +32,24 @@ fn max_height(work_h: u32, scale: f64) -> f64 {
     (f64::from(work_h) / scale - WORK_MARGIN).clamp(PANEL_MIN_H, PANEL_MAX_H)
 }
 
-/// Window origin and size in physical px for a panel `height` logical px tall in a
-/// work area `(x, y, w, h)` at `scale`: centred both ways, never above the work area.
-fn layout(work: (i32, i32, u32, u32), scale: f64, height: f64) -> (i32, i32, u32, u32) {
+/// Window size `(w, h)` in physical px for a panel `height` logical px tall in a work area
+/// `work_h` physical px high at `scale`; the height is capped to what the work area fits.
+fn panel_size(work_h: u32, scale: f64, height: f64) -> (u32, u32) {
     let w = (PANEL_W * scale).round();
-    let h = (height.min(max_height(work.3, scale)) * scale).round();
-    let x = f64::from(work.0) + (f64::from(work.2) - w) / 2.0;
-    let y = f64::from(work.1) + ((f64::from(work.3) - h) / 2.0).max(0.0);
-    (x.round() as i32, y.round() as i32, w as u32, h as u32)
+    let h = (height.min(max_height(work_h, scale)) * scale).round();
+    (w as u32, h as u32)
+}
+
+/// Window origin and size in physical px for a panel `height` logical px tall in a
+/// work area `(x, y, w, h)` at `scale`: centred across, never above the work area.
+///
+/// The top is where a full-height panel would be centred; independent of `height`.
+fn layout(work: (i32, i32, u32, u32), scale: f64, height: f64) -> (i32, i32, u32, u32) {
+    let (w, h) = panel_size(work.3, scale, height);
+    let tallest = (max_height(work.3, scale) * scale).round();
+    let x = f64::from(work.0) + (f64::from(work.2) - f64::from(w)) / 2.0;
+    let y = f64::from(work.1) + ((f64::from(work.3) - tallest) / 2.0).max(0.0);
+    (x.round() as i32, y.round() as i32, w, h)
 }
 
 /// Window origin and size in physical px for the tray menu opened by a click at `anchor`
@@ -386,7 +396,8 @@ fn sync_frame(app: &AppHandle, win: &WebviewWindow) {
     }
 }
 
-/// Sizes the window to the panel and centres it on the monitor under the cursor.
+/// Sizes the window to the panel and places it on the monitor under the cursor.
+/// The top is fixed for this show; later height changes keep it.
 fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let cursor = app.cursor_position()?;
     let Some(m) = monitor_at(app, cursor.x, cursor.y)? else {
@@ -399,7 +410,7 @@ fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
         .map_err(|_| anyhow::anyhow!("state poisoned"))?
         .height
         .unwrap_or(PANEL_MIN_H);
-    center_on(win, &m, height)?;
+    place_panel(win, &m, height)?;
     Ok(())
 }
 
@@ -417,8 +428,9 @@ fn monitor_at(app: &AppHandle, x: f64, y: f64) -> tauri::Result<Option<Monitor>>
     Ok((i < monitors.len()).then(|| monitors.swap_remove(i)))
 }
 
-/// Sizes the window to a panel `height` logical px tall and centres it in `m`'s work area.
-fn center_on(win: &WebviewWindow, m: &Monitor, height: f64) -> tauri::Result<()> {
+/// Sizes the window to a panel `height` logical px tall, centred across `m`'s work area with
+/// its top fixed at the full-height position.
+fn place_panel(win: &WebviewWindow, m: &Monitor, height: f64) -> tauri::Result<()> {
     let (wa, scale) = (m.work_area(), m.scale_factor());
     let (x, y, w, h) = layout(
         (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
@@ -441,8 +453,8 @@ fn set_bounds(
     win.set_position(pos)
 }
 
-/// Grows or shrinks the window to the panel's content height (logical px) and
-/// re-centres it on its monitor.
+/// Grows or shrinks the window to the panel's content height (logical px). Changes the
+/// height only; the top-left stays where `place` put it.
 #[tauri::command]
 pub async fn resize_launcher(
     app: AppHandle,
@@ -465,7 +477,10 @@ pub async fn resize_launcher(
         s.height = Some(h);
     }
     match win.current_monitor() {
-        Ok(Some(m)) => center_on(&win, &m, h),
+        Ok(Some(m)) => {
+            let (w, ph) = panel_size(m.work_area().size.height, m.scale_factor(), h);
+            win.set_size(PhysicalSize::new(w, ph))
+        }
         _ => win.set_size(LogicalSize::new(PANEL_W, h)),
     }
     .map_err(|e| CommandError::new("window", e.to_string()))?;
@@ -514,11 +529,11 @@ mod tests {
 
     #[test]
     fn layout_centres_a_short_panel() {
-        // Input row alone: centred on its own height, not a full list's.
+        // Input row alone: the top is where a full-height panel would sit.
         let (w, h) = (PANEL_W as u32, PANEL_MIN_H as u32);
         assert_eq!(
             layout((0, 0, 1920, 1040), 1.0, PANEL_MIN_H),
-            (((1920 - w) / 2) as i32, ((1040 - h) / 2) as i32, w, h)
+            (((1920 - w) / 2) as i32, (1040 - 540) / 2, w, h)
         );
     }
 
@@ -529,7 +544,24 @@ mod tests {
         let pw = (PANEL_W * 1.5) as u32;
         assert_eq!((w, h), (pw, 300));
         assert_eq!(x, 1920 + ((2880 - pw) / 2) as i32);
-        assert_eq!(y, (1500 - 300) / 2);
+        assert_eq!(y, (1500 - 810) / 2);
+    }
+
+    #[test]
+    fn layout_top_is_independent_of_height() {
+        let work = (0, 10, 800, 300);
+        let (_, y0, _, _) = layout(work, 1.0, PANEL_MIN_H);
+        for height in [56.0, 200.0, 540.0] {
+            let (_, y, _, h) = layout(work, 1.0, height);
+            assert_eq!(y, y0);
+            assert!(y + h as i32 <= 10 + 300, "panel runs past the work area");
+        }
+    }
+
+    #[test]
+    fn panel_size_caps_to_the_work_area() {
+        let (_, h) = panel_size(680, 1.5, PANEL_MAX_H);
+        assert_eq!(h, ((680.0 / 1.5 - WORK_MARGIN) * 1.5_f64).round() as u32);
     }
 
     #[test]
