@@ -11,7 +11,6 @@ pub mod math;
 pub mod media;
 pub mod nlfind;
 pub mod ports;
-pub mod projects;
 pub mod registry;
 pub mod schema;
 pub mod search;
@@ -45,7 +44,6 @@ pub fn builtin_features_with(
         Arc::new(math::Math),
         Arc::new(syscmd::SysCmd::default()),
         Arc::new(web::Web),
-        Arc::new(projects::Projects::default()),
         Arc::new(ports::Ports::default()),
         Arc::new(explain::Explain),
         Arc::new(links::Links::default()),
@@ -59,11 +57,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtins_are_ten_unique_and_enabled() {
+    fn builtins_are_nine_unique_and_enabled() {
         let f = builtin_features();
         let ids: std::collections::HashSet<_> = f.iter().map(|x| x.id()).collect();
-        assert_eq!(f.len(), 10);
-        assert_eq!(ids.len(), 10);
+        assert_eq!(f.len(), 9);
+        assert_eq!(ids.len(), 9);
         assert!(f.iter().all(|x| x.default_enabled()));
         assert!(
             f.iter()

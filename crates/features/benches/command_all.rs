@@ -96,12 +96,6 @@ fn bench(c: &mut Criterion) {
     let idx = MatchIndex::new(&names);
     let mut matcher = FuzzyMatcher::new();
 
-    let tree = tempfile::tempdir().expect("tempdir");
-    for i in 0..200 {
-        let p = tree.path().join(format!("proj-{i:03}-service"));
-        std::fs::create_dir_all(&p).expect("mkdir");
-        std::fs::write(p.join("Cargo.toml"), "").expect("write");
-    }
     let store = Arc::new(Store::open_in_memory().expect("store"));
     for i in 0..300 {
         store.record_launch(&format!("app:p.{i}"), "app", None, 1_700_000_000_000);
@@ -113,12 +107,6 @@ fn bench(c: &mut Criterion) {
     let mut m = toml::Table::new();
     m.insert("currency_refresh".into(), toml::Value::Boolean(false));
     cfg.features.insert("math".into(), m);
-    let mut p = toml::Table::new();
-    p.insert(
-        "roots".into(),
-        toml::Value::Array(vec![tree.path().to_string_lossy().into_owned().into()]),
-    );
-    cfg.features.insert("projects".into(), p);
     let ctx = FeatureCtx {
         config: Arc::new(ArcSwap::from_pointee(cfg.clone())),
         store,
@@ -135,10 +123,10 @@ fn bench(c: &mut Criterion) {
         }
         reg.apply_config(&cfg, &ctx).await;
     });
-    // Wait for the projects scan, the frecency load and the rates cache to publish.
+    // Wait for the frecency load and the rates cache to publish.
     let ready = |t: &str| {
         let i = input(t);
-        !reg.query_all(&input("serv 42")).is_empty() && !Math.query(&i).is_empty()
+        !Math.query(&i).is_empty()
     };
     for _ in 0..500 {
         if ready("250 usd in inr") {
@@ -146,7 +134,7 @@ fn bench(c: &mut Criterion) {
         }
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(ready("250 usd in inr"), "projects or rates never published");
+    assert!(ready("250 usd in inr"), "rates never published");
 
     for t in [
         "c",

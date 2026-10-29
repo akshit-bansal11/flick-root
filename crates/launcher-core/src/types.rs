@@ -45,8 +45,6 @@ pub enum ItemKind {
     File,
     /// Folder.
     Folder,
-    /// Project folder.
-    Project,
     /// Computed result.
     Result,
     /// Running process.

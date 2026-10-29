@@ -35,7 +35,6 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 quick-xml = { workspace = true }
 percent-encoding = { workspace = true }
-rusqlite = { workspace = true }
 regex = { workspace = true }
 sysinfo = { workspace = true }
 base64 = { workspace = true }
@@ -62,10 +61,6 @@ harness = false
 
 [[bench]]
 name = "web"
-harness = false
-
-[[bench]]
-name = "projects"
 harness = false
 
 [[bench]]

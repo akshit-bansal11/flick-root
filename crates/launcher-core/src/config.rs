@@ -766,7 +766,6 @@ fn shortcut(keyword: &str, name: &str, url: &str) -> toml::Value {
 }
 
 fn default_features() -> BTreeMap<String, toml::Table> {
-    let strings = |v: &[&str]| toml::Value::Array(v.iter().map(|s| (*s).into()).collect());
     let shortcuts = vec![
         shortcut("g", "Google", "https://www.google.com/search?q={q}"),
         shortcut("amz", "Amazon.in", "https://www.amazon.in/s?k={q}"),
@@ -783,24 +782,6 @@ fn default_features() -> BTreeMap<String, toml::Table> {
             "https://en.wikipedia.org/w/index.php?search={q}",
         ),
     ];
-    let projects = opts(vec![
-        (
-            "roots",
-            strings(&["D:\\dev", "%USERPROFILE%\\source\\repos"]),
-        ),
-        (
-            "markers",
-            strings(&[
-                ".git",
-                "package.json",
-                "Cargo.toml",
-                "pyproject.toml",
-                "go.mod",
-            ]),
-        ),
-        ("editor", "vscode".into()),
-        ("include_vscode_recents", true.into()),
-    ]);
     BTreeMap::from([
         (
             "frecency".to_string(),
@@ -818,7 +799,6 @@ fn default_features() -> BTreeMap<String, toml::Table> {
             "web".into(),
             opts(vec![("shortcuts", toml::Value::Array(shortcuts))]),
         ),
-        ("projects".into(), projects),
         ("nlfind".into(), opts(vec![])),
         ("ports".into(), opts(vec![])),
         ("media".into(), opts(vec![])),
@@ -1107,6 +1087,23 @@ threshold = 0.7
 #[cfg(test)]
 mod find_drive_tests {
     use super::*;
+
+    #[test]
+    fn old_config_with_projects_table_still_loads() {
+        let old = "[general]
+first_run_done = true
+
+[features.projects]
+roots = ['D:\\dev']
+";
+        let c: Config = toml::from_str(old).unwrap();
+        assert!(c.general.first_run_done);
+        assert!(c.features.contains_key("projects"));
+        assert_eq!(
+            c.modes.find.include_drives,
+            Config::default().modes.find.include_drives
+        );
+    }
 
     #[test]
     fn old_config_defaults_include_drives() {
