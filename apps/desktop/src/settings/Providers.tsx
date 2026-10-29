@@ -52,7 +52,24 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
   useEffect(() => setExtra(p.models.join(", ")), [p.models]);
   const [dialog, setDialog] = useState<"add" | "replace" | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const hostChanged = hostOf(url) !== hostOf(p.base_url);
+
+  const refresh = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const v = await api.refreshProviderModels(p.id);
+      setErr(null);
+      setNote(`${v.models.length + (v.model ? 1 : 0)} models`);
+      reload();
+    } catch (e) {
+      setErr(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const run = async (f: () => Promise<unknown>) => {
     try {
@@ -177,6 +194,25 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
             </button>
             <span className="s-help">Fallback order</span>
           </div>
+          <div className="s-add">
+            <button
+              type="button"
+              className="btn"
+              aria-label={`Refresh models for ${p.title}`}
+              disabled={busy}
+              onClick={refresh}
+            >
+              {busy ? "refreshing" : "refresh models"}
+            </button>
+            {note && (
+              <span className="s-help" role="status">
+                {note}
+              </span>
+            )}
+            <span className="s-help">
+              Reads the model and effort list from the server. Replaces Extra models.
+            </span>
+          </div>
         </div>
       )}
       {err && (
@@ -195,6 +231,7 @@ function Row({ p, probe, canUp, canDown, onMove, reload }: RowProps) {
             await api.setSecret(p.key?.name ?? secretName(p), value, acknowledged);
             setDialog(null);
             reload();
+            void refresh();
           }}
         />
       )}

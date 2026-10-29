@@ -11,6 +11,7 @@ vi.mock("./api", () => ({
   probeProviders: vi.fn(),
   setProvider: vi.fn(),
   setProviderOrder: vi.fn(),
+  refreshProviderModels: vi.fn(),
   setSecret: vi.fn(() => Promise.resolve({})),
   deleteSecret: vi.fn(() => Promise.resolve()),
   testSecret: vi.fn(),
@@ -178,6 +179,57 @@ describe("Providers", () => {
     ).toBe(true);
     await click("Move OpenAI down");
     expect(api.setProviderOrder).toHaveBeenCalledWith(["ollama", "second", "openai"]);
+  });
+
+  it("refresh models calls the api, reloads and shows the count", async () => {
+    const [ollama] = list;
+    if (!ollama) throw new Error("no fixture");
+    vi.mocked(api.refreshProviderModels).mockResolvedValue({
+      ...ollama,
+      model: "m",
+      models: ["a", "b"],
+    });
+    await mount([ollama]);
+    await click("Options for Ollama");
+    const calls = vi.mocked(api.listProviders).mock.calls.length;
+    await click("Refresh models for Ollama");
+    expect(api.refreshProviderModels).toHaveBeenCalledWith("ollama");
+    expect(vi.mocked(api.listProviders).mock.calls.length).toBeGreaterThan(calls);
+    expect(screen.getByText("3 models")).toBeTruthy();
+  });
+
+  it("refresh models disables the button while running and shows errors", async () => {
+    const [ollama] = list;
+    if (!ollama) throw new Error("no fixture");
+    let fail: (e: unknown) => void = () => {};
+    vi.mocked(api.refreshProviderModels).mockReturnValue(
+      new Promise((_, rej) => {
+        fail = rej;
+      }),
+    );
+    await mount([ollama]);
+    await click("Options for Ollama");
+    await click("Refresh models for Ollama");
+    const btn = screen.getByRole("button", { name: "Refresh models for Ollama" });
+    expect((btn as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => fail({ code: "network", message: "server unreachable" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/\S/);
+    expect((btn as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("a saved key triggers a refresh; a refresh error does not fail the save", async () => {
+    vi.mocked(api.refreshProviderModels).mockRejectedValue({
+      code: "network",
+      message: "server unreachable",
+    });
+    await mount();
+    await click("Add key for OpenAI");
+    fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-test" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /understand/ }));
+    await click("save");
+    expect(api.refreshProviderModels).toHaveBeenCalledWith("openai");
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toMatch(/\S/);
   });
 
   it("the off button disables a provider", async () => {

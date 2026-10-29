@@ -84,7 +84,9 @@ export const setProvider = (id: string, patch: ProviderPatch) =>
     models: patch.models,
     effort: patch.effort,
   });
-export const setProviderOrder = (ids: string[]) => invoke<void>("set_provider_order", { ids });
+export const refreshProviderModels = (id: string) =>
+  invoke<ProviderView>("refresh_provider_models", { id });
+export const setProviderOrder =(ids: string[]) => invoke<void>("set_provider_order", { ids });
 
 export const listEngines = () => invoke<EngineView[]>("list_engines");
 export const probeDecisionEngines = () => invoke<EngineProbe[]>("probe_decision_engines");
