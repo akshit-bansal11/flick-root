@@ -936,17 +936,13 @@ first_run_done = true
 
     #[test]
     fn efforts_default_absent_old_effort_loads_and_round_trips() {
-        let old: Config = toml::from_str(
-            "[modes.query]\neffort = \"think\"\n[providers.ollama]\nenabled = true\nwire = \"openai\"\n",
-        )
-        .unwrap();
+        let mut pre = Config::default();
+        pre.modes.query.effort = "think".into();
+        let text = toml::to_string(&pre).unwrap();
+        assert!(!text.contains("efforts"));
+        let old: Config = toml::from_str(&text).unwrap();
         assert_eq!(old.modes.query.effort, "think");
         assert!(old.providers.entries["ollama"].efforts.is_empty());
-        assert!(
-            !toml::to_string(&Config::default())
-                .unwrap()
-                .contains("efforts")
-        );
         let mut c = Config::default();
         c.providers
             .entries
