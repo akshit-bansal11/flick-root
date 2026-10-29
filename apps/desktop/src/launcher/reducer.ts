@@ -71,6 +71,8 @@ export interface State {
   items: Item[];
   /** Recent picks for the blank `all` tab (`home_items`); kept across show and hide. */
   home: Item[];
+  /** Whether `home` has loaded once; until then the empty tab shows nothing, not the welcome. */
+  homeReady: boolean;
   /** Ids of pinned items (`home_items`, `toggle_pin`); kept across show and hide. */
   pins: string[];
   selected: number;
@@ -234,6 +236,7 @@ export const initialState = (
   askToken: 0,
   items: [],
   home: [],
+  homeReady: false,
   pins: [],
   selected: 0,
   query: {
@@ -777,12 +780,12 @@ function step(s: State, ev: Event): Result {
     case "homeLoaded": {
       const home = ev.items;
       const pins = ev.pins;
-      if (!isHome(s)) return out({ ...s, home, pins });
+      if (!isHome(s)) return out({ ...s, home, pins, homeReady: true });
       // Follow the selected item when a pin moves it; else keep the index, clamped.
       const keptId = s.items[s.selected]?.id;
       const at = home.findIndex((i) => i.id === keptId);
       const selected = at >= 0 ? at : Math.min(s.selected, Math.max(0, home.length - 1));
-      return out({ ...s, home, pins, items: home, selected });
+      return out({ ...s, home, pins, homeReady: true, items: home, selected });
     }
     case "themesLoaded": {
       const base: State = { ...s, theme: { ...s.theme, list: ev.themes, loading: false } };
@@ -810,6 +813,7 @@ function step(s: State, ev: Event): Result {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           home: s.home,
+          homeReady: s.homeReady,
           pins: s.pins,
           items: s.home,
           seq: s.seq,
@@ -832,6 +836,7 @@ function step(s: State, ev: Event): Result {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
           home: s.home,
+          homeReady: s.homeReady,
           pins: s.pins,
           items: s.home,
           seq: s.seq,

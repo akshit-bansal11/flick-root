@@ -67,6 +67,9 @@ export function LauncherView({
       ? { ...base, text: `previewing ${pick.theme.name}` }
       : base;
   const hints = availableModes(state.enabledSources);
+  // Blank all tab with nothing pinned or recent, once home has loaded (no flash before it).
+  const blank = state.mode === "none" && state.input.trim() === "";
+  const welcome = blank && state.homeReady && state.home.length === 0;
   const activeId = state.items.length > 0 ? optionId(state.selected) : undefined;
 
   return (
@@ -110,7 +113,7 @@ export function LauncherView({
             onOpenSettings={() => openSettings("providers")}
             onOpenLink={openLink}
           />
-        ) : state.mode === "none" && state.input.trim() === "" && state.home.length === 0 ? (
+        ) : welcome ? (
           <Welcome modes={hints} />
         ) : (
           <Results

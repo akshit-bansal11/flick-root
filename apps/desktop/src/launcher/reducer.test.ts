@@ -605,6 +605,16 @@ describe("reducer", () => {
     expect(kept.items).toBe(away.items);
     expect(kept.home.map((i) => i.id)).toEqual(["n0"]);
   });
+  it("homeReady starts false, turns true on homeLoaded and survives show and hide", () => {
+    expect(initialState().homeReady).toBe(false);
+    const loaded = reduce(initialState(), { type: "homeLoaded", items: [], pins: [] }).state;
+    expect(loaded.homeReady).toBe(true);
+    const away = reduce(withItems(inMode("find")), { type: "homeLoaded", items: [], pins: [] });
+    expect(away.state.homeReady).toBe(true);
+    const hidden = reduce(loaded, { type: "hidden" }).state;
+    expect(hidden.homeReady).toBe(true);
+    expect(reduce(hidden, { type: "shown" }).state.homeReady).toBe(true);
+  });
 
   it("homeLoaded keeps the selection on the same item when a pin reorders the list", () => {
     const old = [item("a"), item("b"), item("c")];

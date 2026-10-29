@@ -499,7 +499,8 @@ body,
   padding: var(--l-sp-1) 0;
 }
 
-.welcome-list b {
+.welcome-list kbd {
+  font: inherit;
   display: inline-block;
   min-width: var(--l-sp-9);
   color: var(--l-accent-text);
@@ -509,7 +510,7 @@ body,
   margin-left: var(--l-sp-6);
 }
 
-.welcome-keys em {
-  font-style: normal;
+.welcome-keys kbd {
+  font: inherit;
   color: var(--l-accent-text);
 }

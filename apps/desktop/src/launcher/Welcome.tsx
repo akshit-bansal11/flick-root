@@ -20,13 +20,13 @@ export function Welcome({ modes }: Props) {
       <ul className="welcome-list">
         {modes.map((m) => (
           <li key={m}>
-            <b>{MODES[m].prefix}</b> {MODES[m].label.toLowerCase()}
+            <kbd>{MODES[m].prefix}</kbd> {MODES[m].label.toLowerCase()}
             <span className="welcome-desc">{MODES[m].desc}</span>
           </li>
         ))}
       </ul>
       <p className="welcome-keys">
-        <em>{chord("openSettings")}</em> settings <em>{chord("sheet")}</em> shortcuts
+        <kbd>{chord("openSettings")}</kbd> settings <kbd>{chord("sheet")}</kbd> shortcuts
       </p>
     </section>
   );

@@ -97,7 +97,7 @@ export function SettingRow({ label, value, hint, help, preview, children }: RowP
             <span>{hint}</span>
           </span>
         )}
-        <span className="sr-ctl">{children}</span>
+        {children && <span className="sr-ctl">{children}</span>}
       </div>
       {help && <p className="s-help s-editor">{help}</p>}
     </>
