@@ -35,3 +35,5 @@ Current state:
 - A new feature is one module plus one registration line, and gets a settings page for free.
 - Stopping a feature must release everything it holds. Tests should show that stop releases the watchers and timers.
 - Shared state held in statics breaks this rule until it is moved into the feature struct.
+
+2026-10-29: the Projects feature and the `@` prefix were removed after 1.0.0; the text above describes the original design.

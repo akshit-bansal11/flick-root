@@ -31,8 +31,6 @@ Reviewer NITs, deferred on purpose. Each line: source, location, note.
 - T3.7: the Explain hotkey is saved to config but not registered (global-shortcut handler toggles the launcher for every shortcut) — F09 must add per-shortcut dispatch.
 - Test temp-dir names in apps/desktop/src-tauri/src/icons.rs:60 and meta_store.rs:100 contain the brand literal; derive from brand::APP_NAME.
 - T4.3 math: '2.5 kg to lb' takes ~295 µs (budget 0.5 ms; fend parse + unit lookup dominate). A hand-rolled fast path for simple unit conversions would cut it if the end-to-end Command bench (T5.6) needs headroom.
-- T4.7 projects: VS Code recents come only from %APPDATA%\Code; on this PC VS Code's store has no recents key while Cursor's has 102 (same format). Read the chosen editor's store (Cursor, VSCodium) too.
-- T4.7 projects: the `&`/spaces test checks only the built argv; add a runtime test that spawns a temp .cmd with `&`, `"` and `%` in the folder name and asserts std either escapes them or returns an error (relies on Rust ≥ 1.77.2 .cmd arg escaping).
 - W3 review NIT: tauri.conf.json CSP adds `style-src 'self' 'unsafe-inline'` beyond ADR-011 rule 3; React style props go through CSSOM (not blocked by CSP) — check if it is needed, else record the deviation in the ADR.
 - W3 review NIT: capabilities/default.json:27 lets the launcher window call probe_providers (keyed probes); drop unless the Query empty state needs it.
 - W3 review NIT: state.rs:190 ctx.http uses the default redirect policy and no connect timeout; use providers::http::plain_client().

@@ -1,6 +1,6 @@
 # Architecture
 
-Flick is a free, open-source, keyboard-first Windows launcher with five prefixes in one bar: Open, Commands, Calc, Ask and Projects. The shell is Tauri 2 (ADR-001). All logic lives in Rust crates under `crates/`, and the Tauri app in `apps/desktop/src-tauri` is a thin layer that wires state, hotkey, tray and windows to those crates. The UI is React 19 and TypeScript, rendered by WebView2. The WebView makes no network calls; all HTTPS traffic (decision engines, providers, update check) is made from Rust. The Next.js site in `apps/web` is separate from the app.
+Flick is a free, open-source, keyboard-first Windows launcher with four prefixes in one bar: Open, Commands, Calc and Ask. The shell is Tauri 2 (ADR-001). All logic lives in Rust crates under `crates/`, and the Tauri app in `apps/desktop/src-tauri` is a thin layer that wires state, hotkey, tray and windows to those crates. The UI is React 19 and TypeScript, rendered by WebView2. The WebView makes no network calls; all HTTPS traffic (decision engines, providers, update check) is made from Rust. The Next.js site in `apps/web` is separate from the app.
 
 ## System diagram
 
@@ -69,7 +69,7 @@ Node count: 21 (3 UI, 5 shell, 7 crates including planned decision, 6 OS/service
 | `index-files` | File index: scan, skip rules, filesystem watcher, snapshot persistence, query for the `files` source of Open (`/`) | No |
 | `providers` | Provider trait, OpenAI-compatible and Anthropic clients, presets, local detection, fallback order, cancellation, secret store (ADR-011) | No |
 | `decision` | NL parser, /v1/systemone client for Laya, Kev and Jev, LLM picker with strict JSON parsing | No |
-| `features` | Feature trait, registry, settings schema, start/stop lifecycle (`TaskScope`), frecency, math, projects and other feature modules | No |
+| `features` | Feature trait, registry, settings schema, start/stop lifecycle (`TaskScope`), frecency, math and other feature modules | No |
 | `win` | Win32 and WinRT wrappers: power, session, recycle bin, Explorer restart, radios, media session, port tables, UI Automation | Yes (SAFETY comments) |
 
 Workspace members (from `Cargo.toml`): `crates/launcher-core`, `crates/index-apps`, `crates/index-files`, `crates/providers`, `crates/decision`, `crates/features`, `crates/win`, `apps/desktop/src-tauri`. The Tauri app is a workspace member but is not a library crate, so it is not in the table above.

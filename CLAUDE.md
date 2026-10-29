@@ -12,7 +12,7 @@ The Notion page Claude Second Brain › Projects › Flick (https://app.notion.c
 - When the method, rules or release procedure change, update the Handbook page; when design, themes or the plan change, update the design-record page.
 - Never write secret values (keys, tokens, passwords) to Notion. Private methods and agent notes go to Notion, not the public repo.
 
-Free, open-source, keyboard-first Windows launcher: five prefixes in one bar (Open, Commands, Calc, Ask, Projects). Tauri 2 shell, Rust crates for all logic, React 19 + TypeScript UI, Next.js site in apps/web. KICKOFF.md is the spec; docs/adr/ holds the locked decisions.
+Free, open-source, keyboard-first Windows launcher: four prefixes in one bar (Open, Commands, Calc, Ask; Projects was removed after 1.0.0). Tauri 2 shell, Rust crates for all logic, React 19 + TypeScript UI, Next.js site in apps/web. KICKOFF.md is the spec; docs/adr/ holds the locked decisions.
 
 ## FOSS-first
 

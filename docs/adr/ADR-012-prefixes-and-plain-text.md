@@ -40,3 +40,5 @@ Flick began with four modes: `>` Commands, `!` Apps, `/` Find and `?` Ask. Apps,
 - Plain-text search runs more Rust work per keystroke, across apps, programs and every enabled feature. Each feature's `query` must stay inside its 0.5 ms budget ([performance budgets](../performance.md); ADR-009 makes `query` synchronous and cheap).
 - Discoverability rests on the prefix list in the empty bar and on the footer, since prefixes are no longer chosen by cycling.
 - A prefix with no live source disappears from the list and its character types normally.
+
+2026-10-29: the Projects feature and the `@` prefix were removed after 1.0.0; the text above describes the original design.

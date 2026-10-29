@@ -13,7 +13,6 @@ Budgets: hotkey to visible p95 <= 50 ms; command match <= 2 ms for 2,000 apps; e
 | Feature query(): frecency boost | <= 0.5 ms | 0.31 ms per 2k items | features bench (frecency) | release | within |
 | Feature query(): math | <= 0.5 ms | 234 us ("2.5 kg to lb") | features bench (math) | release | within (closest) |
 | Feature query(): currency, rates loaded | <= 0.5 ms | 2.4 us ("250 usd in inr") | features bench (command_all) | release | within |
-| Feature query(): projects | <= 0.5 ms | 51 us per 500 projects | features bench (projects) | release | within |
 | Feature query(): zones | <= 0.5 ms | 1.5 us ("5pm ist in pst") | features bench (math) | release | within |
 | Hotkey to visible p95 | <= 50 ms | 241.1 ms (34 of 50 toggles captured, median 61.0, max 242.4) | `scripts/measure.ps1` | release | not comparable (first run not done; script exit 1) |
 | Idle RAM | <= 120 MB total incl. WebView2, CPU ~0% | 1,587 MB working set, 976 MB private, 8 processes, CPU 6.19% | `scripts/measure.ps1` | release | over; also not comparable (settings WebView open, first file scan likely still running); under investigation |
@@ -59,7 +58,7 @@ shared runner is slower and noisier than the dev machine.
 
 ## How to reproduce
 
-- Benches run on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (bench.txt plus criterion estimates). Bench crates: launcher-core, index-files, features (frecency, math, syscmd, web, projects, command_all, nlfind, ports, media, explain, capture).
+- Benches run on GitHub only: `gh workflow run bench.yml`, then `gh run download <run-id> -n bench` (bench.txt plus criterion estimates). Bench crates: launcher-core, index-files, features (frecency, math, syscmd, web, command_all, nlfind, ports, media, explain, capture).
 - Release exe: `pnpm --filter desktop tauri build --no-bundle` (embeds the built UI), output `target/release/desktop-shell.exe`.
 - Live: `pwsh -File scripts/measure.ps1 -Exe target/release/desktop-shell.exe -Toggles 50`. Complete first run first, otherwise the settings window is open at startup and RAM and toggle numbers are not comparable. Do not run it while the app is already running. Exit codes: 0 pass, 1 over budget, 2 inconclusive (a value missing or not comparable).
 

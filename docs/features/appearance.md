@@ -6,7 +6,7 @@ IBM Plex Mono for the interface and IBM Plex Sans for longer prose.
 
 ## The launcher
 
-- A mode tab strip sits at the top: Open, Commands, Calc, Ask and Projects. `ctrl+tab` and
+- A mode tab strip sits at the top: Open, Commands, Calc and Ask. `ctrl+tab` and
   `ctrl+shift+tab` move between tabs.
 - Two panes: the result list on the left, with `#` group headers, and a detail pane on the right
   that lists every action for the selected row.

@@ -28,12 +28,6 @@ const FEATURES: Feature[] = [
     since: "v0.0.1",
   },
   {
-    title: "Project launcher",
-    line: "Open a project in your editor or terminal by name.",
-    example: "@ flick",
-    since: "v0.0.1",
-  },
-  {
     title: "Links and paths",
     line: "Type a web address or a folder path and press Enter to open it.",
     example: "github.com/flick",
@@ -130,7 +124,6 @@ const MODES = [
     key: "?",
     line: "Answers from your AI providers, labelled with provider and model.",
   },
-  { name: "Projects", key: "@", line: "Code folders under your dev roots." },
 ];
 
 export function Features() {

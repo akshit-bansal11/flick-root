@@ -1,10 +1,9 @@
-export type Mode = "none" | "Open" | "Commands" | "Calc" | "Ask" | "Projects";
+export type Mode = "none" | "Open" | "Commands" | "Calc" | "Ask";
 export const PREFIX: Record<string, Exclude<Mode, "none">> = {
   "/": "Open",
   ">": "Commands",
   "=": "Calc",
   "?": "Ask",
-  "@": "Projects",
 };
 
 export interface Item {
@@ -59,10 +58,6 @@ export const ITEMS: Record<Exclude<Mode, "none">, Item[]> = {
       keys: "",
     },
   ],
-  Projects: [
-    { title: "flick", sub: "D:\\projects\\flick", group: "projects", keys: "flick" },
-    { title: "notes-app", sub: "D:\\projects\\notes-app", group: "projects", keys: "notes app" },
-  ],
 };
 
 /** Empty bar with no prefix: the prefix list. */
@@ -71,7 +66,6 @@ const PREFIX_LIST: Item[] = [
   { title: "> Commands", sub: "System, web, media, ports, capture", group: "prefixes", keys: "" },
   { title: "= Calc", sub: "Math, units, currency, time zones", group: "prefixes", keys: "" },
   { title: "? Ask", sub: "Your AI provider", group: "prefixes", keys: "" },
-  { title: "@ Projects", sub: "Folders you code in", group: "prefixes", keys: "" },
 ];
 
 const fallbacks = (q: string): Item[] => [
@@ -80,7 +74,7 @@ const fallbacks = (q: string): Item[] => [
   { title: `Ask your AI: “${q}”`, sub: "Search instead", group: "fallback", keys: "" },
 ];
 
-export const SCRIPT = ["spo", "/ report", "= 2.5 kg to lb", "> lock", "@ flick"];
+export const SCRIPT = ["spo", "/ report", "= 2.5 kg to lb", "> lock"];
 
 /** Tab strip order: `all` first, then one tab per prefix. */
 export const TABS: { mode: Mode; label: string; key: string }[] = [
@@ -95,7 +89,6 @@ export const PRIMARY: Record<Mode, string> = {
   Commands: "run",
   Calc: "copy result",
   Ask: "ask",
-  Projects: "open in editor",
 };
 
 /** Splits typed text into its leading prefix mode and the rest. */

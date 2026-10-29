@@ -9,9 +9,8 @@ Flick is a free, open-source, keyboard-first launcher for Windows. This page lis
 - Commands (`>`): system commands, web shortcuts, media, ports and capture.
 - Calc (`=`): math, units, currency and time zones.
 - Ask (`?`): streams an answer from the first enabled provider that responds, with Fast/Think and provider fallback.
-- Projects (`@`): code folders under your dev folders.
 - Modes chosen by the `/`, `>`, `=`, `?` and `@` prefixes. A prefix is offered only while a feature it needs is on.
-- Feature toggles for frecency ranking, inline math and units, system commands, web shortcuts and the project launcher.
+- Feature toggles for frecency ranking, inline math and units, system commands, web shortcuts.
 - Integrations: natural-language finder (ADR-005), ports and processes, media controls with optional Spotify and YouTube connections (ADR-010), Explain this, and Quick capture to Obsidian, a Markdown file, Notion and webhooks (ADR-010).
 - A Settings window, a first-run flow, and a tray icon with Open, Settings and Quit, single-instance behaviour, and a launch-at-startup toggle.
 
