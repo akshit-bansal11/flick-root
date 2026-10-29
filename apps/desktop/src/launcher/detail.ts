@@ -130,7 +130,9 @@ function actionOf(a: ActionKind, first: boolean, item: Item, ctx: DetailCtx): De
     case "copyPath":
       return row("copyPath", "copy path");
     case "copyResult":
-      return row("copyResult", "copy result");
+      return first
+        ? { id: "open", label: "copy result", keys: shortcutKeys("open"), primary: true }
+        : row("open", "copy result");
     case "kill":
       return ctx.armedProcess ? row("kill", "end process") : null;
     case "custom":

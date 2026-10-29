@@ -184,7 +184,7 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `launch` | `item_id, admin: bool` | `Outcome` | `not_found`, `launch_failed` | Launcher |
 | `reveal` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Enter) |
 | `copy_path` | `item_id` | `()` | `not_found` | Launcher (Ctrl+Shift+C, Find) |
-| `copy_text` | `text` | `()` | see `commands/launch.rs` | Launcher (Ctrl+Shift+C; Copied shows only after the copy succeeds) |
+| `copy_text` | `text` | `()` | see `commands/launch.rs` | Launcher (Enter on results, Ctrl+Shift+C on answers; Copied shows only after the copy succeeds) |
 | `run_system_command` | `command_id, confirm_token?` | `Outcome` (`NeedsConfirm` first for guarded ones) | `unavailable`, `confirm_expired`, `failed` | Launcher |
 | `run_system_command` with `kill: true` | `command_id, confirm_token?, kill` | `Outcome` | `not_found`, `unknown_feature`, `confirm_expired`, plus feature errors (`internal`) | Launcher (ports) |
 | `ask_stream` | `{ text, attachment?, effort }, on_event: Channel<AskEvent>` | `ask_id` | `query_disabled`, `no_provider`, `secret_blocked` | Query view |

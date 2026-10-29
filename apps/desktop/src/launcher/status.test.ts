@@ -79,6 +79,11 @@ describe("statusHints", () => {
     ]);
   });
 
+  it("reads enter copy when the row has a copy value", () => {
+    expect(labels(statusHints("calc", { copyValue: true }, counts))).toEqual(["move", "copy"]);
+    expect(labels(statusHints("calc", {}, counts))).toEqual(["move", "open"]);
+  });
+
   it("shows the pin hint only for a pinnable row", () => {
     const pinnable = statusHints("find", { pinnable: true }, counts);
     expect(labels(pinnable)).toEqual(["move", "open", "pin"]);

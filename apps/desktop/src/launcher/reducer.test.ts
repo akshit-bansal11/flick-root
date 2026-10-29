@@ -314,17 +314,34 @@ describe("reducer", () => {
     }
   });
 
-  it("Ctrl+Shift+C copies a Commands result value, and nothing without one", () => {
-    const withValue = {
-      ...inMode("commands"),
-      items: [
-        { ...item("r"), actions: [{ type: "copyResult" } as const], payload: { value: "42" } },
-      ],
-    };
-    const r = reduce(withValue, k("C", { ctrl: true, shift: true }));
-    expect(r.effects[0]).toEqual({ type: "copyText", text: "42" });
+  const resultRow = (): Item => ({
+    ...item("r"),
+    kind: "result",
+    actions: [{ type: "copyResult" }],
+    payload: { value: "42" },
+  });
+
+  it("Enter copies a result value in Calc, Commands and All; a row with no value launches", () => {
+    for (const mode of ["calc", "commands", "none"] as const) {
+      const s = { ...inMode(mode), items: [resultRow()] };
+      expect(reduce(s, k("Enter")).effects, mode).toEqual([{ type: "copyText", text: "42" }]);
+    }
     const plain = withItems(inMode("commands"));
-    expect(reduce(plain, k("C", { ctrl: true, shift: true })).effects).toEqual([]);
+    expect(reduce(plain, k("Enter")).effects).toEqual([
+      { type: "launch", itemId: "i0", admin: false },
+    ]);
+  });
+
+  it("Ctrl+Shift+C does nothing on a result row in Calc", () => {
+    const s = { ...inMode("calc"), items: [resultRow()] };
+    expect(reduce(s, k("C", { ctrl: true, shift: true })).effects).toEqual([]);
+  });
+
+  it("clicking a result row copies it", () => {
+    const s = { ...inMode("calc"), items: [resultRow()] };
+    expect(reduce(s, { type: "activate", index: 0 }).effects).toEqual([
+      { type: "copyText", text: "42" },
+    ]);
   });
 
   it("Ctrl+Shift+C copies the Ask answer once there is one", () => {

@@ -59,7 +59,11 @@ export function statusHints(
 ): Status {
   const scoped = inScope(mode)
     .filter((s) => s.foot && (!s.when || ctx[s.when]))
-    .map((s) => ({ id: s.id, keys: keyWords(s.keys), label: s.foot ?? "" }));
+    .map((s) => ({
+      id: s.id,
+      keys: keyWords(s.keys),
+      label: s.id === "open" && ctx.copyValue ? "copy" : (s.foot ?? ""),
+    }));
   // Ask mode has no list to move through.
   const move = { id: "move", keys: "↑↓", label: "move" };
   const hints = mode === "query" ? scoped : [move, ...scoped];

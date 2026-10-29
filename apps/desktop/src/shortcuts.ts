@@ -91,14 +91,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
     when: "pathItem",
     foot: "copy path",
   },
-  {
-    id: "copyResult",
-    keys: "Ctrl+Shift+C",
-    label: "Copy result",
-    scope: ["none", "commands", "calc"],
-    when: "copyValue",
-    foot: "copy",
-  },
   { id: "ask", keys: "Enter", label: "Ask", scope: "query", foot: "ask" },
   {
     id: "copyAnswer",

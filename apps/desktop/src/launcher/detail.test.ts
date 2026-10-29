@@ -133,7 +133,18 @@ describe("detailOf actions", () => {
     const actions: ActionKind[] = [{ type: "primary" }, { type: "copyResult" }];
     const d = detailOf(make("command", { actions }));
     expect(d.actions[0]).toEqual({ id: "run", label: "run", keys: "enter", primary: true });
-    expect(d.actions[1]?.id).toBe("copyResult");
+    expect(d.actions[1]?.id).toBe("open");
+    expect(d.actions[1]?.label).toBe("copy result");
+  });
+
+  it("a result row's first action is copy result on Enter", () => {
+    const d = detailOf(make("command", { actions: [{ type: "copyResult" }] }));
+    expect(d.actions[0]).toEqual({
+      id: "open",
+      label: "copy result",
+      keys: "enter",
+      primary: true,
+    });
   });
 
   it("labels a custom primary action run", () => {

@@ -85,8 +85,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "calc",
     title: "= Calc",
-    body: `Math, units, currency and time zones. Type 5 km to mi, then press ${key("copyResult")} to copy the answer.`,
-    keys: ["=", ...caps("copyResult")],
+    body: `Math, units, currency and time zones. Type 5 km to mi, then press ${key("open")} to copy the answer.`,
+    keys: ["=", ...caps("open")],
     example: "= 5 km to mi",
     show: "type",
     goal: (v) => v.mode === "calc" && saw(v, "copied"),

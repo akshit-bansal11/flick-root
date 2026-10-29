@@ -502,6 +502,30 @@ describe("Launcher", () => {
     }
   });
 
+  it("Enter on a Calc result copies it and shows Copied", async () => {
+    await mount();
+    vi.mocked(ipc.search).mockImplementation((req) =>
+      Promise.resolve({
+        seq: req.seq,
+        items: [
+          {
+            ...item("calc:r", "4"),
+            kind: "result",
+            actions: [{ type: "copyResult" }],
+            payload: { value: "4" },
+          },
+        ],
+        group: null,
+      }),
+    );
+    await type("=2+2");
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "Enter" });
+    });
+    expect(ipc.copyText).toHaveBeenCalledWith("4");
+    expect(screen.getByRole("status").textContent).toBe("Copied");
+  });
+
   it("a failed copy shows Copy failed, never Copied", async () => {
     vi.mocked(ipc.copyPath).mockRejectedValueOnce(new Error("clipboard busy"));
     const err = vi.spyOn(console, "error").mockImplementation(() => {});

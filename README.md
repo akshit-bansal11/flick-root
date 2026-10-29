@@ -43,7 +43,7 @@ A prefix typed first in the empty bar narrows the search to one set of results; 
 | `Enter` | Primary action (open, launch, ask) |
 | `Ctrl+Enter` | Show location (Open) |
 | `Ctrl+Shift+Enter` | Run as admin (Open: apps and exe/msi programs, when the result can) |
-| `Ctrl+Shift+C` | Copy: path in Open (files and folders), result in Commands and Calc, answer in Ask |
+| `Ctrl+Shift+C` | Copy: path in Open (files and folders), answer in Ask. Enter copies a result in Calc and Commands |
 | `Delete` | End a process, after arrowing to its row in Commands; `Enter` confirms |
 | `Ctrl+1` to `Ctrl+5` | Go to Open, Commands, Calc, Ask, Projects |
 | `Tab` / `Shift+Tab` | Next / previous thinking mode (Ask) |

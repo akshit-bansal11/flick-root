@@ -507,6 +507,8 @@ function openSelected(s: State, intent: Intent): Result {
       },
     );
   }
+  const value = resultValue(item);
+  if (value !== null) return copied(s, { type: "copyText", text: value });
   return out(s, { type: "launch", itemId: item.id, admin: false });
 }
 
@@ -616,10 +618,6 @@ function key(s: State, k: KeyInput): Result {
       return item?.id.startsWith("file:")
         ? copied(s, { type: "copyPath", itemId: item.id })
         : out(s);
-    case "copyResult": {
-      const value = resultValue(item);
-      return value === null ? out(s) : copied(s, { type: "copyText", text: value });
-    }
     case "copyAnswer":
       return s.query.text === "" ? out(s) : copied(s, { type: "copyText", text: s.query.text });
     case "removeAttachment":
