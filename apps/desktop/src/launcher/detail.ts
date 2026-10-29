@@ -90,8 +90,6 @@ function factsOf(item: Item): DetailFact[] {
       return item.id.startsWith("file:")
         ? [{ label: "path", value: item.id.slice("file:".length) }]
         : [];
-    case "project":
-      return item.subtitle ? [{ label: "path", value: item.subtitle }] : [];
     case "command":
     case "process":
     case "result":

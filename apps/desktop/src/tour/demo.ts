@@ -70,11 +70,6 @@ const proc = item("proc:chrome", "process", "chrome.exe", "Process", {
   actions: [{ type: "kill" }],
 });
 
-export const DEMO_PROJECTS: readonly Item[] = [
-  item("projects:flick", "project", "flick", "Projects"),
-  item("projects:notes", "project", "notes-app", "Projects"),
-];
-
 /** Canned results for the examples the steps use, per source. */
 type Canned = readonly [RegExp, () => Item[]][];
 const CANNED_MATH: Canned = [
@@ -98,7 +93,7 @@ const canned = (list: Canned, text: string): Item[] => {
   return list.find(([re]) => re.test(t))?.[1]() ?? [];
 };
 
-const DEMO_FEATURES: readonly string[] = ["math", "syscmd", "projects"];
+const DEMO_FEATURES: readonly string[] = ["math", "syscmd"];
 
 /** Title the demo gives the first web shortcut, for the plain-text Web row. */
 export const DEMO_WEB_TITLE = "Google";
@@ -106,7 +101,7 @@ export const DEMO_WEB_TITLE = "Google";
 /** Items the demo shows for a search, composed from `sources` in result order. */
 export function demoSearch(mode: Mode, sources: readonly string[], text: string): Item[] {
   if (mode === "query") return [];
-  // "features" stands for the demo's math, command and project sources.
+  // "features" stands for the demo's math and command sources.
   const has = (id: string) =>
     sources.includes(id) || (DEMO_FEATURES.includes(id) && sources.includes("features"));
   const match = (list: readonly Item[], pick: (i: Item) => boolean = () => true) =>
@@ -118,7 +113,6 @@ export function demoSearch(mode: Mode, sources: readonly string[], text: string)
     ...(has("apps") ? match(DEMO_APPS, isProgram) : []),
     ...(has("files") ? match(DEMO_FILES, (i) => i.kind === "file") : []),
     ...(has("files") ? match(DEMO_FILES, (i) => i.kind === "folder") : []),
-    ...(has("projects") ? match(DEMO_PROJECTS) : []),
   ];
 }
 
@@ -180,7 +174,7 @@ export interface DemoHost {
 }
 
 const byId = (id: string): Item | undefined =>
-  [...DEMO_APPS, ...DEMO_FILES, ...DEMO_PROJECTS, lockCommand, proc].find((i) => i.id === id);
+  [...DEMO_APPS, ...DEMO_FILES, lockCommand, proc].find((i) => i.id === id);
 
 /** Runs reducer effects against the demo: toasts instead of actions, canned search and answers. */
 export function createDemoRunner(host: DemoHost) {
@@ -304,9 +298,7 @@ export function tourEventOf(e: Effect): TourEvent | null {
           ? "launchApp"
           : e.itemId.startsWith("cmd:")
             ? "runCommand"
-            : e.itemId.startsWith("projects:")
-              ? "openProject"
-              : null;
+            : null;
     case "reveal":
       return e.itemId.startsWith("file:") ? "openFile" : null;
     case "copyPath":

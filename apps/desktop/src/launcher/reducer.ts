@@ -204,15 +204,6 @@ export const MODES: Record<Exclude<LaunchMode, "none">, ModeDef> = {
     sources: [],
     needs: ["ask"],
   },
-  projects: {
-    prefix: "@",
-    label: "Projects",
-    placeholder: "Find a project folder",
-    desc: "code folders under your dev folders",
-    wire: "command",
-    sources: ["projects"],
-    needs: ["projects"],
-  },
 };
 
 type Entered = Exclude<LaunchMode, "none">;

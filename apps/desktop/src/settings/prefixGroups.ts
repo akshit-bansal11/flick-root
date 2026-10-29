@@ -30,7 +30,6 @@ export const PREFIX_GROUPS: readonly PrefixGroup[] = [
   },
   { id: "calc", mode: "calc", features: ["math"] },
   { id: "query", mode: "query", toggle: { key: "query", label: "Ask" }, features: ["explain"] },
-  { id: "projects", mode: "projects", features: ["projects"] },
   {
     id: "everywhere",
     mode: null,

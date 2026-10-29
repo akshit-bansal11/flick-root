@@ -25,7 +25,6 @@ const NOUN: Record<ItemKind, readonly [string, string]> = {
   command: ["command", "commands"],
   file: ["file", "files"],
   folder: ["folder", "folders"],
-  project: ["project", "projects"],
   process: ["process", "processes"],
   result: ["result", "results"],
   media: ["media item", "media items"],

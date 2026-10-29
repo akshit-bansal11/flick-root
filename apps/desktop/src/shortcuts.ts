@@ -9,7 +9,7 @@ export interface KeyInput {
   shift: boolean;
   alt: boolean;
   meta?: boolean;
-  /** Physical key (KeyboardEvent.code); lets Ctrl+1-5 and Ctrl+/ work on layouts where those need Shift. */
+  /** Physical key (KeyboardEvent.code); lets Ctrl+1-4 and Ctrl+/ work on layouts where those need Shift. */
   code?: string;
 }
 
@@ -49,7 +49,7 @@ export interface Shortcut {
   foot?: string;
 }
 
-const LIST_SCOPES = ["none", "find", "commands", "calc", "projects"] as const;
+const LIST_SCOPES = ["none", "find", "commands", "calc"] as const;
 
 export const SHORTCUTS: readonly Shortcut[] = [
   {
@@ -117,7 +117,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: "go:commands", keys: "Ctrl+2", label: "Go to Commands", scope: "launcher" },
   { id: "go:calc", keys: "Ctrl+3", label: "Go to Calc", scope: "launcher" },
   { id: "go:query", keys: "Ctrl+4", label: "Go to Ask", scope: "launcher" },
-  { id: "go:projects", keys: "Ctrl+5", label: "Go to Projects", scope: "launcher" },
   { id: "tabNext", keys: "Ctrl+Tab", label: "Next mode tab", scope: "launcher" },
   { id: "tabPrev", keys: "Ctrl+Shift+Tab", label: "Previous mode tab", scope: "launcher" },
   { id: "leave", keys: "Backspace", label: "Leave mode (empty input)", scope: "launcher" },
@@ -230,10 +229,10 @@ const KEY_NAMES: Record<string, string> = {
 };
 const KEY_ORIGINAL = Object.fromEntries(Object.entries(KEY_NAMES).map(([k, v]) => [v, k]));
 
-/** Key name; with Ctrl or Alt held, Digit1-5 and Slash come from the physical key (AZERTY needs Shift for digits). */
+/** Key name; with Ctrl or Alt held, Digit1-4 and Slash come from the physical key (AZERTY needs Shift for digits). */
 function nameOf(k: KeyInput): string {
   if (k.code && (k.ctrl || k.alt)) {
-    if (/^Digit[1-5]$/.test(k.code)) return k.code.slice(5);
+    if (/^Digit[1-4]$/.test(k.code)) return k.code.slice(5);
     if (k.code === "Slash") return "/";
   }
   return KEY_NAMES[k.key] ?? (k.key.length === 1 ? k.key.toUpperCase() : k.key);
@@ -327,7 +326,6 @@ export const SCOPE_LABEL: Record<Scope, string> = {
   commands: "Commands",
   calc: "Calc",
   query: "Ask",
-  projects: "Projects",
   settings: "Settings window",
   tour: "Tour",
 };
@@ -339,7 +337,6 @@ const SCOPE_ORDER: Scope[] = [
   "commands",
   "calc",
   "query",
-  "projects",
   "settings",
   "tour",
 ];

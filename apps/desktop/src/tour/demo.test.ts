@@ -45,14 +45,10 @@ describe("demoSearch", () => {
     expect(demoSearch("command", plain, "lock")[0]?.id).toBe("cmd:lock");
     expect(demoSearch("command", plain, "report")).toEqual([]);
   });
-  it("lists apps, programs, files, folders and projects in order", () => {
+  it("lists apps, programs, files and folders in order", () => {
     const ids = demoSearch("find", ["apps", "files"], "").map((i) => i.id);
     expect(ids.indexOf("prog:notepadpp")).toBeGreaterThan(ids.indexOf("app:notepad"));
     expect(ids.indexOf("file:reports")).toBeGreaterThan(ids.indexOf("file:budget"));
-    expect(demoSearch("command", ["projects"], "").map((i) => i.title)).toEqual([
-      "flick",
-      "notes-app",
-    ]);
   });
 });
 
@@ -120,7 +116,6 @@ describe("tourEventOf", () => {
     expect(ev({ type: "launch", itemId: "app:chrome", admin: false })).toBe("launchApp");
     expect(ev({ type: "launch", itemId: "file:report", admin: false })).toBe("openFile");
     expect(ev({ type: "launch", itemId: "cmd:lock", admin: false })).toBe("runCommand");
-    expect(ev({ type: "launch", itemId: "projects:flick", admin: false })).toBe("openProject");
     expect(ev({ type: "reveal", itemId: "file:report" })).toBe("openFile");
     expect(ev({ type: "copyText", text: "1" })).toBe("copied");
     expect(ev({ type: "setThinkingMode", id: "x" })).toBe("modelSwitched");

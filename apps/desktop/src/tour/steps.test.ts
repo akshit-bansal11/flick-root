@@ -36,14 +36,13 @@ describe("tour steps", () => {
       "find",
       "commands",
       "calc",
-      "projects",
       "ask",
       "explain",
       "around",
       "themes",
       "done",
     ]);
-    expect(TOUR_STEPS.at(-1)?.keys).toEqual(["/", ">", "=", "?", "@"]);
+    expect(TOUR_STEPS.at(-1)?.keys).toEqual(["/", ">", "=", "?"]);
   });
   it("next ends after the last step; back stops at the first", () => {
     expect(nextStep(0)).toBe(1);
@@ -65,8 +64,6 @@ describe("tour steps", () => {
     expect(goalMet(at("calc"), view({ mode: "calc", seen: ["copied"] }))).toBe(true);
     expect(goalMet(at("calc"), view({ mode: "commands", seen: ["copied"] }))).toBe(false);
     expect(goalMet(at("calc"), view({ mode: "calc" }))).toBe(false);
-    expect(goalMet(at("projects"), view({ seen: ["openProject"] }))).toBe(true);
-    expect(goalMet(at("projects"), view({ seen: ["launchApp"] }))).toBe(false);
     expect(goalMet(at("ask"), view({ seen: ["modelSwitched"] }))).toBe(false);
     expect(goalMet(at("ask"), view({ seen: ["modelSwitched", "askSent"] }))).toBe(true);
     expect(goalMet(at("explain"), view({ seen: ["captured"] }))).toBe(false);

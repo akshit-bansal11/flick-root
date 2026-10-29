@@ -7,7 +7,6 @@ export type TourEvent =
   | "launchApp"
   | "openFile"
   | "runCommand"
-  | "openProject"
   | "copied"
   | "askSent"
   | "modelSwitched"
@@ -92,15 +91,6 @@ export const TOUR_STEPS: readonly TourStep[] = [
     goal: (v) => v.mode === "calc" && saw(v, "copied"),
   },
   {
-    id: "projects",
-    title: "@ Projects",
-    body: `Jump into a code project. Type a name, then press ${key("open")} to open it.`,
-    keys: ["@", ...caps("open")],
-    example: "@ flick",
-    show: "type",
-    goal: (v) => saw(v, "openProject"),
-  },
-  {
     id: "ask",
     title: "? Ask",
     body: `Ask your own AI. ${key("model")} switches the model, ${key("ask")} asks. Nothing is sent from this tour.`,
@@ -139,7 +129,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "done",
     title: "You are set",
     body: "Press the hotkey any time and pick a prefix. Find this tour again in Settings > General.",
-    keys: ["/", ">", "=", "?", "@"],
+    keys: ["/", ">", "=", "?"],
   },
 ];
 
@@ -169,7 +159,7 @@ export const GHOST_MS = 45;
  * An example with no prefix is typed as it is.
  */
 export const ghostInput = (typed: string): string =>
-  /^[/>=?@]/.test(typed) && typed.length > 1 ? typed.slice(1).trimStart() : typed;
+  /^[/>=?]/.test(typed) && typed.length > 1 ? typed.slice(1).trimStart() : typed;
 
 const ACCEL_NAMES: Record<string, string> = {
   control: "Ctrl",

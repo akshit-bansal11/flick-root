@@ -1,18 +1,17 @@
 // Mirrors crates/launcher-core/src/types.rs (serde camelCase).
 
 // `search` takes source ids with the mode: "apps", "files", "features", or one feature id
-// (math syscmd web media ports capture projects nlfind links frecency explain).
+// (math syscmd web media ports capture nlfind links frecency explain).
 export type Mode = "command" | "find" | "query";
 
 /** UI mode: "none" is the prefix-hint state; the others map onto a wire `Mode` and its sources. */
-export type LaunchMode = "none" | "find" | "commands" | "calc" | "query" | "projects";
+export type LaunchMode = "none" | "find" | "commands" | "calc" | "query";
 
 export type ItemKind =
   | "app"
   | "command"
   | "file"
   | "folder"
-  | "project"
   | "result"
   | "process"
   | "media"

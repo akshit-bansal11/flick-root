@@ -353,7 +353,7 @@ describe("reducer", () => {
     expect(reduce(inMode("query"), k("C", { ctrl: true, shift: true })).effects).toEqual([]);
   });
 
-  it("Ctrl+1..5 enter modes, carry typed text and respect disabled modes", () => {
+  it("Ctrl+1..4 enter modes, carry typed text and respect disabled modes", () => {
     const typed = { ...initialState(), input: "abc" };
     const r = reduce(typed, k("1", { ctrl: true }));
     expect(r.state).toMatchObject({ mode: "find", input: "abc" });
@@ -361,7 +361,6 @@ describe("reducer", () => {
     expect(reduce(typed, k("2", { ctrl: true })).state.mode).toBe("commands");
     expect(reduce(typed, k("3", { ctrl: true })).state.mode).toBe("calc");
     expect(reduce(typed, k("4", { ctrl: true })).state.mode).toBe("query");
-    expect(reduce(typed, k("5", { ctrl: true })).state.mode).toBe("projects");
     const off = initialState(["syscmd"]);
     expect(reduce(off, k("1", { ctrl: true })).state).toBe(off);
     expect(reduce(off, k("4", { ctrl: true })).state).toBe(off);
@@ -370,7 +369,7 @@ describe("reducer", () => {
   it("a prefix is offered only while one of its needs is live", () => {
     expect(availableModes(initialState(["apps"]).enabledSources)).toEqual(["find"]);
     expect(availableModes(["apps", "syscmd"])).toEqual(["find", "commands"]);
-    expect(availableModes(null)).toEqual(["find", "commands", "calc", "query", "projects"]);
+    expect(availableModes(null)).toEqual(["find", "commands", "calc", "query"]);
   });
 
   it("? stays text when ask is not live", () => {
@@ -439,7 +438,6 @@ describe("reducer", () => {
     ["/", "find", "find", ["apps", "files", "nlfind"]],
     [">", "commands", "command", ["syscmd", "web", "media", "ports", "capture", "links"]],
     ["=", "calc", "command", ["math"]],
-    ["@", "projects", "command", ["projects"]],
   ] as const)("prefix %s enters %s, is consumed, and searches", (ch, mode, wire, sources) => {
     const r = reduce(initialState(), { type: "text", text: ch });
     expect(r.state.mode).toBe(mode);
@@ -454,7 +452,7 @@ describe("reducer", () => {
   });
 
   it("prefix table is one-to-one", () => {
-    expect(Object.values(MODES).map((m) => m.prefix)).toEqual(["/", ">", "=", "?", "@"]);
+    expect(Object.values(MODES).map((m) => m.prefix)).toEqual(["/", ">", "=", "?"]);
   });
 
   it("a prefix typed on an empty field in another mode switches mode", () => {
@@ -549,16 +547,16 @@ describe("reducer", () => {
   it("Ctrl+Tab cycles the tabs with all first and wraps", () => {
     let s = initialState();
     const seen: LaunchMode[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       s = reduce(s, k("Tab", { ctrl: true })).state;
       seen.push(s.mode);
     }
-    expect(seen).toEqual(["find", "commands", "calc", "query", "projects", "none"]);
+    expect(seen).toEqual(["find", "commands", "calc", "query", "none"]);
   });
 
   it("Ctrl+Shift+Tab cycles backwards and wraps from all to the last tab", () => {
     const back = k("Tab", { ctrl: true, shift: true });
-    expect(reduce(initialState(), back).state.mode).toBe("projects");
+    expect(reduce(initialState(), back).state.mode).toBe("query");
     expect(reduce(inMode("find"), back).state.mode).toBe("none");
     expect(reduce(inMode("calc"), back).state.mode).toBe("commands");
   });

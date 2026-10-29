@@ -115,7 +115,7 @@ describe("shortcut table", () => {
   });
 
   it("shares no chord inside one effective scope", () => {
-    const modes: Scope[] = ["none", "find", "commands", "calc", "query", "projects"];
+    const modes: Scope[] = ["none", "find", "commands", "calc", "query"];
     const effective = [...modes.map((m): Scope[] => [m, "launcher"]), ["settings"] as Scope[]];
     for (const scopes of effective) {
       const chords = scopes.flatMap((s) => inScope(s).map((x) => x.keys));
@@ -157,7 +157,7 @@ describe("chordOf and matches", () => {
 
 describe("mode tab cycling", () => {
   it("maps Ctrl+Tab and Ctrl+Shift+Tab to tabNext and tabPrev in every launcher mode", () => {
-    for (const mode of ["none", "find", "commands", "calc", "query", "projects"] as const) {
+    for (const mode of ["none", "find", "commands", "calc", "query"] as const) {
       expect(idFor(mode, key("Tab", { ctrl: true })), mode).toBe("tabNext");
       expect(idFor(mode, key("Tab", { ctrl: true, shift: true })), mode).toBe("tabPrev");
     }

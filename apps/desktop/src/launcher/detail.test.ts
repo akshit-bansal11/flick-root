@@ -57,12 +57,6 @@ describe("detailOf facts", () => {
     expect(detailOf(folder).tag).toBe("folder");
   });
 
-  it("takes a project's path from its subtitle", () => {
-    const p = make("project", { subtitle: "D:/code/p" });
-    expect(detailOf(p).facts).toEqual([{ label: "path", value: "D:/code/p" }]);
-    expect(detailOf(make("project")).facts).toEqual([]);
-  });
-
   it("takes a command or process subtitle as about", () => {
     const c = make("command", { subtitle: "Lock the PC" });
     expect(detailOf(c).facts).toEqual([{ label: "about", value: "Lock the PC" }]);

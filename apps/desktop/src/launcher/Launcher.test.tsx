@@ -115,7 +115,7 @@ const type = (text: string) =>
 describe("Launcher", () => {
   it("starts on the all tab with the mode tab strip and no search", async () => {
     await mount();
-    expect(screen.getByPlaceholderText("Search apps and commands, or type / > = ? @")).toBeTruthy();
+    expect(screen.getByPlaceholderText("Search apps and commands, or type / > = ?")).toBeTruthy();
     expect(screen.getByRole("tablist", { name: "Modes" })).toBeTruthy();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
       "all",
@@ -123,7 +123,6 @@ describe("Launcher", () => {
       ">commands",
       "=calc",
       "?ask",
-      "@projects",
     ]);
     expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("listbox", { name: "Modes" })).toBeNull();
@@ -442,7 +441,7 @@ describe("Launcher", () => {
     expect(screen.getByRole("tab", { name: "all" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it.each(["/", ">", "=", "?", "@"])("the prompt shows %s in its mode", async (prefix) => {
+  it.each(["/", ">", "=", "?"])("the prompt shows %s in its mode", async (prefix) => {
     await mount();
     await type(prefix);
     expect(screen.getByTestId("prompt").textContent).toBe(prefix);

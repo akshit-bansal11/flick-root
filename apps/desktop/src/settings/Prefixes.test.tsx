@@ -80,14 +80,7 @@ describe("Prefixes", () => {
   it("renders groups in prefix order, each feature once", async () => {
     const all = PREFIX_GROUPS.flatMap((g) => g.features).map((id) => make(id, `Mod ${id}`));
     await mount(all);
-    expect(headings()).toEqual([
-      "# open",
-      "# commands",
-      "# calc",
-      "# ask",
-      "# projects",
-      "# everywhere",
-    ]);
+    expect(headings()).toEqual(["# open", "# commands", "# calc", "# ask", "# everywhere"]);
     for (const m of all) expect(screen.getAllByText(m.title)).toHaveLength(1);
     expect(headings()).not.toContain("# other");
   });
