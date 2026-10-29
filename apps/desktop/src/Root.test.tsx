@@ -9,7 +9,7 @@ vi.mock("./ipc", () => ({
   launch: vi.fn(),
   askStream: vi.fn(),
   cancelAsk: vi.fn(),
-  listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null })),
+  listThinkingModes: vi.fn(() => Promise.resolve({ modes: [], selected: null, effort: "auto" })),
   setThinkingMode: vi.fn(() => Promise.resolve()),
   homeItems: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   togglePin: vi.fn(() => Promise.resolve({ items: [], pins: [] })),

@@ -14,6 +14,7 @@ import {
   type Scope,
   SHORTCUTS,
   scopesOf,
+  shortcut,
 } from "./shortcuts";
 
 const key = (k: string, o: object = {}) => ({
@@ -163,9 +164,13 @@ describe("mode tab cycling", () => {
     }
   });
 
-  it("keeps Tab alone on the model shortcut in the query scope", () => {
-    expect(idFor("query", key("Tab"))).toBe("model");
-    expect(idFor("query", key("Tab", { shift: true }))).toBe("modelPrev");
+  it("binds Ctrl+T to the next model and Shift+Tab to the next effort in the query scope", () => {
+    expect(idFor("query", key("t", { ctrl: true }))).toBe("model");
+    expect(idFor("query", key("Tab", { shift: true }))).toBe("effort");
+    expect(idFor("query", key("Tab"))).toBeUndefined();
+    expect(() => shortcut("modelPrev")).toThrow();
+    expect(isReserved("Ctrl+T", "query")).toBe(false);
+    expect(isReserved("Shift+Tab", "query")).toBe(false);
   });
 
   it("keeps Settings page cycling on the same chords", () => {

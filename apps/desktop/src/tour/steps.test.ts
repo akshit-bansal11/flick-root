@@ -82,6 +82,7 @@ describe("tour steps", () => {
     expect(body("around")).toContain("ctrl shift tab");
     expect(body("plain")).toContain("recent");
     expect(TOUR_STEPS[at("ask")]?.keys).toContain("Tab");
+    expect(TOUR_STEPS[at("ask")]?.keys).toContain("Shift");
   });
   it("ghostInput sends the prefix first, then the text after it", () => {
     expect(ghostInput("/")).toBe("/");

@@ -109,7 +109,14 @@ export function useLauncher(
         case "loadThinkingModes":
           ipc
             .listThinkingModes()
-            .then((r) => dispatch({ type: "thinkingModes", modes: r.modes, selected: r.selected }))
+            .then((r) =>
+              dispatch({
+                type: "thinkingModes",
+                modes: r.modes,
+                selected: r.selected,
+                effort: r.effort,
+              }),
+            )
             .catch(warn);
           break;
         case "loadHome":
@@ -167,6 +174,9 @@ export function useLauncher(
           break;
         case "setThinkingMode":
           ipc.setThinkingMode(e.id).catch(warn);
+          break;
+        case "setEffort":
+          ipc.setEffort(e.level).catch(warn);
           break;
       }
     }

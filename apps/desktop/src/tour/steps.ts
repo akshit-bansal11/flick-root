@@ -93,8 +93,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     id: "ask",
     title: "? Ask",
-    body: `Ask your own AI. ${key("model")} switches the model, ${key("ask")} asks. Nothing is sent from this tour.`,
-    keys: ["?", ...caps("model"), ...caps("ask")],
+    body: `Ask your own AI. ${key("model")} switches the model, ${key("effort")} the effort, ${key("ask")} asks. Nothing is sent from this tour.`,
+    keys: ["?", ...caps("model"), ...caps("effort"), ...caps("ask")],
     example: "? what is a CIDR block",
     show: "type",
     goal: (v) => saw(v, "modelSwitched", "askSent"),

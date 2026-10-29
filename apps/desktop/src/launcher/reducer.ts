@@ -1,8 +1,18 @@
+import { effectiveEffort, nextEffort, selectedMode } from "../query/effort";
 import { filterThemes, slotOf } from "../settings/themePicker";
 import type { AppearancePatch } from "../settings/types";
 import { idFor, type KeyInput } from "../shortcuts";
 import type { ThemeView } from "../theme";
-import type { AskEvent, Effort, Item, LaunchMode, Mode, Outcome, ThinkingMode } from "../types";
+import {
+  type AskEvent,
+  EFFORT_AUTO,
+  type Effort,
+  type Item,
+  type LaunchMode,
+  type Mode,
+  type Outcome,
+  type ThinkingMode,
+} from "../types";
 import { isPinnable, THEME_SOURCE, themeRow } from "./kinds";
 
 export type { KeyInput };
@@ -77,7 +87,7 @@ export interface State {
   pins: string[];
   selected: number;
   query: QueryState;
-  /** Thinking modes (provider + model) Tab cycles through; `selected` is null until chosen. */
+  /** Thinking modes (provider + model) Ctrl+T cycles through; `selected` is null until chosen. */
   thinkingModes: { modes: ThinkingMode[]; selected: string | null };
   pendingConfirm: { commandId: string; token: string } | null;
   /** True once an arrow key moved the selection; only then does Delete end a process row. */
@@ -104,7 +114,7 @@ export type Event =
   | { type: "ask"; token: number; event: AskEvent }
   | { type: "outcome"; commandId: string; outcome: Outcome }
   | { type: "actionFailed"; message: string }
-  | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null }
+  | { type: "thinkingModes"; modes: ThinkingMode[]; selected: string | null; effort: string }
   | { type: "tab"; mode: LaunchMode }
   | { type: "homeLoaded"; items: Item[]; pins: string[] }
   | { type: "themesLoaded"; themes: ThemeView[] }
@@ -145,6 +155,7 @@ export type Effect =
   | { type: "applyTheme"; patch: AppearancePatch }
   | { type: "webSearch"; text: string }
   | { type: "setThinkingMode"; id: string }
+  | { type: "setEffort"; level: string }
   | { type: "hide" }
   | { type: "openSettings"; section: string };
 
@@ -243,7 +254,7 @@ export const initialState = (
     status: "idle",
     text: "",
     provider: null,
-    effort: "fast",
+    effort: EFFORT_AUTO,
     error: null,
     errorCode: null,
     thinking: false,
@@ -415,7 +426,10 @@ function enter(s: State): Result {
         token,
         text,
         attachment: att?.preview,
-        effort: s.query.effort,
+        effort: effectiveEffort(
+          selectedMode(s.thinkingModes.modes, s.thinkingModes.selected)?.efforts ?? [],
+          s.query.effort,
+        ),
         thinkingMode: s.thinkingModes.selected ?? undefined,
       },
     );
@@ -521,15 +535,15 @@ function onEscape(s: State): Result {
   return out(s, { type: "hide" });
 }
 
-/** Select the next or previous thinking mode (wraps); persisted through setThinkingMode. */
-function cycleThinking(s: State, delta: number): Result {
+/** Select the next thinking mode (wraps); persisted through setThinkingMode. */
+function cycleThinking(s: State): Result {
   const { modes, selected } = s.thinkingModes;
   if (modes.length < 2) return out(s);
   const at = Math.max(
     0,
     modes.findIndex((m) => m.id === selected),
   );
-  const next = modes[(at + delta + modes.length) % modes.length];
+  const next = modes[(at + 1) % modes.length];
   if (!next) return out(s);
   return out(
     { ...s, thinkingModes: { modes, selected: next.id } },
@@ -595,9 +609,7 @@ function key(s: State, k: KeyInput): Result {
     case "tabPrev":
       return cycleTab(s, -1);
     case "model":
-      return cycleThinking(s, 1);
-    case "modelPrev":
-      return cycleThinking(s, -1);
+      return cycleThinking(s);
     case "back":
       return onEscape(s);
     case "kill":
@@ -617,8 +629,10 @@ function key(s: State, k: KeyInput): Result {
     case "removeAttachment":
       return s.attachment ? out({ ...s, attachment: null, notice: null }) : out(s);
     case "effort": {
-      const effort: Effort = s.query.effort === "fast" ? "think" : "fast";
-      return out({ ...s, query: { ...s.query, effort } });
+      const { modes, selected } = s.thinkingModes;
+      const level = nextEffort(selectedMode(modes, selected)?.efforts ?? [], s.query.effort);
+      if (level === null) return out(s);
+      return out({ ...s, query: { ...s.query, effort: level } }, { type: "setEffort", level });
     }
     case "openSettings":
       return out(s, { type: "openSettings", section: "general" });
@@ -767,7 +781,11 @@ function step(s: State, ev: Event): Result {
     case "copiedDone":
       return out({ ...s, copied: false, copyFailed: false });
     case "thinkingModes": {
-      const next: State = { ...s, thinkingModes: { modes: ev.modes, selected: ev.selected } };
+      const next: State = {
+        ...s,
+        thinkingModes: { modes: ev.modes, selected: ev.selected },
+        query: { ...s.query, effort: ev.effort },
+      };
       // The Ask fallback row names the chosen model; rebuild it when the modes arrive.
       const plainText = next.mode === "none" && !isHome(next);
       const items = plainText
@@ -812,6 +830,7 @@ function step(s: State, ev: Event): Result {
         {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
+          query: { ...initialState(s.enabledSources, s.webTitle).query, effort: s.query.effort },
           home: s.home,
           homeReady: s.homeReady,
           pins: s.pins,
@@ -835,6 +854,7 @@ function step(s: State, ev: Event): Result {
         state: {
           ...initialState(s.enabledSources, s.webTitle),
           thinkingModes: s.thinkingModes,
+          query: { ...initialState(s.enabledSources, s.webTitle).query, effort: s.query.effort },
           home: s.home,
           homeReady: s.homeReady,
           pins: s.pins,

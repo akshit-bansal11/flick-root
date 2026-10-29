@@ -100,9 +100,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
     when: "answer",
     foot: "copy answer",
   },
-  { id: "model", keys: "Tab", label: "Next model", scope: "query", foot: "model" },
-  { id: "modelPrev", keys: "Shift+Tab", label: "Previous model", scope: "query" },
-  { id: "effort", keys: "Ctrl+T", label: "Fast or Think", scope: "query", foot: "think" },
+  { id: "model", keys: "Ctrl+T", label: "Next model", scope: "query", foot: "model" },
+  { id: "effort", keys: "Shift+Tab", label: "Next effort", scope: "query", foot: "effort" },
   {
     id: "removeAttachment",
     keys: "Ctrl+Shift+X",

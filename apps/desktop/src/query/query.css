@@ -121,3 +121,10 @@
     animation: none;
   }
 }
+
+/* The fetched model list can be long; it scrolls instead of pushing the effort row out. */
+.left .models {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

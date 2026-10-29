@@ -1,6 +1,8 @@
+import { useEffect, useRef } from "react";
 import { keyWords, shortcut } from "../shortcuts";
 import type { Effort, ThinkingMode } from "../types";
 import { EmptyState } from "./EmptyState";
+import { effectiveEffort, selectedMode } from "./effort";
 import { Markdown } from "./Markdown";
 import "./query.css";
 
@@ -16,7 +18,7 @@ interface Props {
   text: string;
   error: string | null;
   noProvider: boolean;
-  /** Thinking modes Tab cycles through, in fallback order. */
+  /** Thinking modes Ctrl+T cycles through, in fallback order. */
   modes?: ThinkingMode[];
   selectedMode?: string | null;
   onToggleEffort: () => void;
@@ -26,12 +28,21 @@ interface Props {
 
 export function QueryView(p: Props) {
   const modes = p.modes ?? [];
-  const mode = modes.find((m) => m.id === p.selectedMode) ?? modes[0];
+  const mode = selectedMode(modes, p.selectedMode);
+  const efforts = mode?.efforts ?? [];
+  const shown = effectiveEffort(efforts, p.effort);
+  const list = useRef<HTMLDivElement>(null);
+  const modeId = mode?.id;
+  // The list scrolls; keep the chosen model visible as Ctrl+T moves through it.
+  useEffect(() => {
+    if (modeId === undefined) return;
+    list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
+  }, [modeId]);
   if (p.noProvider) return <EmptyState onOpenSettings={p.onOpenSettings} />;
   // EU AI Act Art. 50: the disclosure stays on screen with every generated answer.
   const who = [p.provider ?? mode?.providerLabel, p.model ?? mode?.model].filter(Boolean);
-  const showEffort = p.reasoning !== false;
-  const marker = ["AI answer", ...who, ...(showEffort ? [p.effort] : [])].join(" · ");
+  const showEffort = p.reasoning !== false && efforts.length > 0;
+  const marker = ["AI answer", ...who, ...(showEffort ? [shown] : [])].join(" · ");
   return (
     <div className="split">
       <div className="left">
@@ -40,7 +51,7 @@ export function QueryView(p: Props) {
             <div className="group" aria-hidden="true">
               # models, fallback order
             </div>
-            <div role="listbox" aria-label="Models">
+            <div ref={list} className="models" role="listbox" aria-label="Models">
               {modes.map((m) => {
                 const selected = m.id === mode?.id;
                 return (
@@ -71,12 +82,11 @@ export function QueryView(p: Props) {
             <button
               type="button"
               className="row effort"
-              aria-pressed={p.effort === "think"}
               onMouseDown={(e) => e.preventDefault()}
               onClick={p.onToggleEffort}
             >
               <span className="row-mark" aria-hidden="true" />
-              <span className="row-title">{p.effort === "think" ? "think" : "fast"}</span>
+              <span className="row-title">{shown}</span>
               <span className="tag">{keyWords(shortcut("effort").keys)}</span>
             </button>
           </>

@@ -44,12 +44,17 @@ const inMode = (mode: LaunchMode, extra: Partial<State> = {}): State => ({
   ...extra,
 });
 
+const EFFORTS: Record<string, string[]> = {
+  "a/1": ["low", "medium", "high"],
+  "b/2": ["low", "max"],
+};
 const tm = ["a/1", "b/2", "c/3"].map((id) => ({
   id,
   providerId: id.slice(0, 1),
   providerLabel: id,
   model: id.slice(2),
   local: false,
+  efforts: EFFORTS[id] ?? [],
 }));
 const withModes = (selected: string | null, mode: LaunchMode = "query") =>
   inMode(mode, { thinkingModes: { modes: tm, selected } });
@@ -168,7 +173,7 @@ describe("reducer", () => {
       expect(r.state.query.status).toBe("streaming");
       expect(r.effects).toEqual([
         { type: "loadThinkingModes" },
-        { type: "ask", token: 1, text: "cats", effort: "fast" },
+        { type: "ask", token: 1, text: "cats", effort: "auto" },
       ]);
     });
 
@@ -645,7 +650,7 @@ describe("reducer", () => {
   it("Query Enter submits the question with effort", () => {
     const s = inMode("query", { input: " why? " });
     const r = reduce(s, k("Enter"));
-    expect(r.effects[0]).toEqual({ type: "ask", token: 1, text: "why?", effort: "fast" });
+    expect(r.effects[0]).toEqual({ type: "ask", token: 1, text: "why?", effort: "auto" });
     expect(r.state.query.status).toBe("streaming");
   });
 
@@ -675,13 +680,6 @@ describe("reducer", () => {
     expect(r.effects).toEqual([
       { type: "search", seq: 1, mode: "command", text: "", sources: MODES.commands.sources },
     ]);
-  });
-
-  it("Ctrl+T toggles Fast/Think in Query only", () => {
-    const a = reduce(inMode("query"), k("t", { ctrl: true })).state;
-    expect(a.query.effort).toBe("think");
-    expect(reduce(a, k("t", { ctrl: true })).state.query.effort).toBe("fast");
-    expect(reduce(inMode("commands"), k("t", { ctrl: true })).state.query.effort).toBe("fast");
   });
 
   it("Ctrl+P is not a thinking-mode key (the browser prints on it)", () => {
@@ -734,7 +732,7 @@ describe("reducer", () => {
     const r = reduce(streaming({ input: "next" }), k("Enter"));
     expect(r.effects.slice(0, 2)).toEqual([
       { type: "cancelAsk", token: 0 },
-      { type: "ask", token: 1, text: "next", effort: "fast" },
+      { type: "ask", token: 1, text: "next", effort: "auto" },
     ]);
     const late = reduce(r.state, { type: "ask", token: 0, event: { type: "delta", text: "x" } });
     expect(late.state.query.text).toBe("");
@@ -895,7 +893,7 @@ describe("explain attachment", () => {
   it("Enter sends the default question with the attached text", () => {
     const r = reduce(captured(att()), k("Enter"));
     expect(r.effects).toEqual([
-      { type: "ask", token: 1, text: "Explain this", attachment: "some text", effort: "fast" },
+      { type: "ask", token: 1, text: "Explain this", attachment: "some text", effort: "auto" },
     ]);
   });
 
@@ -928,20 +926,81 @@ describe("explain attachment", () => {
 });
 
 describe("thinking modes", () => {
-  it("Tab cycles forward and wraps, Shift+Tab back, each persisted", () => {
-    let r = reduce(withModes("a/1"), k("Tab"));
+  const ctrlT = k("t", { ctrl: true });
+  const shiftTab = k("Tab", { shift: true });
+  const withEffort = (selected: string, effort: string, mode: LaunchMode = "query"): State => {
+    const s = withModes(selected, mode);
+    return { ...s, query: { ...s.query, effort } };
+  };
+
+  it("Ctrl+T cycles forward and wraps, each persisted", () => {
+    const r = reduce(withModes("a/1"), ctrlT);
     expect(r.state.thinkingModes.selected).toBe("b/2");
     expect(r.effects).toEqual([{ type: "setThinkingMode", id: "b/2" }]);
-    expect(reduce(withModes("c/3"), k("Tab")).state.thinkingModes.selected).toBe("a/1");
-    r = reduce(withModes("a/1"), k("Tab", { shift: true }));
-    expect(r.state.thinkingModes.selected).toBe("c/3");
+    expect(reduce(withModes("c/3"), ctrlT).state.thinkingModes.selected).toBe("a/1");
   });
 
-  it("is a no-op with one mode, none, or outside query", () => {
+  it("Ctrl+T is a no-op with one mode, none, or outside query", () => {
     const one = inMode("query", { thinkingModes: { modes: tm.slice(0, 1), selected: "a/1" } });
-    expect(reduce(one, k("Tab")).effects).toEqual([]);
-    expect(reduce(inMode("query"), k("Tab")).effects).toEqual([]);
-    expect(reduce(withModes("a/1", "find"), k("Tab")).effects).toEqual([]);
+    expect(reduce(one, ctrlT).effects).toEqual([]);
+    expect(reduce(inMode("query"), ctrlT).effects).toEqual([]);
+    expect(reduce(withModes("a/1", "find"), ctrlT).effects).toEqual([]);
+  });
+
+  it("plain Tab and Shift+Tab no longer move the model", () => {
+    expect(reduce(withModes("a/1"), k("Tab")).effects).toEqual([]);
+    expect(reduce(withModes("a/1"), k("Tab")).state.thinkingModes.selected).toBe("a/1");
+  });
+
+  it("Shift+Tab cycles auto, the levels, then auto, emitting setEffort each time", () => {
+    let s = withModes("a/1");
+    const seen: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = reduce(s, shiftTab);
+      s = r.state;
+      seen.push(s.query.effort);
+      expect(r.effects).toEqual([{ type: "setEffort", level: s.query.effort }]);
+    }
+    expect(seen).toEqual(["low", "medium", "high", "auto"]);
+  });
+
+  it("Shift+Tab does nothing when the model has no levels or outside query", () => {
+    const none = reduce(withModes("c/3"), shiftTab);
+    expect(none.effects).toEqual([]);
+    expect(none.state.query.effort).toBe("auto");
+    expect(reduce(withModes("a/1", "find"), shiftTab).effects).toEqual([]);
+  });
+
+  it("a stored level the model lacks counts as auto, and is not sent", () => {
+    const s = withEffort("a/1", "max");
+    expect(reduce(s, shiftTab).state.query.effort).toBe("low");
+    const ask = reduce({ ...s, input: "hi" }, k("Enter"));
+    expect(ask.effects).toContainEqual(expect.objectContaining({ type: "ask", effort: "auto" }));
+  });
+
+  it("the ask carries the stored level only if the selected model supports it", () => {
+    const ask = (s: State) =>
+      reduce({ ...s, input: "hi" }, k("Enter")).effects.find((e) => e.type === "ask");
+    expect(ask(withEffort("a/1", "high"))).toMatchObject({ effort: "high" });
+    expect(ask(withEffort("b/2", "high"))).toMatchObject({ effort: "auto" });
+    expect(ask(withEffort("b/2", "max"))).toMatchObject({ effort: "max" });
+  });
+
+  it("switching to a model with another list keeps the level only when supported", () => {
+    const s = withEffort("a/1", "low");
+    const next = reduce(s, ctrlT).state;
+    expect(next.thinkingModes.selected).toBe("b/2");
+    expect(reduce(next, shiftTab).state.query.effort).toBe("max");
+    const lost = reduce(withEffort("a/1", "medium"), ctrlT).state;
+    expect(reduce(lost, shiftTab).state.query.effort).toBe("low");
+  });
+
+  it("the stored effort survives shown and hidden, and the thinkingModes event sets it", () => {
+    const s = withEffort("a/1", "high");
+    expect(reduce(s, { type: "shown" }).state.query.effort).toBe("high");
+    expect(reduce(s, { type: "hidden" }).state.query.effort).toBe("high");
+    const ev: Event = { type: "thinkingModes", modes: tm, selected: "a/1", effort: "medium" };
+    expect(reduce(initialState(), ev).state.query.effort).toBe("medium");
   });
 
   it("ask carries the selected thinkingMode", () => {
@@ -953,7 +1012,7 @@ describe("thinking modes", () => {
     const typed = reduce(initialState(["apps", "ask"]), { type: "text", text: "cats" }).state;
     const titles = (s: State) => s.items.filter((i) => i.id === "ui:ask").map((i) => i.title);
     expect(titles(typed)).toEqual(["Ask your AI: “cats”"]);
-    const r = reduce(typed, { type: "thinkingModes", modes: tm, selected: "b/2" });
+    const r = reduce(typed, { type: "thinkingModes", modes: tm, selected: "b/2", effort: "auto" });
     expect(titles(r.state)).toEqual(["Ask b/2 · 2: “cats”"]);
   });
 
@@ -961,7 +1020,8 @@ describe("thinking modes", () => {
     expect(reduce(initialState(), { type: "tab", mode: "query" }).effects).toContainEqual({
       type: "loadThinkingModes",
     });
-    const r = reduce(initialState(), { type: "thinkingModes", modes: tm, selected: "c/3" });
+    const ev: Event = { type: "thinkingModes", modes: tm, selected: "c/3", effort: "high" };
+    const r = reduce(initialState(), ev);
     expect(r.state.thinkingModes.selected).toBe("c/3");
   });
 });

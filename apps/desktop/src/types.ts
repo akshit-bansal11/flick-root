@@ -51,7 +51,10 @@ export type Outcome =
   | { type: "needsConfirm"; token: string; expiresMs: number }
   | { type: "showItems"; items: Item[] };
 
-export type Effort = "fast" | "think";
+/** `auto` (the model default) or an effort level such as `low` or `high`. */
+export type Effort = string;
+
+export const EFFORT_AUTO = "auto";
 
 export interface SearchResponse {
   seq: number;
@@ -78,6 +81,8 @@ export interface ThinkingMode {
   providerLabel: string;
   model: string;
   local: boolean;
+  /** Effort levels this model supports, low to max; empty when it has none. */
+  efforts: string[];
 }
 
 /** Reply to `home_items`: recent picks and pinned item ids. */
@@ -89,6 +94,8 @@ export interface HomeView {
 export interface ThinkingModes {
   modes: ThinkingMode[];
   selected: string | null;
+  /** Stored effort: `auto` or a level. */
+  effort: string;
 }
 
 export type AskEvent =

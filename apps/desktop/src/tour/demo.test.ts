@@ -88,14 +88,14 @@ describe("demo runner", () => {
   });
   it("streams the canned answer and stops on cancel", () => {
     const { dispatched, runner } = setup();
-    runner.run({ type: "ask", token: 1, text: "q", effort: "fast" });
+    runner.run({ type: "ask", token: 1, text: "q", effort: "auto" });
     vi.advanceTimersByTime(2000);
     const deltas = dispatched.filter((e) => e.type === "ask" && e.event.type === "delta");
     expect(deltas).toHaveLength(DEMO_ANSWER.length);
     expect(dispatched.at(-1)).toMatchObject({ event: { type: "done" } });
 
     const second = setup();
-    second.runner.run({ type: "ask", token: 2, text: "q", effort: "fast" });
+    second.runner.run({ type: "ask", token: 2, text: "q", effort: "auto" });
     second.runner.run({ type: "cancelAsk", token: 2 });
     vi.advanceTimersByTime(2000);
     expect(second.dispatched).toEqual([]);

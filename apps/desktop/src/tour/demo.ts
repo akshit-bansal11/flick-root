@@ -123,6 +123,7 @@ export const DEMO_MODES: ThinkingMode[] = [
     providerLabel: "Local",
     model: "llama3.2",
     local: true,
+    efforts: [],
   },
   {
     id: "demo-claude",
@@ -130,6 +131,7 @@ export const DEMO_MODES: ThinkingMode[] = [
     providerLabel: "Claude",
     model: "sonnet",
     local: false,
+    efforts: ["low", "medium", "high"],
   },
 ];
 
@@ -263,6 +265,7 @@ export function createDemoRunner(host: DemoHost) {
                 type: "thinkingModes",
                 modes: DEMO_MODES,
                 selected: DEMO_MODES[0]?.id ?? null,
+                effort: "auto",
               }),
             0,
           );
@@ -274,6 +277,7 @@ export function createDemoRunner(host: DemoHost) {
         case "loadHome":
         case "togglePin":
         case "setThinkingMode":
+        case "setEffort":
         case "previewTheme":
         case "revertTheme":
         case "applyTheme":

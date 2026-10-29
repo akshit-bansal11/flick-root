@@ -8,7 +8,7 @@ const base = {
   question: "why",
   provider: "Ollama",
   model: null,
-  effort: "fast" as const,
+  effort: "auto",
   text: "",
   error: null,
   noProvider: false,
@@ -17,8 +17,22 @@ const base = {
   onOpenLink: () => {},
 };
 const modes = [
-  { id: "a/m1", providerId: "a", providerLabel: "Ollama", model: "m1", local: true },
-  { id: "b/m2", providerId: "b", providerLabel: "OpenAI", model: "m2", local: false },
+  {
+    id: "a/m1",
+    providerId: "a",
+    providerLabel: "Ollama",
+    model: "m1",
+    local: true,
+    efforts: [],
+  },
+  {
+    id: "b/m2",
+    providerId: "b",
+    providerLabel: "OpenAI",
+    model: "m2",
+    local: false,
+    efforts: ["low", "high"],
+  },
 ];
 const render = (props: Partial<Parameters<typeof QueryView>[0]>) => {
   const c = document.body.appendChild(document.createElement("div"));
@@ -58,16 +72,16 @@ describe("QueryView", () => {
   });
 
   it("keeps the AI answer marker while streaming and after the answer is done", () => {
-    const ai = { provider: "Local", model: "llama3.2" };
+    const ai = { provider: "Local", model: "llama3.2", modes, selectedMode: "b/m2" };
     const c = render({ ...ai, streaming: true });
-    const marker = "AI answer · Local · llama3.2 · fast";
+    const marker = "AI answer · Local · llama3.2 · auto";
     expect(c.querySelector(".ai-mark")?.textContent).toBe(marker);
     act(() => root?.render(<QueryView {...base} {...ai} streaming text="Hi" />));
     expect(c.querySelector(".ai-mark")?.textContent).toBe(marker);
     act(() => root?.render(<QueryView {...base} {...ai} text="Hi there" />));
     expect(c.querySelector(".ai-mark")?.textContent).toBe(marker);
-    act(() => root?.render(<QueryView {...base} {...ai} effort="think" text="Hi there" />));
-    expect(c.querySelector(".ai-mark")?.textContent).toBe("AI answer · Local · llama3.2 · think");
+    act(() => root?.render(<QueryView {...base} {...ai} effort="high" text="Hi there" />));
+    expect(c.querySelector(".ai-mark")?.textContent).toBe("AI answer · Local · llama3.2 · high");
   });
 
   it("leaves effort out of the marker when the provider has no reasoning control", () => {
@@ -108,27 +122,37 @@ describe("QueryView", () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
-  it("effort row reflects the effort and toggles on click", () => {
+  it("effort row shows the effective effort and cycles on click", () => {
     const toggle = vi.fn();
-    const c = render({ onToggleEffort: toggle });
+    const c = render({ modes, selectedMode: "b/m2", onToggleEffort: toggle });
     const btn = () => c.querySelector("button.row.effort");
-    expect(btn()?.getAttribute("aria-pressed")).toBe("false");
-    expect(btn()?.textContent).toBe("fastctrl+t");
+    expect(btn()?.hasAttribute("aria-pressed")).toBe(false);
+    expect(btn()?.textContent).toBe("autoshift+tab");
     act(() => btn()?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(toggle).toHaveBeenCalledOnce();
-    act(() => root?.render(<QueryView {...base} effort="think" />));
-    expect(btn()?.getAttribute("aria-pressed")).toBe("true");
-    expect(btn()?.textContent).toBe("thinkctrl+t");
+    act(() =>
+      root?.render(<QueryView {...base} modes={modes} selectedMode="b/m2" effort="high" />),
+    );
+    expect(btn()?.textContent).toBe("highshift+tab");
+    act(() =>
+      root?.render(<QueryView {...base} modes={modes} selectedMode="b/m2" effort="max" />),
+    );
+    expect(btn()?.textContent).toBe("autoshift+tab");
   });
 
   it("mousedown on the effort row is default-prevented so the input keeps focus", () => {
-    const c = render({});
+    const c = render({ modes, selectedMode: "b/m2" });
     const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
     act(() => c.querySelector("button.row.effort")?.dispatchEvent(down));
     expect(down.defaultPrevented).toBe(true);
   });
 
-  it("hides the effort row when reasoning is false", () => {
-    expect(render({ reasoning: false }).querySelector(".effort")).toBeNull();
+  it("hides the effort row when reasoning is false or the model has no levels", () => {
+    const noReasoning = render({ modes, selectedMode: "b/m2", reasoning: false });
+    expect(noReasoning.querySelector(".effort")).toBeNull();
+    act(() => root?.unmount());
+    expect(render({ modes, selectedMode: "a/m1" }).querySelector(".effort")).toBeNull();
+    act(() => root?.unmount());
+    expect(render({}).querySelector(".effort")).toBeNull();
   });
 });
