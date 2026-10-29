@@ -2,7 +2,7 @@
 
 ## Welcome screen
 
-On first launch, setup opens with a welcome screen: the animated logo, the five prefixes (`/`, `>`, `=`, `?`, `@`) and "Take a 2-minute interactive tour?" with two buttons.
+On first launch, setup opens with a welcome screen: the animated logo, the four prefixes (`/`, `>`, `=`, `?`) and "Take a 2-minute interactive tour?" with two buttons.
 
 - **Take the tour** starts the tour.
 - **Not now** shows a note that you can take the tour any time from Settings > General > Take the tour, then Continue.

@@ -12,7 +12,7 @@ describe("Welcome", () => {
     render(<Welcome note={false} {...f} />);
     expect(screen.getByText("Take a 2-minute interactive tour?")).toBeTruthy();
     const chips = [...document.querySelectorAll(".fr-chip")];
-    expect(chips).toHaveLength(5);
+    expect(chips).toHaveLength(4);
     for (const [i, m] of Object.values(MODES).entries()) {
       expect(chips[i]?.querySelector("kbd")?.textContent).toBe(m.prefix);
     }

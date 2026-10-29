@@ -129,7 +129,7 @@ const MODES = [
 export function Features() {
   return (
     <section aria-labelledby="features">
-      <h2 className="mb-2 text-2xl font-semibold">Five prefixes, one bar</h2>
+      <h2 className="mb-2 text-2xl font-semibold">Four prefixes, one bar</h2>
       <p className="mb-4 text-muted">
         Type a prefix first to narrow the search. Plain text with no prefix searches apps and
         commands and always offers Find, Web and Ask.

@@ -136,7 +136,7 @@ describe("Tour", () => {
 
   it("Finish marks the tutorial done", async () => {
     const { onDone } = await mount();
-    for (let i = 0; i < 10; i++) click("next");
+    for (let i = 0; i < 9; i++) click("next");
     expect(title()).toBe("You are set");
     click("finish");
     await act(async () => {});
@@ -146,7 +146,7 @@ describe("Tour", () => {
 
   const toThemes = async () => {
     await mount();
-    for (let i = 0; i < 9; i++) click("next");
+    for (let i = 0; i < 8; i++) click("next");
   };
   const demoBg = () => screen.getByTestId("demo").style.getPropertyValue("--l-bg");
 

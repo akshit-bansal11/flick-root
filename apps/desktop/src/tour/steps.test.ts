@@ -26,10 +26,10 @@ describe("tour steps", () => {
   it("run open to done with unique ids", () => {
     expect(TOUR_STEPS[0]?.id).toBe("open");
     expect(TOUR_STEPS.at(-1)?.id).toBe("done");
-    expect(TOUR_STEPS).toHaveLength(11);
+    expect(TOUR_STEPS).toHaveLength(10);
     expect(new Set(TOUR_STEPS.map((s) => s.id)).size).toBe(TOUR_STEPS.length);
   });
-  it("follow the prefix order and end with the five prefixes", () => {
+  it("follow the prefix order and end with the four prefixes", () => {
     expect(TOUR_STEPS.map((s) => s.id)).toEqual([
       "open",
       "plain",
