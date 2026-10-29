@@ -13,12 +13,9 @@ export function useLauncher(
   initialShown?: ipc.ShownEvent | null,
 ) {
   const [state, setState] = useState<State>(() => initialState());
-  const panelRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   const ask = useRef<{ token: number; id: string | null }>({ token: 0, id: null });
   const cancelled = useRef(new Set<number>());
-  const lastHeight = useRef(0);
-  const syncHeight = useRef((_force: boolean) => {});
   const copiedTimer = useRef<number | undefined>(undefined);
   /** The saved theme in use (last shown or applied); revert puts this back. */
   const saved = useRef<ActiveTheme | null>(null);
@@ -187,14 +184,12 @@ export function useLauncher(
       }
       inputRef.current?.focus();
       requestAnimationFrame(() => {
-        syncHeight.current(true);
         ipc.reportShown(p.shownId).catch(warn);
       });
     };
     const unlisten = [
       ipc.onShown(onShown),
       ipc.onHidden(() => {
-        lastHeight.current = 0;
         dispatch({ type: "hidden" });
       }),
       ipc.onExplainCaptured((c) =>
@@ -219,21 +214,6 @@ export function useLauncher(
       for (const u of unlisten) u.then((fn) => fn()).catch(warn);
     };
   }, [dispatch, inputRef]);
-
-  // Window height follows the panel; unless forced (after show), only a changed height crosses IPC.
-  useEffect(() => {
-    const el = panelRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    syncHeight.current = (force) => {
-      const h = Math.round(el.getBoundingClientRect().height);
-      if (h === 0 || (!force && h === lastHeight.current)) return;
-      lastHeight.current = h;
-      ipc.resizeLauncher(h).catch(warn);
-    };
-    const ro = new ResizeObserver(() => syncHeight.current(false));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -273,7 +253,6 @@ export function useLauncher(
 
   return {
     state,
-    panelRef,
     removeAttachment,
     selectTab,
     setText,

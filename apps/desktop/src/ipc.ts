@@ -78,8 +78,6 @@ export const webSearch = (text: string) => invoke<Outcome>("web_search", { text 
 
 export const hideLauncher = () => invoke<void>("hide_launcher");
 
-export const resizeLauncher = (height: number) => invoke<void>("resize_launcher", { height });
-
 export const reportShown = (shownId: number) => invoke<void>("report_shown", { shownId });
 
 export const openSettings = (section?: string) => invoke<void>("open_settings", { section });

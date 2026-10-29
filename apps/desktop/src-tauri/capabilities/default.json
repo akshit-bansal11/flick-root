@@ -8,7 +8,6 @@
     "core:event:allow-unlisten",
     "allow-report-shown",
     "allow-hide-launcher",
-    "allow-resize-launcher",
     "allow-open-settings",
     "allow-tray-action",
     "allow-search",

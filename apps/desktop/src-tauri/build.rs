@@ -2,7 +2,6 @@ fn main() {
     let commands = &[
         "report_shown",
         "hide_launcher",
-        "resize_launcher",
         "open_settings",
         "tray_action",
         "search",

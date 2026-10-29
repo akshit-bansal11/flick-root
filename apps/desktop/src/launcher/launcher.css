@@ -12,6 +12,8 @@ body,
 .launcher {
   position: relative;
   width: 100%;
+  /* The window is sized once per show and never resizes, so the panel fills it. */
+  height: 100vh;
   max-height: var(--l-panel-max);
   display: flex;
   flex-direction: column;
@@ -33,6 +35,8 @@ body,
 .launcher-body {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
 }
 
@@ -169,6 +173,7 @@ body,
 
 .split {
   display: flex;
+  flex: 1 1 auto;
   min-height: 0;
 }
 

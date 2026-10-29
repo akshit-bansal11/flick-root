@@ -1,4 +1,4 @@
-import type { Ref, RefObject } from "react";
+import type { RefObject } from "react";
 import { Attachment } from "../query/Attachment";
 import type { LaunchMode } from "../types";
 import "../query/attachment.css";
@@ -8,7 +8,7 @@ import { InputBar } from "./InputBar";
 import { isPinnable, themeRow } from "./kinds";
 import { ModeTabs } from "./ModeTabs";
 import { LISTBOX_ID, optionId, Results } from "./Results";
-import { availableModes, DEFAULT_QUESTION, type State } from "./reducer";
+import { availableModes, DEFAULT_QUESTION, MODES, type State } from "./reducer";
 import { ShortcutSheet } from "./ShortcutSheet";
 import { StatusLine } from "./StatusLine";
 import { countsOf, statusHints } from "./status";
@@ -18,7 +18,6 @@ import { Welcome } from "./Welcome";
 export interface LauncherViewProps {
   state: State;
   inputRef: RefObject<HTMLInputElement | null>;
-  panelRef?: Ref<HTMLDivElement>;
   removeAttachment: () => void;
   selectTab: (mode: LaunchMode) => void;
   setText: (text: string) => void;
@@ -33,7 +32,6 @@ export interface LauncherViewProps {
 export function LauncherView({
   state,
   inputRef,
-  panelRef,
   removeAttachment,
   selectTab,
   setText,
@@ -71,9 +69,14 @@ export function LauncherView({
   const blank = state.mode === "none" && state.input.trim() === "";
   const welcome = blank && state.homeReady && state.home.length === 0;
   const activeId = state.items.length > 0 ? optionId(state.selected) : undefined;
+  // A mode tab with nothing typed: say what the mode does instead of leaving the list blank.
+  const hint =
+    state.mode !== "none" && state.mode !== "query" && state.input.trim() === ""
+      ? MODES[state.mode].desc
+      : undefined;
 
   return (
-    <div ref={panelRef} className={state.visible ? "launcher show" : "launcher"}>
+    <div className={state.visible ? "launcher show" : "launcher"}>
       <InputBar
         mode={state.mode}
         value={state.input}
@@ -121,6 +124,7 @@ export function LauncherView({
             selected={state.selected}
             query={state.input}
             pending={state.pending}
+            hint={hint}
             onActivate={activate}
             detail={selected && <DetailPane item={selected} ctx={ctx} onPress={press} />}
           />

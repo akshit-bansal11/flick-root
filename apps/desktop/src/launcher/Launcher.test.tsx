@@ -6,6 +6,7 @@ import * as ipc from "../ipc";
 import type { Appearance, ThemeRoles, ThemeView } from "../theme";
 import type { ExplainCaptured, Item } from "../types";
 import { Launcher } from "./Launcher";
+import { MODES } from "./reducer";
 
 vi.mock("../ipc", () => ({
   search: vi.fn(),
@@ -88,13 +89,6 @@ async function mount() {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
 });
 afterEach(() => {
   localStorage.clear();
@@ -421,6 +415,18 @@ describe("Launcher", () => {
       fireEvent.click(screen.getByRole("tab", { name: "/open" }));
     });
     expect(screen.getByTestId("prompt").textContent).toBe("/");
+  });
+
+  it("a mode tab with nothing typed shows what the mode does", async () => {
+    await mount();
+    vi.mocked(ipc.search).mockImplementation((req) =>
+      Promise.resolve({ seq: req.seq, items: [], group: null }),
+    );
+    act(() => {
+      fireEvent.click(screen.getByRole("tab", { name: ">commands" }));
+    });
+    await act(async () => {});
+    expect(document.querySelector(".right .empty")?.textContent).toBe(MODES.commands.desc);
   });
 
   it("shows group label, subtitle and mode footer", async () => {

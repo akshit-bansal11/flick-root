@@ -5,8 +5,8 @@ use std::time::Instant;
 use crate::error::CommandError;
 use serde_json::json;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, Monitor, PhysicalPosition, PhysicalSize, State,
-    WebviewWindow, WindowEvent,
+    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, State, WebviewWindow,
+    WindowEvent,
 };
 
 /// Label of the single launcher window.
@@ -16,7 +16,7 @@ pub const LABEL: &str = "launcher";
 const PANEL_W: f64 = 820.0;
 /// Tallest panel in logical px. Keep equal to `--l-panel-max` in tokens.css.
 const PANEL_MAX_H: f64 = 540.0;
-/// Shortest window in logical px (the input row alone). Keep equal to `--l-input` in tokens.css.
+/// Floor for the panel height in logical px, for tiny work areas.
 const PANEL_MIN_H: f64 = 56.0;
 /// Gap kept between the panel and the work-area edge, in logical px.
 const WORK_MARGIN: f64 = 24.0;
@@ -32,23 +32,20 @@ fn max_height(work_h: u32, scale: f64) -> f64 {
     (f64::from(work_h) / scale - WORK_MARGIN).clamp(PANEL_MIN_H, PANEL_MAX_H)
 }
 
-/// Window size `(w, h)` in physical px for a panel `height` logical px tall in a work area
-/// `work_h` physical px high at `scale`; the height is capped to what the work area fits.
-fn panel_size(work_h: u32, scale: f64, height: f64) -> (u32, u32) {
+/// Window size `(w, h)` in physical px for the full panel in a work area `work_h` physical px
+/// high at `scale`; the height is capped to what the work area fits.
+fn panel_size(work_h: u32, scale: f64) -> (u32, u32) {
     let w = (PANEL_W * scale).round();
-    let h = (height.min(max_height(work_h, scale)) * scale).round();
+    let h = (max_height(work_h, scale) * scale).round();
     (w as u32, h as u32)
 }
 
-/// Window origin and size in physical px for a panel `height` logical px tall in a
-/// work area `(x, y, w, h)` at `scale`: centred across, never above the work area.
-///
-/// The top is where a full-height panel would be centred; independent of `height`.
-fn layout(work: (i32, i32, u32, u32), scale: f64, height: f64) -> (i32, i32, u32, u32) {
-    let (w, h) = panel_size(work.3, scale, height);
-    let tallest = (max_height(work.3, scale) * scale).round();
+/// Window origin and size in physical px for the full panel in a work area `(x, y, w, h)` at
+/// `scale`: centred in both directions, never above the work area.
+fn layout(work: (i32, i32, u32, u32), scale: f64) -> (i32, i32, u32, u32) {
+    let (w, h) = panel_size(work.3, scale);
     let x = f64::from(work.0) + (f64::from(work.2) - f64::from(w)) / 2.0;
-    let y = f64::from(work.1) + ((f64::from(work.3) - tallest) / 2.0).max(0.0);
+    let y = f64::from(work.1) + ((f64::from(work.3) - f64::from(h)) / 2.0).max(0.0);
     (x.round() as i32, y.round() as i32, w, h)
 }
 
@@ -79,14 +76,6 @@ fn menu_layout(work: (i32, i32, u32, u32), scale: f64, anchor: (f64, f64)) -> (i
     (x.round() as i32, y.round() as i32, w as u32, h as u32)
 }
 
-fn clamp_height(h: f64) -> f64 {
-    if h.is_finite() {
-        h.clamp(PANEL_MIN_H, PANEL_MAX_H)
-    } else {
-        PANEL_MIN_H
-    }
-}
-
 /// Timing and monitor state shared between toggles and `report_shown`.
 #[derive(Default)]
 pub struct ShowState {
@@ -97,8 +86,6 @@ pub struct ShowState {
 struct Inner {
     shown_id: u64,
     t0: Option<Instant>,
-    /// Last logical window height set by the UI.
-    height: Option<f64>,
     /// Dark flag last given to the native frame (its Windows 11 border follows it).
     dark: bool,
     /// Whether the window currently shows the tray menu instead of the launcher.
@@ -307,7 +294,6 @@ pub fn show_menu(app: &AppHandle, anchor: PhysicalPosition<f64>) {
         tracing::error!("launcher window missing");
         return;
     };
-    // Set first so a resize from the UI cannot move the menu.
     set_menu(app, true);
     match monitor_at(app, anchor.x, anchor.y) {
         Ok(Some(m)) => {
@@ -396,21 +382,15 @@ fn sync_frame(app: &AppHandle, win: &WebviewWindow) {
     }
 }
 
-/// Sizes the window to the panel and places it on the monitor under the cursor.
-/// The top is fixed for this show; later height changes keep it.
+/// Sizes the window to the full panel and places it on the monitor under the cursor.
+/// The size is fixed for this show: the panel never resizes while open, so the window cannot
+/// trail the content.
 fn place(app: &AppHandle, win: &WebviewWindow) -> anyhow::Result<()> {
     let cursor = app.cursor_position()?;
     let Some(m) = monitor_at(app, cursor.x, cursor.y)? else {
         return Ok(());
     };
-    let state: State<ShowState> = app.state();
-    let height = state
-        .inner
-        .lock()
-        .map_err(|_| anyhow::anyhow!("state poisoned"))?
-        .height
-        .unwrap_or(PANEL_MIN_H);
-    place_panel(win, &m, height)?;
+    place_panel(win, &m)?;
     Ok(())
 }
 
@@ -428,14 +408,12 @@ fn monitor_at(app: &AppHandle, x: f64, y: f64) -> tauri::Result<Option<Monitor>>
     Ok((i < monitors.len()).then(|| monitors.swap_remove(i)))
 }
 
-/// Sizes the window to a panel `height` logical px tall, centred across `m`'s work area with
-/// its top fixed at the full-height position.
-fn place_panel(win: &WebviewWindow, m: &Monitor, height: f64) -> tauri::Result<()> {
+/// Sizes the window to the full-height panel (capped to `m`'s work area), centred in it.
+fn place_panel(win: &WebviewWindow, m: &Monitor) -> tauri::Result<()> {
     let (wa, scale) = (m.work_area(), m.scale_factor());
     let (x, y, w, h) = layout(
         (wa.position.x, wa.position.y, wa.size.width, wa.size.height),
         scale,
-        height,
     );
     set_bounds(win, PhysicalPosition::new(x, y), PhysicalSize::new(w, h))
 }
@@ -451,40 +429,6 @@ fn set_bounds(
     win.set_position(pos)?;
     win.set_size(size)?;
     win.set_position(pos)
-}
-
-/// Grows or shrinks the window to the panel's content height (logical px). Changes the
-/// height only; the top-left stays where `place` put it.
-#[tauri::command]
-pub async fn resize_launcher(
-    app: AppHandle,
-    state: State<'_, ShowState>,
-    height: f64,
-) -> Result<(), CommandError> {
-    let win = app
-        .get_webview_window(LABEL)
-        .ok_or_else(|| CommandError::new("window_missing", "launcher window missing"))?;
-    let h = clamp_height(height);
-    {
-        let mut s = state
-            .inner
-            .lock()
-            .map_err(|_| CommandError::new("internal", "state poisoned"))?;
-        // The tray menu has a fixed size; the launcher lays itself out again on its next show.
-        if s.menu {
-            return Ok(());
-        }
-        s.height = Some(h);
-    }
-    match win.current_monitor() {
-        Ok(Some(m)) => {
-            let (w, ph) = panel_size(m.work_area().size.height, m.scale_factor(), h);
-            win.set_size(PhysicalSize::new(w, ph))
-        }
-        _ => win.set_size(LogicalSize::new(PANEL_W, h)),
-    }
-    .map_err(|e| CommandError::new("window", e.to_string()))?;
-    Ok(())
 }
 
 /// Called by the UI after paint; logs hotkey-to-paint latency.
@@ -522,45 +466,24 @@ mod tests {
         // 1920x1040 work area with a 40px taskbar at the bottom.
         let (w, h) = (PANEL_W as u32, PANEL_MAX_H as u32);
         assert_eq!(
-            layout((0, 0, 1920, 1040), 1.0, PANEL_MAX_H),
+            layout((0, 0, 1920, 1040), 1.0),
             (((1920 - w) / 2) as i32, ((1040 - h) / 2) as i32, w, h)
-        );
-    }
-
-    #[test]
-    fn layout_centres_a_short_panel() {
-        // Input row alone: the top is where a full-height panel would sit.
-        let (w, h) = (PANEL_W as u32, PANEL_MIN_H as u32);
-        assert_eq!(
-            layout((0, 0, 1920, 1040), 1.0, PANEL_MIN_H),
-            (((1920 - w) / 2) as i32, (1040 - 540) / 2, w, h)
         );
     }
 
     #[test]
     fn layout_scales_and_offsets() {
         // Second monitor to the right, 150%.
-        let (x, y, w, h) = layout((1920, 0, 2880, 1500), 1.5, 200.0);
+        let (x, y, w, h) = layout((1920, 0, 2880, 1500), 1.5);
         let pw = (PANEL_W * 1.5) as u32;
-        assert_eq!((w, h), (pw, 300));
+        assert_eq!((w, h), (pw, 810));
         assert_eq!(x, 1920 + ((2880 - pw) / 2) as i32);
         assert_eq!(y, (1500 - 810) / 2);
     }
 
     #[test]
-    fn layout_top_is_independent_of_height() {
-        let work = (0, 10, 800, 300);
-        let (_, y0, _, _) = layout(work, 1.0, PANEL_MIN_H);
-        for height in [56.0, 200.0, 540.0] {
-            let (_, y, _, h) = layout(work, 1.0, height);
-            assert_eq!(y, y0);
-            assert!(y + h as i32 <= 10 + 300, "panel runs past the work area");
-        }
-    }
-
-    #[test]
     fn panel_size_caps_to_the_work_area() {
-        let (_, h) = panel_size(680, 1.5, PANEL_MAX_H);
+        let (_, h) = panel_size(680, 1.5);
         assert_eq!(h, ((680.0 / 1.5 - WORK_MARGIN) * 1.5_f64).round() as u32);
     }
 
@@ -573,7 +496,7 @@ mod tests {
 
     #[test]
     fn layout_never_above_work_area() {
-        let (_, y, _, _) = layout((0, 10, 800, 300), 1.0, PANEL_MAX_H);
+        let (_, y, _, _) = layout((0, 10, 800, 300), 1.0);
         assert!(y >= 10, "panel top above the work area: {y}");
         assert_eq!(y, 10 + (WORK_MARGIN / 2.0) as i32);
     }
@@ -688,13 +611,5 @@ mod tests {
             menu_layout((100, 50, 200, 100), 1.0, (150.0, 160.0)),
             (100, 50, 280, 187)
         );
-    }
-
-    #[test]
-    fn height_is_clamped() {
-        assert_eq!(clamp_height(10.0), PANEL_MIN_H);
-        assert_eq!(clamp_height(9999.0), PANEL_MAX_H);
-        assert_eq!(clamp_height(f64::NAN), PANEL_MIN_H);
-        assert_eq!(clamp_height(200.0), 200.0);
     }
 }

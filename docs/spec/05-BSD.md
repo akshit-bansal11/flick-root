@@ -201,7 +201,6 @@ All commands are `async` and return `Result<T, CommandError>`. `CommandError` is
 | `set_feature_enabled` | `id, enabled` | `FeatureView` | `unknown_feature`, `start_failed` | Features |
 | `set_mode_enabled` | `mode, enabled` | `()` | `locked` (Command) | Features |
 | `set_feature_options` | `id, options: json` | `FeatureView` | `invalid_options` | Features |
-| `resize_launcher` | `height` (clamped) | `()` | `window_missing` | Launcher |
 | `list_thinking_modes` | none | `{ modes: Vec<{ id, provider_id, provider_label, model, local }>, selected? }` (every enabled provider x model, fallback order; stale or missing `selected` means the first) | none | Launcher (Ask) |
 | `set_thinking_mode` | `id` | `()` | see `providers.rs` | Launcher (Ask) |
 | `get_appearance` / `set_appearance` | none / `{ theme, glass, scheme }` | `AppearanceView` | `invalid_value` | Appearance |

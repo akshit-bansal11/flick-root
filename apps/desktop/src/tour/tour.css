@@ -35,6 +35,7 @@
 }
 
 .demo .launcher {
+  height: auto;
   max-height: calc(var(--l-input) + var(--l-row) * 7 + var(--l-foot-h));
 }
 

@@ -14,7 +14,6 @@ vi.mock("./ipc", () => ({
   homeItems: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   togglePin: vi.fn(() => Promise.resolve({ items: [], pins: [] })),
   hideLauncher: vi.fn(() => Promise.resolve()),
-  resizeLauncher: vi.fn(() => Promise.resolve()),
   reportShown: vi.fn(() => Promise.resolve()),
   openSettings: vi.fn(() => Promise.resolve()),
   trayAction: vi.fn(() => Promise.resolve()),
@@ -47,13 +46,6 @@ async function mount() {
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      disconnect() {}
-    },
-  );
 });
 afterEach(() => {
   localStorage.clear();

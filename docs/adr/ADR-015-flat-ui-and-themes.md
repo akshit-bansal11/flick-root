@@ -22,6 +22,10 @@ checked for a few hand-written palettes only, and users could not bring their ow
   tab strip (Open, Commands, Calc, Ask, Projects), then two panes: the list on the left and the
   detail pane on the right, then a status line. Ask shows models and effort on the left and the
   answer on the right. Keyboard shortcuts are shown as lowercase words, for example `ctrl+tab`.
+  The panel is a fixed height per show (`PANEL_MAX_H`, capped to the work area) and never resizes
+  while open: the list and detail area fills the space and scrolls inside, and the status line stays
+  at the bottom. A window that followed its content resized twice per keystroke, and the native
+  resize trailed the page, clipping the footer or showing the desktop below the panel.
 - **Shortcuts.** `ctrl+tab` and `ctrl+shift+tab` switch mode tabs. `ctrl+p` pins or unpins in Home
   and Open. Typing `theme` in Commands opens the theme quick pick, which previews live. The table is
   `apps/desktop/src/shortcuts.ts`.

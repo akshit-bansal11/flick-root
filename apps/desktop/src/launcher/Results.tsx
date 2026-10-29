@@ -13,12 +13,22 @@ interface Props {
   query: string;
   /** True while a search is in flight; the empty state waits for its results. */
   pending?: boolean;
+  /** Muted line shown when the list is empty and nothing is typed (a mode tab's description). */
+  hint?: string;
   onActivate: (index: number, mods: { ctrl: boolean; shift: boolean }) => void;
   /** Right pane content for the selected row. */
   detail?: ReactNode;
 }
 
-export function Results({ items, selected, query, pending = false, onActivate, detail }: Props) {
+export function Results({
+  items,
+  selected,
+  query,
+  pending = false,
+  hint,
+  onActivate,
+  detail,
+}: Props) {
   // Window of MAX_ROWS rows that always contains the selection.
   const start = Math.max(0, Math.min(selected - MAX_ROWS + 1, items.length - MAX_ROWS));
   const visible = items.slice(start, start + MAX_ROWS);
@@ -50,6 +60,9 @@ export function Results({ items, selected, query, pending = false, onActivate, d
       </div>
       <div className="right">
         {detail}
+        {items.length === 0 && !pending && query.trim() === "" && hint && (
+          <div className="empty">{hint}</div>
+        )}
         {items.length === 0 && !pending && query.trim() !== "" && (
           <div className="empty">No matches</div>
         )}

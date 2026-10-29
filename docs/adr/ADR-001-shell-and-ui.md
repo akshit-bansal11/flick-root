@@ -16,7 +16,7 @@ Flick is a keyboard-first launcher for Windows. It needs a window that appears w
 
 ## Launcher placement and material
 
-- The window is the panel: it is sized to the bar plus its results, and its height follows the results (`resize_launcher`).
+- The window is the panel: it is sized once per show to the full panel height and never resizes while open (see ADR-015).
 - It is centred on the monitor under the cursor when shown, and re-centred on its monitor at every height change, so the input moves as the list grows. A fixed input position sat too close to the top edge of a laptop screen.
 - The backdrop is Windows acrylic with rounded corners, set from `window.rs` and `crates/win/src/dwm.rs`. The palette is the Design Lab dark theme (`#14171D`).
 - When Windows transparency effects are off, the panel is opaque.
