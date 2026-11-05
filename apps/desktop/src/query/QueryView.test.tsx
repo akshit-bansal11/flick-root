@@ -134,9 +134,7 @@ describe("QueryView", () => {
       root?.render(<QueryView {...base} modes={modes} selectedMode="b/m2" effort="high" />),
     );
     expect(btn()?.textContent).toBe("highshift+tab");
-    act(() =>
-      root?.render(<QueryView {...base} modes={modes} selectedMode="b/m2" effort="max" />),
-    );
+    act(() => root?.render(<QueryView {...base} modes={modes} selectedMode="b/m2" effort="max" />));
     expect(btn()?.textContent).toBe("autoshift+tab");
   });
 
